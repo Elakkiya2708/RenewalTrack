@@ -58,6 +58,10 @@
       appName: "RenewalTrack",
       tagline: "Renewal Tracking System",
       main: "Main",
+      teamManagement: "Team Management",
+      teamMembers: "Team Members",
+      inviteMembers: "Invite Members",
+      auditLogs: "Audit Logs",
       account: "Account",
       dashboard: "Dashboard",
       records: "Renewal Records",
@@ -145,6 +149,10 @@
       appName: "ரினீவல் ட்ராக்",
       tagline: "புதுப்பித்தல் கண்காணிப்பு அமைப்பு",
       main: "முதன்மை",
+      teamManagement: "குழு மேலாண்மை",
+      teamMembers: "குழு உறுப்பினர்கள்",
+      inviteMembers: "உறுப்பினர்களை அழைக்க",
+      auditLogs: "தணிக்கை பதிவுகள்",
       account: "கணக்கு",
       dashboard: "முகப்பு பலகை",
       records: "புதுப்பித்தல் பதிவுகள்",
@@ -1294,18 +1302,43 @@
     const user = getCurrentUser();
     const role = user.role || "Admin";
 
-    // 1. Ensure TEAM MANAGEMENT section exists for Admin
-    let teamLabel = nav.querySelector(".sidebar-team-label");
-    if (!teamLabel) {
+    // 1. Clean up any dynamic duplicate links or labels previously injected
+    nav.querySelectorAll(".sidebar-team-link, .sidebar-team-label").forEach((el) => el.remove());
+
+    // 2. Remove duplicate nav links if any
+    const seenHrefs = new Set();
+    nav.querySelectorAll(".nav-link").forEach((link) => {
+      const href = link.getAttribute("href");
+      if (seenHrefs.has(href)) {
+        link.remove();
+      } else {
+        seenHrefs.add(href);
+      }
+    });
+
+    // 3. Remove duplicate section labels if any
+    const seenLabels = new Set();
+    nav.querySelectorAll(".sidebar-section-label").forEach((lbl) => {
+      const key = (lbl.getAttribute("data-role") || "") + ":" + lbl.textContent.trim().toLowerCase();
+      if (seenLabels.has(key)) {
+        lbl.remove();
+      } else {
+        seenLabels.add(key);
+      }
+    });
+
+    // 4. Ensure Team Management links exist for Admin only if missing
+    const hasTeamLink = nav.querySelector("a[href='team.html']");
+    if (!hasTeamLink) {
       const accountLabel = Array.from(nav.querySelectorAll(".sidebar-section-label")).find(
-        (el) => el.textContent.trim().toLowerCase() === "account"
+        (el) => el.textContent.trim().toLowerCase() === "account" || el.textContent.trim().toLowerCase() === "கணக்கு"
       );
 
       const teamHtml = `
-        <div class="sidebar-section-label sidebar-team-label" data-role="Admin">Team Management</div>
-        <a href="team.html" class="nav-link sidebar-team-link" data-role="Admin"><i data-lucide="users" class="icon"></i>Team Members</a>
-        <a href="team.html#invite" class="nav-link sidebar-team-link" data-role="Admin"><i data-lucide="user-plus" class="icon"></i>Invite Members</a>
-        <a href="audit.html" class="nav-link sidebar-team-link" data-role="Admin"><i data-lucide="clipboard-list" class="icon"></i>Audit Logs</a>
+        <div class="sidebar-section-label" data-role="Admin">Team Management</div>
+        <a href="team.html" class="nav-link" data-role="Admin"><i data-lucide="users" class="icon"></i>Team Members</a>
+        <a href="team.html#invite" class="nav-link" data-role="Admin"><i data-lucide="user-plus" class="icon"></i>Invite Members</a>
+        <a href="audit.html" class="nav-link" data-role="Admin"><i data-lucide="clipboard-list" class="icon"></i>Audit Logs</a>
       `;
 
       if (accountLabel) {
@@ -1313,16 +1346,17 @@
       } else {
         nav.insertAdjacentHTML("beforeend", teamHtml);
       }
+      refreshIcons();
     }
 
-    // 2. Remove "My Profile" from sidebar across all dashboards (profile is managed in Settings)
+    // 5. Remove "My Profile" from sidebar across all dashboards (profile is managed in Settings)
     const profileLink = nav.querySelector("a[href='profile.html']");
     if (profileLink) {
       profileLink.remove();
     }
 
-    // 3. Control visibility based on role
-    const teamItems = nav.querySelectorAll("[data-role='Admin'], .sidebar-team-label, .sidebar-team-link");
+    // 6. Control visibility based on role (Team Management is Admin only)
+    const teamItems = nav.querySelectorAll("[data-role='Admin']");
     teamItems.forEach((el) => {
       if (role === "Admin") {
         el.style.display = "";
@@ -1333,7 +1367,7 @@
 
     initSidebarActive();
 
-    // 4. Apply read-only protections if Viewer
+    // 7. Apply read-only protections if Viewer
     if (role === "Viewer") {
       applyViewerRestrictions();
     }
@@ -1575,6 +1609,9 @@
       "history.html": dict.history,
       "documents.html": dict.documents,
       "reports.html": dict.reports,
+      "team.html": dict.teamMembers || "Team Members",
+      "team.html#invite": dict.inviteMembers || "Invite Members",
+      "audit.html": dict.auditLogs || "Audit Logs",
       "settings.html": dict.settings,
     };
     document.querySelectorAll(".sidebar-nav .nav-link").forEach((link) => {
@@ -1587,8 +1624,14 @@
       }
     });
 
-    document.querySelectorAll(".sidebar-section-label").forEach((el, idx) => {
-      el.textContent = idx === 0 ? dict.main : dict.account;
+    document.querySelectorAll(".sidebar-section-label").forEach((el) => {
+      if (el.getAttribute("data-role") === "Admin" || el.textContent.toLowerCase().includes("team") || el.textContent.includes("குழு")) {
+        el.textContent = dict.teamManagement || "Team Management";
+      } else if (el.textContent.trim().toLowerCase() === "main" || el.textContent.trim() === "முதன்மை" || (el.parentElement && el === el.parentElement.querySelector(".sidebar-section-label"))) {
+        el.textContent = dict.main;
+      } else {
+        el.textContent = dict.account;
+      }
     });
 
     // Topbar search placeholder
