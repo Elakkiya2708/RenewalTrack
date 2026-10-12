@@ -65,10 +65,6 @@ router.get("/", async (req, res) => {
 // GET /api/renewals/assignees — Get active employee users available for assignment
 router.get("/assignees", async (req, res) => {
   try {
-    const actor = await getReqUser(req);
-    if (!actor) {
-      return res.status(401).json({ ok: false, error: "Authentication required. Please log in." });
-    }
     const employees = await db.getActiveEmployees();
     res.json({ ok: true, data: employees });
   } catch (err) {
@@ -269,28 +265,26 @@ router.put("/:id", async (req, res) => {
       const createdBy = (existing.createdBy || "").toLowerCase();
 
       const isAssigned =
-        (existingAssigneeId && existingAssigneeId === actor.id) ||
-        (!respEmail && !respName) ||
-        respEmail === actor.email.toLowerCase() ||
-        respName === actor.fullName.toLowerCase() ||
-        createdBy === actor.email.toLowerCase();
+        (existingAssigneeId && String(existingAssigneeId) === String(actor.id)) ||
+        (respEmail && respEmail === actor.email.toLowerCase()) ||
+        (respName && respName === actor.fullName.toLowerCase()) ||
+        (createdBy && createdBy === actor.email.toLowerCase());
 
       if (!isAssigned) {
         return res.status(403).json({
           ok: false,
-          error: "Access denied. Employees may only modify renewals assigned to them.",
+          error: "Access denied. Employees may only manage renewals assigned to them.",
         });
       }
 
-      // Requirement 6: Employees must NOT change assignments unless explicitly authorized
+      // Requirement 6: Employees must NOT change assignments
       if (
-        updates.assignedToId &&
-        existingAssigneeId &&
-        updates.assignedToId !== existingAssigneeId
+        updates.assignedToId !== undefined &&
+        String(updates.assignedToId || "") !== String(existingAssigneeId || "")
       ) {
         return res.status(403).json({
           ok: false,
-          error: "Access denied. Only Administrators can reassign renewals.",
+          error: "Access denied. Only Administrators can assign or reassign renewals.",
         });
       }
 
@@ -333,9 +327,23 @@ router.put("/:id", async (req, res) => {
         updates.responsibleEmail = newlyAssignedUser.email;
         isReassigned = true;
       } else if (!updates.assignedToId) {
+        if (existingAssigneeId) {
+          await db.logAudit({
+            actorId: actor.id || "admin",
+            actorName: actor.fullName,
+            actorEmail: actor.email,
+            actorRole: actor.role,
+            action: "RENEWAL_UNASSIGNED",
+            targetType: "renewal",
+            targetId: req.params.id,
+            details: `Unassigned renewal "${existing.name}" (previously assigned to ${existingAssigneeName}).`,
+          });
+        }
         updates.assignedToId = null;
         updates.assignedToName = null;
         updates.assignedToEmail = null;
+        updates.responsiblePerson = "";
+        updates.responsibleEmail = "";
       }
     }
 

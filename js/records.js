@@ -39,33 +39,104 @@
     return "File";
   }
 
-  async function loadAssignableEmployees() {
-    try {
-      if (RTS.team && RTS.team.getAssignableEmployees) {
-        assignableEmployees = await RTS.team.getAssignableEmployees();
-      }
-    } catch (e) {
-      console.warn("Could not load assignees:", e);
+  let assigneesStatus = "idle"; // "idle" | "loading" | "success" | "empty" | "error"
+  let loadAssigneesPromise = null;
+
+  async function loadAssignableEmployees(forceRefresh = false) {
+    if (loadAssigneesPromise && !forceRefresh) {
+      return loadAssigneesPromise;
     }
-    populateAssigneeSelect();
+    assigneesStatus = "loading";
+    const sel = document.getElementById("in_assignedTo");
+    if (sel && (!assignableEmployees || !assignableEmployees.length)) {
+      sel.innerHTML = `<option value="" disabled selected>⏳ Loading active employees from database…</option>`;
+    }
+    loadAssigneesPromise = (async () => {
+      try {
+        let list = [];
+        if (RTS.team && RTS.team.getAssignableEmployees) {
+          list = await RTS.team.getAssignableEmployees();
+        } else {
+          const res = await fetch("/api/renewals/assignees");
+          const json = await res.json();
+          if (json && json.ok && Array.isArray(json.data)) list = json.data;
+        }
+        assignableEmployees = Array.isArray(list) ? list : [];
+        assigneesStatus = assignableEmployees.length > 0 ? "success" : "empty";
+      } catch (e) {
+        console.warn("Could not load assignees from database:", e);
+        assigneesStatus = "error";
+      }
+      return assignableEmployees;
+    })();
+    return loadAssigneesPromise;
   }
 
-  function populateAssigneeSelect() {
+  function populateAssigneeSelect(selectedId = null, fallback = null) {
     const sel = document.getElementById("in_assignedTo");
     if (!sel) return;
-    const currentVal = sel.value;
-    sel.innerHTML = `<option value="">Select Employee…</option>`;
+    const currentVal = selectedId !== null ? selectedId : sel.value;
+
+    if (assigneesStatus === "loading") {
+      sel.innerHTML = `<option value="" disabled selected>⏳ Loading active employees from database…</option>`;
+      return;
+    }
+
+    if (assigneesStatus === "error") {
+      sel.innerHTML = `
+        <option value="">— Unassigned —</option>
+        <option value="" disabled>⚠️ Failed to load employees from database</option>
+      `;
+      if (currentVal && fallback && fallback.fullName) {
+        sel.insertAdjacentHTML(
+          "beforeend",
+          `<option value="${RTS.escapeHtml(currentVal)}" selected>${RTS.escapeHtml(fallback.fullName)} (Current Assignee)</option>`
+        );
+      }
+      return;
+    }
+
+    if (assigneesStatus === "empty" || !assignableEmployees.length) {
+      sel.innerHTML = `<option value="">— Unassigned — (No active employees found in database)</option>`;
+      if (currentVal && fallback && fallback.fullName) {
+        sel.insertAdjacentHTML(
+          "beforeend",
+          `<option value="${RTS.escapeHtml(currentVal)}" selected>${RTS.escapeHtml(fallback.fullName)} (Current Assignee)</option>`
+        );
+      }
+      return;
+    }
+
+    // Successfully loaded active employees
+    sel.innerHTML = `<option value="">— Unassigned —</option>`;
+    let hasMatched = !currentVal;
+
     assignableEmployees.forEach((emp) => {
       const name = emp.fullName || emp.name || "Employee";
       const email = emp.email || "";
       const role = emp.role ? ` (${emp.role})` : "";
+      const isSelected = currentVal && String(emp.id) === String(currentVal);
+      if (isSelected) hasMatched = true;
       sel.insertAdjacentHTML(
         "beforeend",
-        `<option value="${emp.id}" data-name="${RTS.escapeHtml(name)}" data-email="${RTS.escapeHtml(email)}">${RTS.escapeHtml(name)}${role} — ${RTS.escapeHtml(email)}</option>`
+        `<option value="${emp.id}" ${isSelected ? "selected" : ""} data-name="${RTS.escapeHtml(name)}" data-email="${RTS.escapeHtml(email)}">${RTS.escapeHtml(name)}${role} — ${RTS.escapeHtml(email)}</option>`
       );
     });
+
+    // If record has an assignee not present in active list (e.g. deactivated account, or unlisted), dynamically preserve it
+    if (currentVal && !hasMatched) {
+      const fbName = fallback ? (fallback.fullName || fallback.name) : "Assigned User";
+      const fbEmail = fallback ? fallback.email : "";
+      sel.insertAdjacentHTML(
+        "beforeend",
+        `<option value="${RTS.escapeHtml(currentVal)}" selected>${RTS.escapeHtml(fbName)} ${fbEmail ? "— " + RTS.escapeHtml(fbEmail) : ""}</option>`
+      );
+    }
+
     if (currentVal) {
       sel.value = currentVal;
+    } else {
+      sel.value = "";
     }
   }
 
@@ -311,24 +382,30 @@
     renderUploadList();
   }
 
-  function openAdd() {
+  async function openAdd() {
     if (RTS.auth.isViewer()) {
       RTS.toast("Viewer role has read-only access and cannot create renewals.", "error");
       return;
     }
     editingId = null;
     resetForm();
-    populateAssigneeSelect();
 
     const sel = document.getElementById("in_assignedTo");
     const help = document.getElementById("assignedToHelp");
     const respInput = document.getElementById("in_responsible");
     const emailInput = document.getElementById("in_responsibleEmail");
 
+    if (sel) {
+      sel.innerHTML = `<option value="" disabled selected>⏳ Loading active employees from database…</option>`;
+    }
+
+    await loadAssignableEmployees();
+
     if (RTS.auth.isEmployee()) {
       const u = RTS.auth.getCurrentUser();
       const matched = assignableEmployees.find((e) => String(e.id) === String(u.id) || (e.email && e.email.toLowerCase() === (u.email || "").toLowerCase()));
       const empId = matched ? matched.id : u.id;
+      populateAssigneeSelect(empId, { id: empId, fullName: u.fullName || u.name, email: u.email });
       if (sel) {
         sel.value = empId || "";
         sel.disabled = true;
@@ -339,12 +416,13 @@
       if (respInput) respInput.value = (matched && (matched.fullName || matched.name)) || u.fullName || u.name || "";
       if (emailInput) emailInput.value = (matched && matched.email) || u.email || "";
     } else {
+      populateAssigneeSelect("");
       if (sel) {
         sel.disabled = false;
         sel.value = "";
       }
       if (help) {
-        help.textContent = "Employee responsible for managing this renewal.";
+        help.textContent = "Select an active employee, or leave as Unassigned.";
       }
       if (respInput) respInput.value = "";
       if (emailInput) emailInput.value = "";
@@ -354,7 +432,7 @@
     RTS.modal.open("renewalModal");
   }
 
-  function openEdit(id) {
+  async function openEdit(id) {
     if (RTS.auth.isViewer()) {
       RTS.toast("Viewer role has read-only access and cannot edit renewals.", "error");
       return;
@@ -367,27 +445,43 @@
     }
     editingId = id;
     resetForm();
-    populateAssigneeSelect();
 
     const sel = document.getElementById("in_assignedTo");
     const help = document.getElementById("assignedToHelp");
 
     let targetAssigneeId = record.assignedToId || record.assigned_to_id || "";
-    if (!targetAssigneeId) {
-      const email = (record.assignedToEmail || record.assigned_to_email || record.responsibleEmail || record.responsible_email || "").toLowerCase();
-      const name = (record.assignedToName || record.assigned_to_name || record.responsiblePerson || record.responsible_person || "").toLowerCase();
-      const found = assignableEmployees.find((e) => (e.email && e.email.toLowerCase() === email) || ((e.fullName || e.name || "").toLowerCase() === name));
+    const fallbackName = record.assignedToName || record.assigned_to_name || record.responsiblePerson || record.responsible_person || "";
+    const fallbackEmail = record.assignedToEmail || record.assigned_to_email || record.responsibleEmail || record.responsible_email || "";
+
+    if (sel) {
+      sel.innerHTML = `<option value="" disabled selected>⏳ Loading active employees from database…</option>`;
+    }
+
+    await loadAssignableEmployees();
+
+    if (!targetAssigneeId && (fallbackEmail || fallbackName)) {
+      const fEmail = fallbackEmail.toLowerCase();
+      const fName = fallbackName.toLowerCase();
+      const found = assignableEmployees.find(
+        (e) => (e.email && e.email.toLowerCase() === fEmail) || ((e.fullName || e.name || "").toLowerCase() === fName)
+      );
       if (found) targetAssigneeId = found.id;
     }
 
+    populateAssigneeSelect(targetAssigneeId, { id: targetAssigneeId, fullName: fallbackName, email: fallbackEmail });
+
     if (sel) {
-      sel.value = targetAssigneeId || "";
+      if (targetAssigneeId) {
+        sel.value = targetAssigneeId;
+      } else {
+        sel.value = "";
+      }
       if (RTS.auth.isEmployee()) {
         sel.disabled = true;
         if (help) help.textContent = "Assignment is locked. Only Admins can reassign renewals.";
       } else {
         sel.disabled = false;
-        if (help) help.textContent = "Employee responsible for managing this renewal.";
+        if (help) help.textContent = "Assign or reassign to an active employee, or leave Unassigned.";
       }
     }
 
@@ -473,7 +567,7 @@
     req("in_name", "f_name");
     req("in_category", "f_category");
     req("in_organization", "f_organization");
-    req("in_assignedTo", "f_assignedTo");
+    // in_assignedTo is optional to support Unassigned state
     req("in_issueDate", "f_issueDate");
     req("in_expiryDate", "f_expiryDate");
 
@@ -508,10 +602,15 @@
 
     const cycleInput = document.getElementById("in_recurringCycle");
     const sel = document.getElementById("in_assignedTo");
-    const assignedId = sel ? sel.value : null;
-    const matchedEmp = assignableEmployees.find((emp) => String(emp.id) === String(assignedId));
-    const assignedName = matchedEmp ? (matchedEmp.fullName || matchedEmp.name) : (document.getElementById("in_responsible") ? document.getElementById("in_responsible").value.trim() : "");
-    const assignedEmail = matchedEmp ? (matchedEmp.email || "") : (document.getElementById("in_responsibleEmail") ? document.getElementById("in_responsibleEmail").value.trim() : "");
+    const assignedId = sel && sel.value ? sel.value.trim() : null;
+    let assignedName = null;
+    let assignedEmail = null;
+
+    if (assignedId) {
+      const matchedEmp = assignableEmployees.find((emp) => String(emp.id) === String(assignedId));
+      assignedName = matchedEmp ? (matchedEmp.fullName || matchedEmp.name) : (document.getElementById("in_responsible").value.trim() || null);
+      assignedEmail = matchedEmp ? (matchedEmp.email || "") : (document.getElementById("in_responsibleEmail").value.trim() || "");
+    }
 
     const data = {
       name: document.getElementById("in_name").value.trim(),
@@ -524,8 +623,8 @@
       assignedToId: assignedId || null,
       assignedToName: assignedName,
       assignedToEmail: assignedEmail,
-      responsiblePerson: assignedName,
-      responsibleEmail: assignedEmail,
+      responsiblePerson: assignedName || "",
+      responsibleEmail: assignedEmail || "",
       issueDate: document.getElementById("in_issueDate").value,
       expiryDate: document.getElementById("in_expiryDate").value,
       reminderDate: document.getElementById("in_reminderDate").value,
@@ -1015,11 +1114,11 @@
     const editId = params.get("edit");
     if (editId) {
       history.replaceState(null, "", window.location.pathname);
-      setTimeout(() => openEdit(editId), 50);
+      openEdit(editId);
     }
     if (window.location.hash === "#add") {
       history.replaceState(null, "", window.location.pathname);
-      if (!RTS.auth.isViewer()) setTimeout(openAdd, 50);
+      if (!RTS.auth.isViewer()) openAdd();
     } else if (window.location.hash === "#import") {
       history.replaceState(null, "", window.location.pathname);
       setTimeout(() => {

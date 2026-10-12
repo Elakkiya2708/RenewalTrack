@@ -213,12 +213,15 @@
         </div>
         <div class="field-row">
           <div class="field" id="f_assignedTo">
-            <label for="in_assignedTo">Assigned To (Employee) <span class="req">*</span></label>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <label for="in_assignedTo">Assigned To (Employee) <span style="font-size:11px;font-weight:normal;color:var(--text-low);">(Optional)</span></label>
+              <span id="assignedToBadge" style="font-size:11px;color:var(--accent-text);"></span>
+            </div>
             <select class="input" id="in_assignedTo">
-              <option value="">Select Employee…</option>
+              <option value="">— Unassigned —</option>
             </select>
             <span class="cell-sub" id="assignedToHelp" style="font-size:11px;margin-top:2px;">Employee responsible for managing this renewal</span>
-            <span class="error-msg">Please select an assigned employee.</span>
+            <span class="error-msg">Please select an assigned employee or leave Unassigned.</span>
           </div>
           <div class="field" id="f_responsibleEmail">
             <label for="in_responsibleEmail">Alert / Notification Email</label>

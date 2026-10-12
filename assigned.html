@@ -9,9 +9,153 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
+  <style>
+    /* Scoped Dark Navy & Purple Aesthetics for Assigned to Me */
+    .assigned-hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.22), rgba(168, 85, 247, 0.22));
+      border: 1px solid rgba(129, 140, 248, 0.35);
+      color: #a5b4fc;
+      padding: 4px 11px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .assigned-stat-card {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(129, 140, 248, 0.16);
+      background: linear-gradient(180deg, rgba(17, 24, 39, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%);
+      border-radius: 12px;
+      padding: 18px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    }
+
+    .assigned-stat-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(168, 85, 247, 0.45);
+      box-shadow: 0 12px 28px -6px rgba(79, 70, 229, 0.22);
+    }
+
+    .stat-icon-wrap {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .stat-icon-total {
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.25), rgba(147, 51, 234, 0.25));
+      color: #a78bfa;
+      border: 1px solid rgba(167, 139, 250, 0.35);
+    }
+
+    .stat-icon-due {
+      background: rgba(245, 158, 11, 0.18);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+
+    .stat-icon-overdue {
+      background: rgba(239, 68, 68, 0.18);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+
+    .stat-icon-completed {
+      background: rgba(16, 185, 129, 0.18);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+
+    /* Urgency Warning Badges */
+    .urgency-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .urgency-overdue {
+      background: rgba(239, 68, 68, 0.16);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+
+    .urgency-today {
+      background: rgba(220, 38, 38, 0.28);
+      color: #fca5a5;
+      border: 1px solid #ef4444;
+      animation: pulse-danger 2s infinite ease-in-out;
+    }
+
+    .urgency-soon {
+      background: rgba(245, 158, 11, 0.16);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+
+    .urgency-safe {
+      background: rgba(16, 185, 129, 0.14);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .urgency-completed {
+      background: rgba(99, 102, 241, 0.18);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.35);
+    }
+
+    @keyframes pulse-danger {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.65; }
+    }
+
+    /* Skeleton Shimmer Loading */
+    .skeleton-box {
+      background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 6px;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .locked-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--text-mid);
+      background: var(--bg-surface-2);
+      padding: 2px 7px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+  </style>
   <script src="js/app.js"></script>
 </head>
-<body>
+<body class="theme-indigo-dark">
 <div class="app-layout">
   <!-- Sidebar -->
   <aside class="sidebar">
@@ -76,51 +220,77 @@
     <main class="content">
       <div class="page-header">
         <div>
-          <div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:4px;">
-            <span class="badge badge-info" style="font-size:11px;padding:3px 8px;text-transform:uppercase;letter-spacing:0.5px;">Employee Workspace</span>
+          <div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span class="assigned-hero-badge"><i data-lucide="shield" style="width:12px;height:12px;"></i> Employee Workspace</span>
+            <span id="employeeBadgeName" style="font-size:12px;color:var(--text-mid);"></span>
           </div>
           <h1>Assigned to Me</h1>
           <p>Renewals currently assigned to your account for tracking, management, and renewal execution.</p>
         </div>
         <div class="page-header-actions">
+          <button class="btn btn-secondary" id="refreshBtn" title="Refresh records"><i data-lucide="rotate-cw" class="icon"></i>Refresh</button>
           <button class="btn btn-secondary" id="exportMyCsvBtn"><i data-lucide="download" class="icon"></i>Export CSV</button>
           <a class="btn btn-primary" href="records.html#add"><i data-lucide="plus" class="icon"></i>Create Renewal</a>
         </div>
       </div>
 
-      <!-- KPI Stat Cards -->
-      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:16px;margin-bottom:20px;">
-        <div class="card stat-card">
-          <div class="stat-body">
+      <!-- Error Alert (Hidden by default) -->
+      <div id="assignedErrorAlert" style="display:none;margin-bottom:18px;padding:12px 16px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:10px;color:#f87171;font-size:13px;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <i data-lucide="alert-octagon" class="icon" style="color:#ef4444;width:18px;height:18px;"></i>
+          <span id="assignedErrorText">Unable to load assigned renewals.</span>
+        </div>
+        <button class="btn btn-sm btn-secondary" id="retryLoadBtn" style="padding:4px 10px;font-size:11.5px;">Retry</button>
+      </div>
+
+      <!-- Summary KPI Stat Cards (4 required: Total Assigned, Due Soon, Overdue, Completed) -->
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:16px;margin-bottom:24px;">
+        <!-- 1. Total Assigned -->
+        <div class="assigned-stat-card">
+          <div>
             <div class="stat-label">Total Assigned</div>
-            <div class="stat-value" id="statTotalAssigned">0</div>
-            <div class="stat-sub">Across all categories</div>
+            <div class="stat-value" id="statTotalAssigned" style="font-size:26px;font-weight:700;color:var(--text-hi);">0</div>
+            <div class="stat-sub" style="font-size:12px;color:var(--text-mid);margin-top:2px;">All active assignments</div>
           </div>
-          <div class="stat-icon" style="background:var(--accent-glow);color:var(--accent);"><i data-lucide="user-check" class="icon"></i></div>
-        </div>
-        <div class="card stat-card">
-          <div class="stat-body">
-            <div class="stat-label">Active &amp; Good</div>
-            <div class="stat-value text-success" id="statActiveAssigned">0</div>
-            <div class="stat-sub">&gt; 30 days remaining</div>
+          <div class="stat-icon-wrap stat-icon-total">
+            <i data-lucide="clipboard-list" class="icon" style="width:22px;height:22px;"></i>
           </div>
-          <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:var(--success);"><i data-lucide="check-circle" class="icon"></i></div>
         </div>
-        <div class="card stat-card">
-          <div class="stat-body">
+
+        <!-- 2. Due Soon -->
+        <div class="assigned-stat-card">
+          <div>
             <div class="stat-label">Due Soon</div>
-            <div class="stat-value text-warning" id="statDueSoonAssigned">0</div>
-            <div class="stat-sub">Action required &le; 30d</div>
+            <div class="stat-value text-warning" id="statDueSoonAssigned" style="font-size:26px;font-weight:700;">0</div>
+            <div class="stat-sub" style="font-size:12px;color:var(--text-mid);margin-top:2px;">Expiring within 30 days</div>
           </div>
-          <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:var(--warning);"><i data-lucide="clock" class="icon"></i></div>
+          <div class="stat-icon-wrap stat-icon-due">
+            <i data-lucide="clock" class="icon" style="width:22px;height:22px;"></i>
+          </div>
         </div>
-        <div class="card stat-card">
-          <div class="stat-body">
-            <div class="stat-label">Overdue / Expired</div>
-            <div class="stat-value text-danger" id="statExpiredAssigned">0</div>
-            <div class="stat-sub">Immediate renewal needed</div>
+
+        <!-- 3. Overdue -->
+        <div class="assigned-stat-card">
+          <div>
+            <div class="stat-label">Overdue</div>
+            <div class="stat-value text-danger" id="statOverdueAssigned" style="font-size:26px;font-weight:700;">0</div>
+            <div class="stat-sub" style="font-size:12px;color:var(--text-mid);margin-top:2px;">Immediate action required</div>
           </div>
-          <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:var(--danger);"><i data-lucide="alert-triangle" class="icon"></i></div>
+          <div class="stat-icon-wrap stat-icon-overdue">
+            <i data-lucide="alert-triangle" class="icon" style="width:22px;height:22px;"></i>
+          </div>
+        </div>
+
+        <!-- 4. Completed -->
+        <div class="assigned-stat-card">
+          <div>
+            <div class="stat-label">Completed</div>
+            <div class="stat-value text-success" id="statCompletedAssigned" style="font-size:26px;font-weight:700;">0</div>
+            <div class="stat-sub" style="font-size:12px;color:var(--text-mid);margin-top:2px;">Successfully renewed</div>
+          </div>
+          <div class="stat-icon-wrap stat-icon-completed">
+            <i data-lucide="check-circle-2" class="icon" style="width:22px;height:22px;"></i>
+          </div>
         </div>
       </div>
 
@@ -136,9 +306,9 @@
         <select class="select-filter" id="assignedFilterStatus">
           <option value="">All Statuses</option>
           <option value="active">Active</option>
-          <option value="due-soon">Due Soon</option>
-          <option value="expired">Expired</option>
-          <option value="renewed">Renewed</option>
+          <option value="due-soon">Due Soon (&le;30d)</option>
+          <option value="expired">Overdue / Expired</option>
+          <option value="renewed">Completed (Renewed)</option>
         </select>
         <select class="select-filter" id="assignedFilterPriority">
           <option value="">All Priorities</option>
@@ -146,37 +316,166 @@
           <option value="Medium">Medium</option>
           <option value="Low">Low</option>
         </select>
+        <button class="btn btn-ghost btn-sm" id="resetFiltersBtn" style="font-size:12px;padding:6px 10px;" title="Reset search & filters">
+          <i data-lucide="filter-x" class="icon" style="width:14px;height:14px;"></i> Clear
+        </button>
         <div class="table-toolbar-spacer"></div>
         <span class="text-mid" id="assignedResultCount" style="font-size:12.5px;"></span>
       </div>
 
       <!-- Table Section -->
       <div class="table-wrap">
-        <table class="data-table">
+        <!-- Skeleton loader container -->
+        <div id="assignedSkeletonWrap" style="display:none;padding:16px;">
+          <div class="skeleton-box" style="height:36px;margin-bottom:12px;width:100%;"></div>
+          <div class="skeleton-box" style="height:44px;margin-bottom:8px;width:100%;"></div>
+          <div class="skeleton-box" style="height:44px;margin-bottom:8px;width:100%;"></div>
+          <div class="skeleton-box" style="height:44px;margin-bottom:8px;width:100%;"></div>
+          <div class="skeleton-box" style="height:44px;margin-bottom:8px;width:100%;"></div>
+        </div>
+
+        <table class="data-table" id="assignedTable">
           <thead>
             <tr>
               <th data-i18n="recordId">Record ID</th>
-              <th data-i18n="recordName">Record Name</th>
+              <th data-i18n="recordName">Renewal Name</th>
               <th data-i18n="category">Category</th>
               <th data-i18n="organization">Organization</th>
               <th id="sortExpiry"><span data-i18n="expiryDate">Expiry Date</span> <i data-lucide="arrow-up-down" class="sort-icon"></i></th>
-              <th data-i18n="recurringCycle">Cycle</th>
-              <th data-i18n="cost">Cost</th>
-              <th data-i18n="status">Status</th>
               <th data-i18n="priority">Priority</th>
-              <th data-i18n="actions">Actions</th>
+              <th data-i18n="status">Status</th>
+              <th>Remaining Days</th>
+              <th data-i18n="actions" style="text-align:right;">Actions</th>
             </tr>
           </thead>
           <tbody id="assignedTableBody"></tbody>
         </table>
-        <div id="assignedEmptyState" class="empty-state hidden">
-          <i data-lucide="folder-check" class="icon"></i>
-          <h4>No renewals assigned to you yet</h4>
-          <p>Renewals assigned to your authenticated account by administrators will show up here.</p>
+
+        <!-- Empty State: When no renewals assigned to this account -->
+        <div id="assignedEmptyState" class="empty-state hidden" style="padding:48px 24px;">
+          <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg, rgba(79,70,229,0.2), rgba(168,85,247,0.2));border:1px solid rgba(129,140,248,0.3);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">
+            <i data-lucide="folder-check" class="icon" style="width:28px;height:28px;color:#a5b4fc;"></i>
+          </div>
+          <h4 style="font-size:16px;font-weight:700;margin-bottom:6px;color:var(--text-hi);">No renewals assigned to you yet</h4>
+          <p style="max-width:440px;margin:0 auto 18px;color:var(--text-mid);font-size:13px;line-height:1.5;">
+            Renewals assigned to your authenticated account by administrators will show up here. You can also create a new renewal or view team records.
+          </p>
+          <div style="display:flex;gap:10px;justify-content:center;">
+            <a class="btn btn-secondary" href="records.html"><i data-lucide="file-text" class="icon"></i>Browse All Records</a>
+            <a class="btn btn-primary" href="records.html#add"><i data-lucide="plus" class="icon"></i>Create Renewal</a>
+          </div>
         </div>
+
+        <!-- Empty State: When filters return 0 results -->
+        <div id="assignedNoMatchesState" class="empty-state hidden" style="padding:40px 20px;">
+          <i data-lucide="search-x" class="icon" style="color:var(--text-low);width:36px;height:36px;margin-bottom:8px;"></i>
+          <h4 style="font-size:15px;font-weight:600;margin-bottom:4px;color:var(--text-hi);">No matching assigned renewals found</h4>
+          <p style="font-size:12.5px;color:var(--text-mid);margin-bottom:12px;">Try adjusting or clearing your search term and filters.</p>
+          <button class="btn btn-secondary btn-sm" id="clearFiltersBtn"><i data-lucide="x" class="icon"></i>Clear Filters</button>
+        </div>
+
         <div class="pagination" id="assignedPagination"></div>
       </div>
     </main>
+  </div>
+</div>
+
+<!-- Quick Edit Modal for Permitted Renewal Updates (Employee Role) -->
+<div class="modal-overlay" id="quickEditModal">
+  <div class="modal modal-md">
+    <div class="modal-header">
+      <h3 style="display:flex;align-items:center;gap:8px;">
+        <i data-lucide="edit-3" class="icon" style="color:var(--accent);"></i>
+        <span>Update Renewal Details</span>
+      </h3>
+      <button class="modal-close" data-close-modal="quickEditModal"><i data-lucide="x" class="icon"></i></button>
+    </div>
+    <form id="quickEditForm" novalidate>
+      <input type="hidden" id="qe_id" />
+      <div class="modal-body">
+        <!-- Assignment Notice Banner -->
+        <div style="background:linear-gradient(135deg, rgba(79,70,229,0.12), rgba(168,85,247,0.12));border:1px solid rgba(129,140,248,0.25);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;font-size:12px;">
+          <div>
+            <strong style="color:#a5b4fc;display:block;">Assigned to Your Account</strong>
+            <span style="color:var(--text-mid);">Assignment ownership is protected. Only Admins can reassign renewals.</span>
+          </div>
+          <span class="locked-badge"><i data-lucide="lock" style="width:11px;height:11px;"></i> Locked</span>
+        </div>
+
+        <div class="field" id="qef_name">
+          <label for="qe_name">Record Name <span class="req">*</span></label>
+          <input class="input" id="qe_name" />
+          <span class="error-msg">Record name is required.</span>
+        </div>
+
+        <div class="field-row">
+          <div class="field" id="qef_category">
+            <label for="qe_category">Category <span class="req">*</span></label>
+            <select class="input" id="qe_category"></select>
+            <span class="error-msg">Category is required.</span>
+          </div>
+          <div class="field" id="qef_priority">
+            <label for="qe_priority">Priority <span class="req">*</span></label>
+            <select class="input" id="qe_priority">
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field" id="qef_organization">
+            <label for="qe_organization">Organization / Provider <span class="req">*</span></label>
+            <input class="input" id="qe_organization" />
+            <span class="error-msg">Organization is required.</span>
+          </div>
+          <div class="field" id="qef_reference">
+            <label for="qe_reference">Reference Number</label>
+            <input class="input" id="qe_reference" />
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field" id="qef_issueDate">
+            <label for="qe_issueDate">Issue Date <span class="req">*</span></label>
+            <input class="input" type="date" id="qe_issueDate" />
+            <span class="error-msg">Issue date is required.</span>
+          </div>
+          <div class="field" id="qef_expiryDate">
+            <label for="qe_expiryDate">Expiry Date <span class="req">*</span></label>
+            <input class="input" type="date" id="qe_expiryDate" />
+            <span class="error-msg">Expiry date must be after issue date.</span>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field" id="qef_cost">
+            <label for="qe_cost">Renewal Cost</label>
+            <input class="input" type="number" step="0.01" min="0" id="qe_cost" />
+            <span class="error-msg">Enter a valid non-negative cost.</span>
+          </div>
+          <div class="field" id="qef_currency">
+            <label for="qe_currency">Currency</label>
+            <select class="input" id="qe_currency"></select>
+          </div>
+        </div>
+
+        <div class="field" id="qef_cycle">
+          <label for="qe_cycle">Recurring Cycle</label>
+          <select class="input" id="qe_cycle"></select>
+        </div>
+
+        <div class="field" id="qef_notes">
+          <label for="qe_notes">Notes &amp; Execution Remarks</label>
+          <textarea class="input" id="qe_notes" placeholder="Add tracking updates, vendor replies, or remarks"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer modal-footer-between">
+        <button type="button" class="btn btn-secondary" data-close-modal="quickEditModal">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i data-lucide="check" class="icon"></i>Save Changes</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -241,23 +540,6 @@
         <button type="submit" class="btn btn-primary"><i data-lucide="check" class="icon"></i>Confirm Renewal</button>
       </div>
     </form>
-  </div>
-</div>
-
-<!-- Delete Confirmation Modal -->
-<div class="modal-overlay" id="deleteModal">
-  <div class="modal modal-sm">
-    <div class="modal-header">
-      <h3>Delete Renewal</h3>
-      <button class="modal-close" data-close-modal="deleteModal"><i data-lucide="x" class="icon"></i></button>
-    </div>
-    <div class="modal-body">
-      <p class="text-mid">Are you sure you want to delete <strong id="deleteRecordName"></strong>? This cannot be undone.</p>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" data-close-modal="deleteModal">Cancel</button>
-      <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
-    </div>
   </div>
 </div>
 
