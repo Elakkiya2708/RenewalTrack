@@ -78,11 +78,12 @@
     const css = getComputedStyle(document.body);
     const cv = (name) => css.getPropertyValue(name).trim();
     const colors = { active: cv("--success"), "due-soon": cv("--warning"), expired: cv("--danger"), renewed: cv("--blue") };
-    const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+    const actualTotal = statuses.length;
+    const divisor = actualTotal || 1;
 
     let acc = 0;
     const segments = Object.keys(counts).map((key) => {
-      const pct = (counts[key] / total) * 100;
+      const pct = (counts[key] / divisor) * 100;
       const seg = `${colors[key]} ${acc}% ${acc + pct}%`;
       acc += pct;
       return seg;
@@ -90,12 +91,12 @@
 
     const donut = document.getElementById("statusDonut");
     donut.style.background =
-      total === 0
-        ? "var(--bg-surface-2)"
+      actualTotal === 0
+        ? "var(--border-subtle)"
         : `conic-gradient(${segments.join(",")})`;
     donut.style.position = "relative";
     donut.innerHTML = `<div style="position:absolute;inset:14px;border-radius:50%;background:var(--bg-surface);display:flex;align-items:center;justify-content:center;flex-direction:column;">
-        <span style="font-family:var(--font-display);font-size:20px;font-weight:700;">${total}</span>
+        <span style="font-family:var(--font-display);font-size:20px;font-weight:700;">${actualTotal}</span>
         <span style="font-size:10.5px;color:var(--text-mid);">records</span>
       </div>`;
 

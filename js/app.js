@@ -604,6 +604,9 @@
     const before = list.length;
     list = list.filter((r) => !ids.includes(r.id));
     saveRenewals(list);
+    ids.forEach((id) => {
+      syncRenewalToBackend('DELETE', '/api/renewals/' + encodeURIComponent(id));
+    });
     return before - list.length;
   }
 
@@ -665,340 +668,15 @@
   /* ------------------------------------------------------------------ */
 
   function seedData() {
-    if (localStorage.getItem(STORAGE_KEYS.RENEWALS)) return;
+    // Default sample data disabled — user adds real records
+    if (!localStorage.getItem(STORAGE_KEYS.RENEWALS)) {
+      saveRenewals([]);
+    }
+  }
 
-    const T = todayISO();
-    const seeds = [
-      {
-        name: "Microsoft 365 Enterprise License",
-        category: "License",
-        organization: "Microsoft Corporation",
-        description: "Enterprise-wide productivity suite licensing covering 250 seats.",
-        referenceNumber: "MS-E3-2024-118",
-        issueDate: addDays(T, -345),
-        expiryDate: addDays(T, 20),
-        cost: 18500,
-        currency: "USD",
-        reminderDate: addDays(T, 6),
-        priority: "High",
-        responsiblePerson: "Anita Sharma",
-        notes: "Renew before new fiscal year pricing takes effect.",
-      },
-      {
-        name: "Head Office Lease Agreement",
-        category: "Contract",
-        organization: "Meridian Realty Group",
-        description: "Commercial lease for the downtown head office, floors 4–6.",
-        referenceNumber: "LEASE-HO-2023-04",
-        issueDate: addDays(T, -125),
-        expiryDate: addDays(T, 240),
-        cost: 96000,
-        currency: "USD",
-        reminderDate: addDays(T, 210),
-        priority: "Medium",
-        responsiblePerson: "David Kim",
-        notes: "Landlord open to a 3-year extension at 4% escalation.",
-      },
-      {
-        name: "ISO 27001 Information Security Certification",
-        category: "Certification",
-        organization: "BSI Group",
-        description: "Information security management system certification.",
-        referenceNumber: "ISO27001-8821",
-        issueDate: addDays(T, -380),
-        expiryDate: addDays(T, -15),
-        cost: 7200,
-        currency: "USD",
-        reminderDate: addDays(T, -29),
-        priority: "High",
-        responsiblePerson: "Priya Nair",
-        notes: "Surveillance audit report pending from auditor.",
-      },
-      {
-        name: "Fire Safety Operating Permit",
-        category: "Regulatory Permit",
-        organization: "City Fire Department",
-        description: "Annual fire safety compliance permit for the main warehouse.",
-        referenceNumber: "FSP-2025-3391",
-        issueDate: addDays(T, -360),
-        expiryDate: addDays(T, 5),
-        cost: 450,
-        currency: "USD",
-        reminderDate: addDays(T, -9),
-        priority: "High",
-        responsiblePerson: "Marcus Chen",
-        notes: "Inspection scheduled prior to renewal submission.",
-      },
-      {
-        name: "Fleet Vehicle Insurance",
-        category: "Insurance",
-        organization: "Allied Insurance Co.",
-        description: "Comprehensive coverage for the 14-vehicle delivery fleet.",
-        referenceNumber: "POL-FLEET-2244",
-        issueDate: addDays(T, -320),
-        expiryDate: addDays(T, 45),
-        cost: 21400,
-        currency: "USD",
-        reminderDate: addDays(T, 15),
-        priority: "Medium",
-        responsiblePerson: "David Kim",
-        notes: "",
-      },
-      {
-        name: "AWS Cloud Infrastructure Subscription",
-        category: "Subscription",
-        organization: "Amazon Web Services",
-        description: "Reserved instance commitment for production infrastructure.",
-        referenceNumber: "AWS-RI-99213",
-        issueDate: addDays(T, -353),
-        expiryDate: addDays(T, 12),
-        cost: 32000,
-        currency: "USD",
-        reminderDate: addDays(T, -2),
-        priority: "High",
-        responsiblePerson: "Wei Zhang",
-        notes: "Evaluate 3-year reserved pricing before renewal.",
-      },
-      {
-        name: "Server Hardware Warranty — Dell PowerEdge",
-        category: "Warranty",
-        organization: "Dell Technologies",
-        description: "Extended on-site warranty for the PowerEdge R750 cluster.",
-        referenceNumber: "DELL-WAR-7743",
-        issueDate: addDays(T, -760),
-        expiryDate: addDays(T, -40),
-        cost: 5600,
-        currency: "USD",
-        reminderDate: addDays(T, -54),
-        priority: "Medium",
-        responsiblePerson: "Wei Zhang",
-        notes: "Check if hardware refresh makes more sense than renewal.",
-        history: [
-          {
-            id: uid("hist"),
-            previousExpiry: addDays(T, -405),
-            newExpiry: addDays(T, -40),
-            renewalDate: addDays(T, -410),
-            cost: 5200,
-            currency: "USD",
-            renewedBy: "Wei Zhang",
-            notes: "Standard 1-year warranty extension.",
-          },
-        ],
-      },
-      {
-        name: "Employee Group Health Insurance",
-        category: "Insurance",
-        organization: "BlueCross Corporate Plans",
-        description: "Group health coverage for all full-time employees.",
-        referenceNumber: "HLTH-GRP-5567",
-        issueDate: addDays(T, -65),
-        expiryDate: addDays(T, 300),
-        cost: 145000,
-        currency: "USD",
-        reminderDate: addDays(T, 270),
-        priority: "High",
-        responsiblePerson: "Anita Sharma",
-        notes: "",
-      },
-      {
-        name: "Municipal Trade License",
-        category: "Regulatory Permit",
-        organization: "City Corporation",
-        description: "Trade license permitting commercial operations at the retail branch.",
-        referenceNumber: "TL-2025-9042",
-        issueDate: addDays(T, -362),
-        expiryDate: addDays(T, -3),
-        cost: 300,
-        currency: "USD",
-        reminderDate: addDays(T, -17),
-        priority: "High",
-        responsiblePerson: "Marcus Chen",
-        notes: "Application submitted, awaiting approval.",
-      },
-      {
-        name: "Adobe Creative Cloud Subscription",
-        category: "Subscription",
-        organization: "Adobe Inc.",
-        description: "Team plan covering the design and marketing departments.",
-        referenceNumber: "ADBE-TEAM-3120",
-        issueDate: addDays(T, -305),
-        expiryDate: addDays(T, 60),
-        cost: 4800,
-        currency: "USD",
-        reminderDate: addDays(T, 30),
-        priority: "Low",
-        responsiblePerson: "Sofia Torres",
-        notes: "",
-      },
-      {
-        name: "ISO 9001 Quality Management Certification",
-        category: "Certification",
-        organization: "SGS Certification",
-        description: "Quality management system certification for manufacturing operations.",
-        referenceNumber: "ISO9001-4471",
-        issueDate: addDays(T, -185),
-        expiryDate: addDays(T, 180),
-        cost: 6100,
-        currency: "USD",
-        reminderDate: addDays(T, 150),
-        priority: "Medium",
-        responsiblePerson: "Priya Nair",
-        notes: "",
-      },
-      {
-        name: "Data Center Colocation Contract",
-        category: "Contract",
-        organization: "Equinix",
-        description: "Colocation services for the disaster-recovery site.",
-        referenceNumber: "EQX-COLO-8834",
-        issueDate: addDays(T, -355),
-        expiryDate: addDays(T, 9),
-        cost: 27600,
-        currency: "USD",
-        reminderDate: addDays(T, -5),
-        priority: "High",
-        responsiblePerson: "Wei Zhang",
-        notes: "Negotiating renewal terms with account manager.",
-      },
-      {
-        name: "Manufacturing Equipment Warranty",
-        category: "Warranty",
-        organization: "Siemens Industrial",
-        description: "Extended warranty on CNC production line equipment.",
-        referenceNumber: "SIE-WAR-2291",
-        issueDate: addDays(T, -30),
-        expiryDate: addDays(T, 400),
-        cost: 12300,
-        currency: "USD",
-        reminderDate: addDays(T, 370),
-        priority: "Low",
-        responsiblePerson: "Marcus Chen",
-        notes: "",
-      },
-      {
-        name: "Professional Indemnity Insurance",
-        category: "Insurance",
-        organization: "Chubb Insurance",
-        description: "Professional liability coverage for the consulting division.",
-        referenceNumber: "POL-PI-7789",
-        issueDate: addDays(T, -10),
-        expiryDate: addDays(T, 400),
-        cost: 8900,
-        currency: "USD",
-        reminderDate: addDays(T, 370),
-        priority: "Medium",
-        responsiblePerson: "Anita Sharma",
-        notes: "Renewed early to lock in favorable premium.",
-        lastRenewedAt: addDays(T, -10),
-        history: [
-          {
-            id: uid("hist"),
-            previousExpiry: addDays(T, -10),
-            newExpiry: addDays(T, 400),
-            renewalDate: addDays(T, -10),
-            cost: 8900,
-            currency: "USD",
-            renewedBy: "Anita Sharma",
-            notes: "Renewed early to lock in favorable premium.",
-          },
-        ],
-      },
-      {
-        name: "Slack Workspace Subscription",
-        category: "Subscription",
-        organization: "Salesforce (Slack)",
-        description: "Business+ plan for company-wide workspace.",
-        referenceNumber: "SLACK-BIZ-6612",
-        issueDate: addDays(T, -230),
-        expiryDate: addDays(T, 500),
-        cost: 9600,
-        currency: "USD",
-        reminderDate: addDays(T, 470),
-        priority: "Low",
-        responsiblePerson: "Sofia Torres",
-        notes: "",
-      },
-      {
-        name: "Environmental Compliance Permit",
-        category: "Regulatory Permit",
-        organization: "State Environmental Agency",
-        description: "Permit for wastewater discharge from the manufacturing plant.",
-        referenceNumber: "ENV-2024-1187",
-        issueDate: addDays(T, -465),
-        expiryDate: addDays(T, -100),
-        cost: 1200,
-        currency: "USD",
-        reminderDate: addDays(T, -114),
-        priority: "High",
-        responsiblePerson: "Marcus Chen",
-        notes: "Overdue — renewal application must be filed immediately.",
-      },
-      {
-        name: "Building Fire Insurance Policy",
-        category: "Insurance",
-        organization: "Allied Insurance Co.",
-        description: "Property and fire insurance for the main manufacturing facility.",
-        referenceNumber: "POL-FIRE-3345",
-        issueDate: addDays(T, -5),
-        expiryDate: addDays(T, 200),
-        cost: 15400,
-        currency: "USD",
-        reminderDate: addDays(T, 170),
-        priority: "Medium",
-        responsiblePerson: "David Kim",
-        notes: "",
-        lastRenewedAt: addDays(T, -5),
-        history: [
-          {
-            id: uid("hist"),
-            previousExpiry: addDays(T, -5),
-            newExpiry: addDays(T, 200),
-            renewalDate: addDays(T, -5),
-            cost: 15400,
-            currency: "USD",
-            renewedBy: "David Kim",
-            notes: "",
-          },
-        ],
-      },
-    ];
-
-    const records = seeds.map((s, i) =>
-      Object.assign(
-        {
-          id: uid("ren"),
-          code: recordCode(i + 1),
-          documents: [],
-          history: [],
-          reminderCompleted: false,
-          lastRenewedAt: null,
-          createdAt: new Date(Date.now() - (seeds.length - i) * 3600 * 1000).toISOString(),
-        },
-        s
-      )
-    );
-
-    // A few sample documents attached to some records
-    const docTargets = [0, 1, 4, 7, 10];
-    const docTypes = [
-      { name: "Signed Agreement.pdf", type: "PDF" },
-      { name: "Renewal Notice.pdf", type: "PDF" },
-      { name: "Certificate Scan.jpg", type: "Image" },
-      { name: "Invoice.xlsx", type: "Spreadsheet" },
-    ];
-    docTargets.forEach((idx, i) => {
-      const dt = docTypes[i % docTypes.length];
-      records[idx].documents.push({
-        id: uid("doc"),
-        name: dt.name,
-        type: dt.type,
-        size: (Math.round((150 + Math.random() * 900) * 10) / 10) + " KB",
-        uploadDate: addDays(T, -Math.floor(Math.random() * 60)),
-      });
-    });
-
-    saveRenewals(records);
+  function clearAllRenewals() {
+    saveRenewals([]);
+    syncRenewalToBackend('DELETE', '/api/renewals');
   }
 
   function seedAccount() {
@@ -1939,7 +1617,15 @@
 
   function ensureSeed() {
     seedAccount();
-    seedData();
+    // One-time automatic reset to clear default mock/sample data (certificates, licenses, etc.)
+    const DATA_RESET_KEY = 'rts_default_data_cleared_v1';
+    if (localStorage.getItem(DATA_RESET_KEY) !== 'true') {
+      saveRenewals([]);
+      syncRenewalToBackend('DELETE', '/api/renewals');
+      localStorage.setItem(DATA_RESET_KEY, 'true');
+    } else {
+      seedData();
+    }
   }
 
   function initLayout() {
@@ -2008,6 +1694,7 @@
       toggleReminderCompleted,
       getAllDocuments,
       getAllHistory,
+      clearAllRenewals,
     },
     auth: {
       login,

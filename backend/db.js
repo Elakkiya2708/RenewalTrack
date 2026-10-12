@@ -22,131 +22,9 @@ function addDays(isoDate, days) {
   return d.toISOString().slice(0, 10);
 }
 
-// Generate realistic seeded records relative to today
+// Return initial seeded records (Empty by default for clean start)
 function getInitialSeedRenewals() {
-  const T = todayISO();
-  return [
-    {
-      id: "ren-ms365",
-      code: "REN-001",
-      name: "Microsoft 365 Enterprise License",
-      category: "License",
-      organization: "Microsoft Corporation",
-      description: "Enterprise-wide productivity suite licensing covering 250 seats.",
-      referenceNumber: "MS-E3-2024-118",
-      issueDate: addDays(T, -345),
-      expiryDate: addDays(T, 30), // 30 days away (triggers 30-day reminder)
-      cost: 18500,
-      currency: "USD",
-      reminderDate: addDays(T, 16),
-      priority: "High",
-      responsiblePerson: "Anita Sharma",
-      responsibleEmail: "demo@renewaltrack.com",
-      recurringCycle: "Yearly",
-      notes: "Renew before new fiscal year pricing takes effect.",
-      reminderCompleted: false,
-    },
-    {
-      id: "ren-lease-ho",
-      code: "REN-002",
-      name: "Head Office Lease Agreement",
-      category: "Contract",
-      organization: "Meridian Realty Group",
-      description: "Commercial lease for the downtown head office, floors 4–6.",
-      referenceNumber: "LEASE-HO-2023-04",
-      issueDate: addDays(T, -125),
-      expiryDate: addDays(T, 15), // 15 days away (triggers 15-day reminder)
-      cost: 96000,
-      currency: "USD",
-      reminderDate: addDays(T, 1),
-      priority: "Medium",
-      responsiblePerson: "David Kim",
-      responsibleEmail: "david.kim@renewaltrack.com",
-      recurringCycle: "3-Year",
-      notes: "Landlord open to a 3-year extension at 4% escalation.",
-      reminderCompleted: false,
-    },
-    {
-      id: "ren-fire-safety",
-      code: "REN-003",
-      name: "Fire Safety Operating Permit",
-      category: "Regulatory Permit",
-      organization: "City Fire Department",
-      description: "Annual fire safety compliance permit for the main warehouse.",
-      referenceNumber: "FSP-2025-3391",
-      issueDate: addDays(T, -360),
-      expiryDate: addDays(T, 7), // 7 days away (triggers 7-day urgent reminder)
-      cost: 450,
-      currency: "USD",
-      reminderDate: addDays(T, -7),
-      priority: "High",
-      responsiblePerson: "Marcus Chen",
-      responsibleEmail: "demo@renewaltrack.com",
-      recurringCycle: "Yearly",
-      notes: "Inspection scheduled prior to renewal submission.",
-      reminderCompleted: false,
-    },
-    {
-      id: "ren-iso27001",
-      code: "REN-004",
-      name: "ISO 27001 Information Security Certification",
-      category: "Certification",
-      organization: "BSI Group",
-      description: "Information security management system certification.",
-      referenceNumber: "ISO27001-8821",
-      issueDate: addDays(T, -380),
-      expiryDate: T, // 0 days away / Expiry Date (triggers expiry date reminder)
-      cost: 7200,
-      currency: "USD",
-      reminderDate: addDays(T, -14),
-      priority: "High",
-      responsiblePerson: "Priya Nair",
-      responsibleEmail: "priya.nair@renewaltrack.com",
-      recurringCycle: "Yearly",
-      notes: "Surveillance audit report pending from auditor.",
-      reminderCompleted: false,
-    },
-    {
-      id: "ren-fleet-ins",
-      code: "REN-005",
-      name: "Fleet Vehicle Insurance Policy",
-      category: "Insurance",
-      organization: "Allied Mutual Insurance",
-      description: "Comprehensive liability and collision cover for 18 service vehicles.",
-      referenceNumber: "POL-FLT-2024-99",
-      issueDate: addDays(T, -300),
-      expiryDate: addDays(T, 65),
-      cost: 14200,
-      currency: "USD",
-      reminderDate: addDays(T, 35),
-      priority: "Medium",
-      responsiblePerson: "David Kim",
-      responsibleEmail: "david.kim@renewaltrack.com",
-      recurringCycle: "Yearly",
-      notes: "Clean claims history this cycle — request 5% no-claim discount.",
-      reminderCompleted: false,
-    },
-    {
-      id: "ren-aws-sub",
-      code: "REN-006",
-      name: "AWS Cloud Infrastructure Enterprise Support",
-      category: "Subscription",
-      organization: "Amazon Web Services",
-      description: "Business Support tier for production VPCs and hosting.",
-      referenceNumber: "AWS-ENT-8842",
-      issueDate: addDays(T, -180),
-      expiryDate: addDays(T, 185),
-      cost: 36000,
-      currency: "USD",
-      reminderDate: addDays(T, 155),
-      priority: "Low",
-      responsiblePerson: "Wei Zhang",
-      responsibleEmail: "wei.zhang@renewaltrack.com",
-      recurringCycle: "Yearly",
-      notes: "Review Reserved Instances utilization before renewal.",
-      reminderCompleted: false,
-    },
-  ];
+  return [];
 }
 
 // Local store helpers
@@ -248,13 +126,7 @@ const db = {
         } else if (data && data.length > 0) {
           return data.map(toCamelCase);
         } else {
-          // If Supabase table is empty, seed it with initial records
-          console.log("[Supabase] renewals table is empty. Seeding initial records...");
-          const seeds = getInitialSeedRenewals().map(toSnakeCase);
-          const { error: seedError } = await supabase.from("renewals").insert(seeds);
-          if (!seedError) {
-            return getInitialSeedRenewals();
-          }
+          return [];
         }
       } catch (err) {
         console.error(`[Supabase error] ${err.message}`);
@@ -323,6 +195,23 @@ const db = {
     }
     const store = getLocalStore();
     store.renewals = (store.renewals || []).filter((r) => r.id !== id);
+    saveLocalStore(store);
+    return true;
+  },
+
+  // 4b. Clear all renewals (clean slate)
+  async clearAllRenewals() {
+    if (isConfigured()) {
+      try {
+        await supabase.from("reminder_logs").delete().neq("id", "none");
+        await supabase.from("renewals").delete().neq("id", "none");
+      } catch (e) {
+        console.error(`[Supabase clearAllRenewals error] ${e.message}`);
+      }
+    }
+    const store = getLocalStore();
+    store.renewals = [];
+    store.reminder_logs = [];
     saveLocalStore(store);
     return true;
   },

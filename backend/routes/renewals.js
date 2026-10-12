@@ -63,7 +63,17 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// DELETE /api/renewals/:id — Delete renewal
+// DELETE /api/renewals — Clear all renewals (clean slate)
+router.delete("/", async (req, res) => {
+  try {
+    await db.clearAllRenewals();
+    res.json({ ok: true, message: "All renewals cleared successfully." });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// DELETE /api/renewals/:id — Delete single renewal
 router.delete("/:id", async (req, res) => {
   try {
     await db.deleteRenewal(req.params.id);
