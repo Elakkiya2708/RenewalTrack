@@ -84,7 +84,7 @@
         RTS.settings.setSettings({ reminderDays });
 
         try {
-          await fetch("/api/settings/notifications", {
+          await fetch(RTS.apiUrl("/api/settings/notifications"), {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ reminderDays, sendOnExpiryDay: reminderDays.includes(0) }),
@@ -129,7 +129,7 @@
           });
 
           try {
-            await fetch("/api/settings/notifications", {
+            await fetch(RTS.apiUrl("/api/settings/notifications"), {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ emailNotificationsEnabled: emailOn }),
@@ -152,7 +152,7 @@
         }
         RTS.settings.setSettings({ defaultRecipientEmail: email });
         try {
-          await fetch("/api/settings/notifications", {
+          await fetch(RTS.apiUrl("/api/settings/notifications"), {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ defaultRecipientEmail: email }),
@@ -164,7 +164,7 @@
 
     // Fetch live backend diagnostics
     try {
-      const res = await fetch("/api/reminders/status");
+      const res = await fetch(RTS.apiUrl("/api/reminders/status"));
       if (res.ok) {
         const data = await res.json();
         const pEl = document.getElementById("statEmailProvider");
@@ -202,7 +202,7 @@
         RTS.refreshIcons();
 
         try {
-          const res = await fetch("/api/reminders/test-email", {
+          const res = await fetch(RTS.apiUrl("/api/reminders/test-email"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ targetEmail }),
@@ -226,7 +226,7 @@
             }
           }
         } catch (e) {
-          RTS.toast("Could not reach backend reminder service: " + e.message, "error");
+          RTS.toast("Could not reach backend at " + RTS.apiUrl("/api/reminders/test-email") + ". Ensure 'npm start' or 'start.bat' is running.", "error");
         } finally {
           testBtn.disabled = false;
           testBtn.innerHTML = '<i data-lucide="send" class="icon"></i> Send Test Reminder Email';
@@ -244,7 +244,7 @@
         RTS.refreshIcons();
 
         try {
-          const res = await fetch("/api/reminders/trigger", {
+          const res = await fetch(RTS.apiUrl("/api/reminders/trigger"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
           });
@@ -268,7 +268,7 @@
             );
           }
         } catch (e) {
-          RTS.toast("Could not execute reminder check: " + e.message, "error");
+          RTS.toast("Could not reach backend at " + RTS.apiUrl("/api/reminders/trigger") + ". Ensure 'npm start' or 'start.bat' is running.", "error");
         } finally {
           triggerBtn.disabled = false;
           triggerBtn.innerHTML = '<i data-lucide="play" class="icon"></i> Run Reminder Check Now';

@@ -462,9 +462,18 @@
     return getRenewals().find((r) => r.id === id) || null;
   }
 
+  function apiUrl(endpoint) {
+    if (!endpoint) return "";
+    const clean = endpoint.startsWith("/") ? endpoint : "/" + endpoint;
+    if (window.location.protocol === "file:" || !window.location.host) {
+      return "http://localhost:3000" + clean;
+    }
+    return clean;
+  }
+
   function syncRenewalToBackend(method, url, body) {
     try {
-      fetch(url, {
+      fetch(apiUrl(url), {
         method,
         headers: { "Content-Type": "application/json" },
         body: body ? JSON.stringify(body) : undefined,
@@ -2019,7 +2028,7 @@
     },
     reminders: {
       async triggerCheck(force) {
-        const res = await fetch("/api/reminders/trigger", {
+        const res = await fetch(apiUrl("/api/reminders/trigger"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ force }),
@@ -2027,7 +2036,7 @@
         return res.json();
       },
       async sendTestEmail(targetEmail) {
-        const res = await fetch("/api/reminders/test-email", {
+        const res = await fetch(apiUrl("/api/reminders/test-email"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ targetEmail }),
@@ -2035,14 +2044,15 @@
         return res.json();
       },
       async getLogs(limit) {
-        const res = await fetch("/api/reminders/logs?limit=" + (limit || 50));
+        const res = await fetch(apiUrl("/api/reminders/logs?limit=" + (limit || 50)));
         return res.json();
       },
       async getStatus() {
-        const res = await fetch("/api/reminders/status");
+        const res = await fetch(apiUrl("/api/reminders/status"));
         return res.json();
       },
     },
+    apiUrl,
     toast: showToast,
     modal: { open: openModal, close: closeModal },
     initLayout,
