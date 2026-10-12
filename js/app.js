@@ -1102,13 +1102,35 @@
     if (isAdmin()) return true;
     if (isViewer()) return false;
     const user = getCurrentUser();
+    const uEmail = (user.email || "").toLowerCase();
+    const uName = (user.fullName || "").toLowerCase();
     const respEmail = (r.responsibleEmail || r.responsible_email || "").toLowerCase();
     const respName = (r.responsiblePerson || r.responsible_person || "").toLowerCase();
     const createdBy = (r.createdBy || "").toLowerCase();
     return (
-      respEmail === user.email.toLowerCase() ||
-      respName === user.fullName.toLowerCase() ||
-      createdBy === user.email.toLowerCase()
+      (!respEmail && !respName) ||
+      (uEmail && respEmail === uEmail) ||
+      (uName && respName === uName) ||
+      (uName && respName.includes(uName)) ||
+      (uEmail && createdBy === uEmail)
+    );
+  }
+
+  function canDeleteRenewal(r) {
+    if (!r) return false;
+    if (isAdmin()) return true;
+    if (isViewer()) return false;
+    const user = getCurrentUser();
+    const uEmail = (user.email || "").toLowerCase();
+    const uName = (user.fullName || "").toLowerCase();
+    const respEmail = (r.responsibleEmail || r.responsible_email || "").toLowerCase();
+    const respName = (r.responsiblePerson || r.responsible_person || "").toLowerCase();
+    const createdBy = (r.createdBy || "").toLowerCase();
+    return (
+      (uEmail && respEmail === uEmail) ||
+      (uName && respName === uName) ||
+      (uName && respName.includes(uName)) ||
+      (uEmail && createdBy === uEmail)
     );
   }
 
@@ -1257,33 +1279,80 @@
 
   function initSidebarActive() {
     const page = currentPageName();
+    const isAssignedMe = global.location.search.includes("assigned=me");
+    const isInvite = global.location.hash.includes("invite");
+
     document.querySelectorAll(".nav-link").forEach((link) => {
-      const href = link.getAttribute("href");
-      if (href === page || (page === "" && href === "dashboard.html")) {
-        link.classList.add("active");
+      const href = link.getAttribute("href") || "";
+      if (isAssignedMe) {
+        if (href.includes("assigned=me")) {
+          link.classList.add("active");
+        } else {
+          link.classList.remove("active");
+        }
+      } else if (page === "team.html" && isInvite) {
+        if (href.includes("#invite")) {
+          link.classList.add("active");
+        } else {
+          link.classList.remove("active");
+        }
       } else {
-        link.classList.remove("active");
+        const hrefBase = href.split("?")[0].split("#")[0];
+        if (
+          (hrefBase === page || (page === "" && hrefBase === "dashboard.html")) &&
+          !href.includes("assigned=me") &&
+          !href.includes("#invite")
+        ) {
+          link.classList.add("active");
+        } else {
+          link.classList.remove("active");
+        }
       }
     });
   }
 
   function applyViewerRestrictions() {
     const hideSelectors = [
-      ".page-header-actions a[href*='add']",
-      ".page-header-actions button",
+      "a[href*='#add']",
+      "a[href='records.html#add']",
+      "#openAddBtn",
+      "#quickAddBtn",
+      "#openImportBtn",
+      "#bulkActionBar",
+      "#openUploadBtn",
+      "#editBtn",
+      "#deleteBtn",
+      "#renewBtn",
+      "#clearAllBtn",
+      ".btn-add",
+      ".btn-create",
+      ".btn-delete",
+      ".btn-edit",
+      ".change-role-btn",
+      ".toggle-status-btn",
+      "#btnRunCheckFromReminders",
       "#btnAddRenewal",
       "#btnImportCsv",
-      "#bulkActionBar",
-      ".row-actions button[aria-label='Edit']",
-      ".row-actions button[aria-label='Delete']",
       "#btnMarkRenewed",
       "#btnDeleteRenewal",
       "#btnEditRenewal",
-      "#btnUploadDocTrigger"
+      "#btnUploadDocTrigger",
+      ".record-select-checkbox",
+      "#selectAllRecords"
     ];
-    document.querySelectorAll(hideSelectors.join(", ")).forEach((btn) => {
-      btn.style.display = "none";
+
+    hideSelectors.forEach((sel) => {
+      document.querySelectorAll(sel).forEach((el) => {
+        el.style.display = "none";
+      });
     });
+
+    const modalForm = document.getElementById("renewalForm");
+    if (modalForm) {
+      modalForm.querySelectorAll("input, select, textarea, button[type='submit']").forEach((input) => {
+        input.disabled = true;
+      });
+    }
 
     const topbarActions = document.querySelector(".topbar-actions");
     if (topbarActions && !document.getElementById("viewerModePill")) {
@@ -1305,7 +1374,51 @@
     // 1. Clean up any dynamic duplicate links or labels previously injected
     nav.querySelectorAll(".sidebar-team-link, .sidebar-team-label").forEach((el) => el.remove());
 
-    // 2. Remove duplicate nav links if any
+    // 2. Remove "My Profile" and "Logout" from sidebar across all roles and dashboards
+    nav.querySelectorAll("a[href*='profile.html'], [data-logout], a[href*='logout']").forEach((el) => el.remove());
+
+    // 3. Ensure Employee "Assigned to Me" link exists
+    let empLink = nav.querySelector("a[href='records.html?assigned=me']");
+    if (!empLink) {
+      const reportsLink = nav.querySelector("a[href='reports.html']");
+      const empHtml = `
+        <div class="sidebar-section-label" data-role="Employee">My Work</div>
+        <a href="records.html?assigned=me" class="nav-link" data-role="Employee"><i data-lucide="user-check" class="icon"></i>Assigned to Me</a>
+      `;
+      if (reportsLink) {
+        reportsLink.insertAdjacentHTML("afterend", empHtml);
+      } else {
+        const accLabel = Array.from(nav.querySelectorAll(".sidebar-section-label")).find(
+          (el) => el.textContent.trim().toLowerCase() === "account" || el.textContent.trim().toLowerCase() === "கணக்கு"
+        );
+        if (accLabel) {
+          accLabel.insertAdjacentHTML("beforebegin", empHtml);
+        } else {
+          nav.insertAdjacentHTML("beforeend", empHtml);
+        }
+      }
+    }
+
+    // 4. Ensure Team Management links exist for Admin
+    let adminTeamLink = nav.querySelector("a[href='team.html']");
+    if (!adminTeamLink) {
+      const accLabel = Array.from(nav.querySelectorAll(".sidebar-section-label")).find(
+        (el) => el.textContent.trim().toLowerCase() === "account" || el.textContent.trim().toLowerCase() === "கணக்கு"
+      );
+      const teamHtml = `
+        <div class="sidebar-section-label" data-role="Admin">Team Management</div>
+        <a href="team.html" class="nav-link" data-role="Admin"><i data-lucide="users" class="icon"></i>Team Members</a>
+        <a href="team.html#invite" class="nav-link" data-role="Admin"><i data-lucide="user-plus" class="icon"></i>Invite Members</a>
+        <a href="audit.html" class="nav-link" data-role="Admin"><i data-lucide="clipboard-list" class="icon"></i>Audit Logs</a>
+      `;
+      if (accLabel) {
+        accLabel.insertAdjacentHTML("beforebegin", teamHtml);
+      } else {
+        nav.insertAdjacentHTML("beforeend", teamHtml);
+      }
+    }
+
+    // 5. Remove any duplicate nav links
     const seenHrefs = new Set();
     nav.querySelectorAll(".nav-link").forEach((link) => {
       const href = link.getAttribute("href");
@@ -1316,7 +1429,7 @@
       }
     });
 
-    // 3. Remove duplicate section labels if any
+    // 6. Remove any duplicate section labels
     const seenLabels = new Set();
     nav.querySelectorAll(".sidebar-section-label").forEach((lbl) => {
       const key = (lbl.getAttribute("data-role") || "") + ":" + lbl.textContent.trim().toLowerCase();
@@ -1327,84 +1440,31 @@
       }
     });
 
-    // 4. Ensure Team Management links exist for Admin only if missing
-    const hasTeamLink = nav.querySelector("a[href='team.html']");
-    if (!hasTeamLink) {
-      const accountLabel = Array.from(nav.querySelectorAll(".sidebar-section-label")).find(
-        (el) => el.textContent.trim().toLowerCase() === "account" || el.textContent.trim().toLowerCase() === "கணக்கு"
-      );
+    // 7. Enforce role-based sidebar visibility
+    const adminItems = nav.querySelectorAll("[data-role='Admin']");
+    const empItems = nav.querySelectorAll("[data-role='Employee']");
 
-      const teamHtml = `
-        <div class="sidebar-section-label" data-role="Admin">Team Management</div>
-        <a href="team.html" class="nav-link" data-role="Admin"><i data-lucide="users" class="icon"></i>Team Members</a>
-        <a href="team.html#invite" class="nav-link" data-role="Admin"><i data-lucide="user-plus" class="icon"></i>Invite Members</a>
-        <a href="audit.html" class="nav-link" data-role="Admin"><i data-lucide="clipboard-list" class="icon"></i>Audit Logs</a>
-      `;
-
-      if (accountLabel) {
-        accountLabel.insertAdjacentHTML("beforebegin", teamHtml);
-      } else {
-        nav.insertAdjacentHTML("beforeend", teamHtml);
-      }
-      refreshIcons();
+    if (role === "Admin") {
+      adminItems.forEach((el) => (el.style.display = ""));
+      empItems.forEach((el) => (el.style.display = "none"));
+    } else if (role === "Employee") {
+      adminItems.forEach((el) => (el.style.display = "none"));
+      empItems.forEach((el) => (el.style.display = ""));
+    } else {
+      // Viewer (read-only): hide both Admin team management and Employee assigned items
+      adminItems.forEach((el) => (el.style.display = "none"));
+      empItems.forEach((el) => (el.style.display = "none"));
     }
 
-    // 5. Remove "My Profile" from sidebar across all dashboards (profile is managed in Settings)
-    const profileLink = nav.querySelector("a[href='profile.html']");
-    if (profileLink) {
-      profileLink.remove();
-    }
-
-    // 6. Control visibility based on role (Team Management is Admin only)
-    const teamItems = nav.querySelectorAll("[data-role='Admin']");
-    teamItems.forEach((el) => {
-      if (role === "Admin") {
-        el.style.display = "";
-      } else {
-        el.style.display = "none";
-      }
-    });
-
+    // 8. Active navigation link state
     initSidebarActive();
 
-    // 7. Apply read-only protections if Viewer
+    // 9. Apply viewer restrictions if Viewer
     if (role === "Viewer") {
       applyViewerRestrictions();
     }
-  }
 
-  function applyViewerRestrictions() {
-    const hideSelectors = [
-      "a[href*='#add']",
-      "a[href='records.html#add']",
-      "#openAddBtn",
-      "#openImportBtn",
-      "#bulkActionBar",
-      "#openUploadBtn",
-      "#editBtn",
-      "#deleteBtn",
-      "#renewBtn",
-      "#clearAllBtn",
-      ".btn-add",
-      ".btn-create",
-      ".btn-delete",
-      ".btn-edit",
-      ".change-role-btn",
-      ".toggle-status-btn"
-    ];
-
-    hideSelectors.forEach((sel) => {
-      document.querySelectorAll(sel).forEach((el) => {
-        el.style.display = "none";
-      });
-    });
-
-    const modalForm = document.getElementById("renewalForm");
-    if (modalForm) {
-      modalForm.querySelectorAll("input, select, textarea, button[type='submit']").forEach((input) => {
-        input.disabled = true;
-      });
-    }
+    refreshIcons();
   }
 
   function initMobileSidebar() {
@@ -1609,6 +1669,7 @@
       "history.html": dict.history,
       "documents.html": dict.documents,
       "reports.html": dict.reports,
+      "records.html?assigned=me": dict.assignedToMe || "Assigned to Me",
       "team.html": dict.teamMembers || "Team Members",
       "team.html#invite": dict.inviteMembers || "Invite Members",
       "audit.html": dict.auditLogs || "Audit Logs",
@@ -1625,7 +1686,9 @@
     });
 
     document.querySelectorAll(".sidebar-section-label").forEach((el) => {
-      if (el.getAttribute("data-role") === "Admin" || el.textContent.toLowerCase().includes("team") || el.textContent.includes("குழு")) {
+      if (el.getAttribute("data-role") === "Employee" || el.textContent.toLowerCase().includes("work") || el.textContent.includes("பணி")) {
+        el.textContent = dict.myWork || "My Work";
+      } else if (el.getAttribute("data-role") === "Admin" || el.textContent.toLowerCase().includes("team") || el.textContent.includes("குழு")) {
         el.textContent = dict.teamManagement || "Team Management";
       } else if (el.textContent.trim().toLowerCase() === "main" || el.textContent.trim() === "முதன்மை" || (el.parentElement && el === el.parentElement.querySelector(".sidebar-section-label"))) {
         el.textContent = dict.main;
@@ -2389,6 +2452,43 @@
     }
   }
 
+  async function syncCurrentUserFromBackend() {
+    const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH);
+    if (!token) return;
+    try {
+      const res = await fetch(apiUrl("/api/auth/me"), {
+        headers: { Authorization: "Bearer " + token },
+      });
+      if (res.status === 401 || res.status === 403) {
+        const data = await res.json().catch(() => ({}));
+        if (data.error && data.error.includes("deactivated")) {
+          showToast(data.error, "error");
+          logout();
+          return;
+        }
+      }
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.ok && data.user) {
+          const current = getCurrentUser();
+          const roleChanged = current.role !== data.user.role;
+          const updated = Object.assign({}, current, data.user);
+          writeJSON(STORAGE_KEYS.USER, updated);
+          if (roleChanged) {
+            renderRoleSidebar();
+            renderTopbarUser();
+            applyTranslations();
+            if (updated.role === "Viewer") {
+              applyViewerRestrictions();
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Backend offline or file:/// mode fallback
+    }
+  }
+
   function initLayout() {
     ensureSeed();
     applyTheme(getSettings().theme);
@@ -2403,6 +2503,7 @@
     initLanguageToggle();
     applyTranslations();
     refreshIcons();
+    syncCurrentUserFromBackend();
   }
 
   /* ------------------------------------------------------------------ */
@@ -2471,6 +2572,7 @@
       isPrimaryAdmin,
       applyViewerRestrictions,
       canEditRenewal,
+      canDeleteRenewal,
       redirectIfAuthed,
       registerAccount,
       getAccounts,

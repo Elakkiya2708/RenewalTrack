@@ -3,12 +3,29 @@
    ========================================================================== */
 
 const express = require("express");
+const jwt = require("jsonwebtoken");
 const db = require("../db");
 const emailService = require("../emailService");
 const reminderScheduler = require("../reminderScheduler");
 const config = require("../config");
 
 const router = express.Router();
+
+async function getReqUser(req) {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    try {
+      const decoded = jwt.verify(authHeader.split(" ")[1], config.JWT_SECRET);
+      if (decoded && decoded.email) {
+        const user = await db.getUserByEmail(decoded.email.trim().toLowerCase());
+        if (user && user.status !== "deactivated") {
+          return user;
+        }
+      }
+    } catch (e) {}
+  }
+  return null;
+}
 
 // GET /api/reminders/logs — Retrieve sent reminder audit history
 router.get("/logs", async (req, res) => {
@@ -29,6 +46,14 @@ router.get("/logs", async (req, res) => {
 // POST /api/reminders/trigger — Manually trigger the scheduled reminder check
 router.post("/trigger", async (req, res) => {
   try {
+    const actor = await getReqUser(req);
+    if (actor && actor.role === "Viewer") {
+      return res.status(403).json({
+        ok: false,
+        error: "Access denied. Viewer role has read-only access and cannot trigger reminders.",
+      });
+    }
+
     console.log("[API] Manual trigger request received for reminder check.");
     const force = req.body && req.body.force === true;
     const summary = await reminderScheduler.checkAndSendReminders({ force });
@@ -46,6 +71,14 @@ router.post("/trigger", async (req, res) => {
 // POST /api/reminders/test-email — Send a test reminder email to verify email delivery
 router.post("/test-email", async (req, res) => {
   try {
+    const actor = await getReqUser(req);
+    if (actor && actor.role === "Viewer") {
+      return res.status(403).json({
+        ok: false,
+        error: "Access denied. Viewer role has read-only access and cannot send test emails.",
+      });
+    }
+
     const { targetEmail } = req.body;
     if (!targetEmail) {
       return res.status(400).json({ ok: false, error: "targetEmail is required." });

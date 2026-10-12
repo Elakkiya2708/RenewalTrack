@@ -89,7 +89,12 @@
         const respEmail = (r.responsibleEmail || r.responsible_email || "").toLowerCase();
         const respName = (r.responsiblePerson || r.responsible_person || "").toLowerCase();
         const createdBy = (r.createdBy || "").toLowerCase();
-        return respEmail === uEmail || respName === uName || createdBy === uEmail;
+        return (
+          (uEmail && respEmail === uEmail) ||
+          (uName && respName === uName) ||
+          (uName && respName.includes(uName)) ||
+          (uEmail && createdBy === uEmail)
+        );
       });
     }
 
@@ -105,6 +110,11 @@
     const bar = document.getElementById("bulkActionBar");
     const countEl = document.getElementById("bulkSelectedCount");
     const selectAllCheckbox = document.getElementById("selectAllRecords");
+    if (RTS.auth.isViewer()) {
+      if (bar) bar.style.display = "none";
+      if (selectAllCheckbox) selectAllCheckbox.style.display = "none";
+      return;
+    }
     if (!bar || !countEl) return;
 
     const count = selectedIds.size;
@@ -119,6 +129,12 @@
   }
 
   function renderTable() {
+    const isViewer = RTS.auth.isViewer();
+    const thSelect = document.querySelector(".data-table thead tr th:first-child");
+    if (thSelect) {
+      thSelect.style.display = isViewer ? "none" : "";
+    }
+
     const all = getFilteredSorted();
     const total = all.length;
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -142,15 +158,19 @@
       tbody.innerHTML = pageItems
         .map((r) => {
           const status = RTS.computeStatus(r);
-          const isChecked = selectedIds.has(r.id);
+          const isChecked = !isViewer && selectedIds.has(r.id);
           const cycleTxt = RTS.cycleLabel(r.recurringCycle || "Yearly");
-          const canEdit = RTS.auth.canEditRenewal(r);
-          const canDelete = RTS.auth.isAdmin() || (RTS.auth.isEmployee() && canEdit);
+          const canEdit = !isViewer && RTS.auth.canEditRenewal(r);
+          const canDelete = !isViewer && (RTS.auth.isAdmin() || (RTS.auth.isEmployee() && canEdit));
           return `
           <tr class="${isChecked ? "row-selected" : ""}">
-            <td style="text-align:center;">
+            ${
+              isViewer
+                ? ""
+                : `<td style="text-align:center;">
               <input type="checkbox" class="record-select-checkbox" data-id="${r.id}" ${isChecked ? "checked" : ""} style="cursor:pointer;" />
-            </td>
+            </td>`
+            }
             <td class="cell-primary">${r.code}</td>
             <td>
               <span class="cell-primary"><a href="details.html?id=${r.id}" style="color:inherit;text-decoration:none;">${RTS.escapeHtml(r.name)}</a></span>
@@ -231,15 +251,34 @@
   }
 
   function openAdd() {
+    if (RTS.auth.isViewer()) {
+      RTS.toast("Viewer role has read-only access and cannot create renewals.", "error");
+      return;
+    }
     editingId = null;
     resetForm();
+    if (RTS.auth.isEmployee()) {
+      const u = RTS.auth.getCurrentUser();
+      const respInput = document.getElementById("in_responsible");
+      const emailInput = document.getElementById("in_responsibleEmail");
+      if (respInput && !respInput.value) respInput.value = u.fullName || "";
+      if (emailInput && !emailInput.value) emailInput.value = u.email || "";
+    }
     document.getElementById("renewalModalTitle").textContent = RTS.i18n.t("addNewRenewal", "Add New Renewal");
     RTS.modal.open("renewalModal");
   }
 
   function openEdit(id) {
+    if (RTS.auth.isViewer()) {
+      RTS.toast("Viewer role has read-only access and cannot edit renewals.", "error");
+      return;
+    }
     const record = RTS.data.getRenewalById(id);
     if (!record) return;
+    if (RTS.auth.isEmployee() && !RTS.auth.canEditRenewal(record)) {
+      RTS.toast("Access denied. You can only edit renewals assigned to you.", "error");
+      return;
+    }
     editingId = id;
     resetForm();
     document.getElementById("renewalModalTitle").textContent = "Edit Renewal";
@@ -388,8 +427,16 @@
   /* ------------------------------ Delete ---------------------------------- */
 
   function openDelete(id) {
+    if (RTS.auth.isViewer()) {
+      RTS.toast("Viewer role has read-only access and cannot delete renewals.", "error");
+      return;
+    }
     const record = RTS.data.getRenewalById(id);
     if (!record) return;
+    if (RTS.auth.isEmployee() && !RTS.auth.canDeleteRenewal(record)) {
+      RTS.toast("Access denied. You can only delete renewals assigned to you.", "error");
+      return;
+    }
     deleteTargetId = id;
     document.getElementById("deleteRecordName").textContent = record.name;
     RTS.modal.open("deleteModal");
@@ -433,6 +480,20 @@
     if (renewBtn) {
       renewBtn.addEventListener("click", () => {
         if (!selectedIds.size) return;
+        if (RTS.auth.isViewer()) {
+          RTS.toast("Viewer role has read-only access.", "error");
+          return;
+        }
+        if (RTS.auth.isEmployee()) {
+          const unauthorized = Array.from(selectedIds).filter((id) => {
+            const r = RTS.data.getRenewalById(id);
+            return !RTS.auth.canEditRenewal(r);
+          });
+          if (unauthorized.length > 0) {
+            RTS.toast(`Cannot renew ${unauthorized.length} record(s) assigned to other team members.`, "warning");
+            return;
+          }
+        }
         const count = RTS.data.bulkRenew(Array.from(selectedIds));
         RTS.toast(`Successfully marked ${count} record(s) as renewed!`, "success");
         selectedIds.clear();
@@ -476,6 +537,20 @@
     if (deleteBtn) {
       deleteBtn.addEventListener("click", () => {
         if (!selectedIds.size) return;
+        if (RTS.auth.isViewer()) {
+          RTS.toast("Viewer role has read-only access.", "error");
+          return;
+        }
+        if (RTS.auth.isEmployee()) {
+          const unauthorized = Array.from(selectedIds).filter((id) => {
+            const r = RTS.data.getRenewalById(id);
+            return !RTS.auth.canDeleteRenewal(r);
+          });
+          if (unauthorized.length > 0) {
+            RTS.toast(`Cannot delete ${unauthorized.length} record(s) assigned to other team members.`, "warning");
+            return;
+          }
+        }
         const modal = document.getElementById("bulkConfirmModal");
         document.getElementById("bulkConfirmTitle").textContent = "Delete Selected Records";
         document.getElementById("bulkConfirmMessage").textContent = `Are you sure you want to permanently delete ${selectedIds.size} selected renewal record(s)? This action cannot be undone.`;
@@ -790,6 +865,12 @@
       document.getElementById("recordSearch").value = q;
       state.search = q;
     }
+    const assigned = params.get("assigned");
+    if (assigned === "me" || assigned === "assigned") {
+      state.assignment = "assigned";
+      const filterAssignment = document.getElementById("filterAssignment");
+      if (filterAssignment) filterAssignment.value = "assigned";
+    }
     const editId = params.get("edit");
     if (editId) {
       history.replaceState(null, "", window.location.pathname);
@@ -810,8 +891,16 @@
   /* ---------------------------- Modal: Mark as Renewed --------------------------- */
 
   function openRenew(id) {
+    if (RTS.auth.isViewer()) {
+      RTS.toast("Viewer role has read-only access and cannot renew records.", "error");
+      return;
+    }
     const curRecord = RTS.data.getRenewalById(id);
     if (!curRecord) return;
+    if (RTS.auth.isEmployee() && !RTS.auth.canEditRenewal(curRecord)) {
+      RTS.toast("Access denied. You can only renew records assigned to you.", "error");
+      return;
+    }
     const targetInput = document.getElementById("renewTargetId");
     if (targetInput) targetInput.value = id;
 

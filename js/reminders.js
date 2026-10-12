@@ -48,17 +48,15 @@
       tbody.innerHTML = list
         .map((r) => {
           const status = reminderStatus(r);
-          return `
-          <tr>
-            <td>
-              <a class="link" href="details.html?id=${r.id}" style="font-weight:600;">${RTS.escapeHtml(r.name)}</a>
-              <span class="cell-sub">${r.code} · ${RTS.escapeHtml(r.organization || "—")}</span>
-            </td>
-            <td>${RTS.escapeHtml(r.category)}</td>
-            <td>${RTS.formatDate(r.reminderDate)}</td>
-            <td>${RTS.formatDate(r.expiryDate)}</td>
-            <td>${reminderBadge(status)}</td>
-            <td>
+          const isViewer = RTS.auth.isViewer();
+          const canManage = !isViewer && RTS.auth.canEditRenewal(r);
+          let actionContent = "";
+          if (isViewer) {
+            actionContent = `<span class="cell-sub" style="font-size:12px;color:var(--text-muted);"><i data-lucide="lock" style="width:12px;height:12px;vertical-align:-1px;"></i> Read-only</span>`;
+          } else if (!canManage) {
+            actionContent = `<span class="cell-sub" style="font-size:12px;color:var(--text-muted);"><i data-lucide="shield" style="width:12px;height:12px;vertical-align:-1px;"></i> View only</span>`;
+          } else {
+            actionContent = `
               <div class="row-actions">
                 <button class="btn btn-secondary btn-sm" onclick="RemindersPage.openSnooze('${r.id}')" title="Postpone reminder">
                   <i data-lucide="clock" class="icon" style="width:13px;height:13px;"></i> Snooze
@@ -71,8 +69,19 @@
                     ? `<button class="btn btn-ghost btn-sm" onclick="RemindersPage.toggle('${r.id}', false)">Mark Incomplete</button>`
                     : `<button class="btn btn-primary btn-sm" onclick="RemindersPage.toggle('${r.id}', true)"><i data-lucide="check" class="icon" style="width:13px;height:13px;"></i> Done</button>`
                 }
-              </div>
+              </div>`;
+          }
+          return `
+          <tr>
+            <td>
+              <a class="link" href="details.html?id=${r.id}" style="font-weight:600;">${RTS.escapeHtml(r.name)}</a>
+              <span class="cell-sub">${r.code} · ${RTS.escapeHtml(r.organization || "—")}</span>
             </td>
+            <td>${RTS.escapeHtml(r.category)}</td>
+            <td>${RTS.formatDate(r.reminderDate)}</td>
+            <td>${RTS.formatDate(r.expiryDate)}</td>
+            <td>${reminderBadge(status)}</td>
+            <td>${actionContent}</td>
           </tr>`;
         })
         .join("");
@@ -81,15 +90,23 @@
   }
 
   function toggle(id, completed) {
+    if (RTS.auth.isViewer()) {
+      RTS.toast("Viewer role has read-only access.", "error");
+      return;
+    }
+    const record = RTS.data.getRenewalById(id);
+    if (!record) return;
+    if (RTS.auth.isEmployee() && !RTS.auth.canEditRenewal(record)) {
+      RTS.toast("Access denied. You can only manage reminders for assigned renewals.", "error");
+      return;
+    }
+
     if (!completed) {
       RTS.data.toggleReminderCompleted(id, false);
       RTS.toast("Reminder reopened.", "info");
       render();
       return;
     }
-
-    const record = RTS.data.getRenewalById(id);
-    if (!record) return;
 
     const cycle = record.recurringCycle || "Yearly";
     const nextExpiry = RTS.calculateNextExpiry(record.expiryDate, cycle);
@@ -104,8 +121,16 @@
   }
 
   function openSnooze(id) {
+    if (RTS.auth.isViewer()) {
+      RTS.toast("Viewer role has read-only access.", "error");
+      return;
+    }
     const record = RTS.data.getRenewalById(id);
     if (!record) return;
+    if (RTS.auth.isEmployee() && !RTS.auth.canEditRenewal(record)) {
+      RTS.toast("Access denied. You can only snooze reminders for assigned renewals.", "error");
+      return;
+    }
     snoozeTargetId = id;
     const nameEl = document.getElementById("snoozeRecordName");
     if (nameEl) nameEl.textContent = record.name;
@@ -255,8 +280,16 @@
   }
 
   function openRenew(id) {
+    if (RTS.auth.isViewer()) {
+      RTS.toast("Viewer role has read-only access.", "error");
+      return;
+    }
     const curRecord = RTS.data.getRenewalById(id);
     if (!curRecord) return;
+    if (RTS.auth.isEmployee() && !RTS.auth.canEditRenewal(curRecord)) {
+      RTS.toast("Access denied. You can only renew records assigned to you.", "error");
+      return;
+    }
     const targetInput = document.getElementById("renewTargetId");
     if (targetInput) targetInput.value = id;
 

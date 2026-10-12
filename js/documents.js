@@ -35,10 +35,14 @@
       empty.classList.remove("hidden");
       return;
     }
-    empty.classList.add("hidden");
+    const isViewer = RTS.auth.isViewer();
+    const isAdmin = RTS.auth.isAdmin();
     tbody.innerHTML = docs
       .map(
-        (d) => `
+        (d) => {
+          const ren = RTS.data.getRenewalById(d.renewalId);
+          const canDeleteDoc = !isViewer && (isAdmin || RTS.auth.canEditRenewal(ren));
+          return `
       <tr>
         <td><span class="cell-primary"><i data-lucide="${TYPE_ICONS[d.type] || "file"}" class="icon" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;color:var(--text-mid);"></i>${RTS.escapeHtml(d.name)}</span></td>
         <td><a class="link" href="details.html?id=${d.renewalId}">${RTS.escapeHtml(d.renewalName)}</a></td>
@@ -48,10 +52,11 @@
         <td>
           <div class="row-actions">
             <button class="icon-btn" title="Download" onclick="DocumentsPage.download('${RTS.escapeHtml(d.name).replace(/'/g, "")}')"><i data-lucide="download" class="icon"></i></button>
-            <button class="icon-btn" title="Delete" onclick="DocumentsPage.openDelete('${d.renewalId}','${d.id}')"><i data-lucide="trash-2" class="icon"></i></button>
+            ${canDeleteDoc ? `<button class="icon-btn" title="Delete" onclick="DocumentsPage.openDelete('${d.renewalId}','${d.id}')"><i data-lucide="trash-2" class="icon"></i></button>` : ""}
           </div>
         </td>
-      </tr>`
+      </tr>`;
+        }
       )
       .join("");
     RTS.refreshIcons();
@@ -62,12 +67,24 @@
   }
 
   function openDelete(renewalId, docId) {
+    if (RTS.auth.isViewer()) {
+      RTS.toast("Viewer role has read-only access and cannot delete documents.", "error");
+      return;
+    }
+    const ren = RTS.data.getRenewalById(renewalId);
+    if (!RTS.auth.isAdmin() && !RTS.auth.canEditRenewal(ren)) {
+      RTS.toast("Access denied. You can only delete documents for assigned renewals.", "error");
+      return;
+    }
     deleteTarget = { renewalId, docId };
     RTS.modal.open("deleteDocModal");
   }
 
   function confirmDelete() {
     if (!deleteTarget) return;
+    if (RTS.auth.isViewer()) return;
+    const ren = RTS.data.getRenewalById(deleteTarget.renewalId);
+    if (!RTS.auth.isAdmin() && !RTS.auth.canEditRenewal(ren)) return;
     RTS.data.deleteDocumentFromRenewal(deleteTarget.renewalId, deleteTarget.docId);
     RTS.toast("Document deleted.", "success");
     deleteTarget = null;
@@ -103,14 +120,21 @@
   }
 
   function wireUploadModal() {
-    document.getElementById("openUploadBtn").addEventListener("click", () => {
-      document.getElementById("docUploadForm").reset();
-      stagedFile = null;
-      renderStagedFile();
-      document.querySelectorAll("#docUploadForm .field").forEach((f) => f.classList.remove("has-error"));
-      populateRenewalSelect();
-      RTS.modal.open("uploadModal");
-    });
+    const openBtn = document.getElementById("openUploadBtn");
+    if (openBtn) {
+      if (RTS.auth.isViewer()) {
+        openBtn.style.display = "none";
+      } else {
+        openBtn.addEventListener("click", () => {
+          document.getElementById("docUploadForm").reset();
+          stagedFile = null;
+          renderStagedFile();
+          document.querySelectorAll("#docUploadForm .field").forEach((f) => f.classList.remove("has-error"));
+          populateRenewalSelect();
+          RTS.modal.open("uploadModal");
+        });
+      }
+    }
 
     const zone = document.getElementById("docUploadZone");
     const input = document.getElementById("docFileInput");
