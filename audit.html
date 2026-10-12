@@ -123,13 +123,13 @@
               <input type="text" id="auditSearch" class="input" placeholder="Search actor, details…" style="height:34px;font-size:13px;padding-left:30px;" />
               <i data-lucide="search" class="icon" style="position:absolute;left:9px;top:9px;width:14px;height:14px;color:var(--text-muted);pointer-events:none;"></i>
             </div>
-            <select id="actionFilter" class="input" style="height:34px;font-size:13px;width:180px;padding:4px 8px;">
+            <select id="actionFilter" class="input" style="height:34px;font-size:13px;width:190px;padding:4px 8px;">
               <option value="">All Actions</option>
-              <option value="RENEWAL_">Renewal Operations</option>
-              <option value="ROLE_">Role Changes</option>
-              <option value="USER_">User &amp; Status</option>
-              <option value="INVITATION_">Member Invitations</option>
-              <option value="LOGIN">Logins &amp; Auth</option>
+              <option value="RENEWAL">Renewal Operations</option>
+              <option value="LOGIN_AUTH">Logins &amp; Authentication</option>
+              <option value="INVITE">Team Invitations</option>
+              <option value="ROLE_ACCOUNT">Role &amp; Team Status</option>
+              <option value="SYSTEM">System Events</option>
             </select>
           </div>
         </div>
@@ -168,12 +168,20 @@
 
   async function loadLogs() {
     try {
-      const res = await RTS.audit.getLogs({ limit: 150 });
-      if (res.ok && Array.isArray(res.logs)) {
-        allLogs = res.logs;
-      } else {
-        allLogs = [];
+      const res = await RTS.audit.getLogs({ limit: 200 });
+      let list = [];
+      if (res && res.ok && Array.isArray(res.logs)) {
+        list = res.logs;
+      } else if (res && res.ok && Array.isArray(res.data)) {
+        list = res.data;
+      } else if (Array.isArray(res)) {
+        list = res;
+      } else if (res && Array.isArray(res.logs)) {
+        list = res.logs;
+      } else if (res && Array.isArray(res.data)) {
+        list = res.data;
       }
+      allLogs = list;
       renderLogs();
       updateStats();
     } catch (err) {
@@ -187,8 +195,14 @@
   function updateStats() {
     document.getElementById("statLogCount").textContent = allLogs.length;
     document.getElementById("statRenewalEvents").textContent = allLogs.filter(l => (l.action || "").includes("RENEWAL")).length;
-    document.getElementById("statRoleEvents").textContent = allLogs.filter(l => (l.action || "").includes("ROLE") || (l.action || "").includes("DEACTIVATED")).length;
-    document.getElementById("statInviteEvents").textContent = allLogs.filter(l => (l.action || "").includes("INVIT") || (l.action || "").includes("LOGIN")).length;
+    document.getElementById("statRoleEvents").textContent = allLogs.filter(l => {
+      const a = (l.action || "").toUpperCase();
+      return a.includes("ROLE") || a.includes("DEACTIVAT") || a.includes("ACTIVAT") || a.includes("MEMBER");
+    }).length;
+    document.getElementById("statInviteEvents").textContent = allLogs.filter(l => {
+      const a = (l.action || "").toUpperCase();
+      return a.includes("INVIT") || a.includes("LOGIN") || a.includes("AUTH") || a.includes("REGISTER");
+    }).length;
   }
 
   function renderLogs() {
@@ -197,9 +211,22 @@
     const actionFilter = document.getElementById("actionFilter").value;
 
     const filtered = allLogs.filter(l => {
-      if (actionFilter && !(l.action || "").includes(actionFilter)) return false;
+      const action = (l.action || "").toUpperCase();
+      if (actionFilter) {
+        if (actionFilter === "RENEWAL" && !action.includes("RENEWAL")) return false;
+        if (actionFilter === "LOGIN_AUTH" && !action.includes("LOGIN") && !action.includes("AUTH") && !action.includes("REGISTER")) return false;
+        if (actionFilter === "INVITE" && !action.includes("INVIT")) return false;
+        if (actionFilter === "ROLE_ACCOUNT" && !action.includes("ROLE") && !action.includes("DEACTIVAT") && !action.includes("ACTIVAT") && !action.includes("MEMBER")) return false;
+        if (actionFilter === "SYSTEM" && !action.includes("SYSTEM")) return false;
+        if (!["RENEWAL", "LOGIN_AUTH", "INVITE", "ROLE_ACCOUNT", "SYSTEM"].includes(actionFilter) && !action.includes(actionFilter.toUpperCase())) return false;
+      }
       if (search) {
-        const text = `${l.actor_name} ${l.actor_email} ${l.action} ${l.details}`.toLowerCase();
+        const actorName = l.actor_name || l.actorName || "";
+        const actorEmail = l.actor_email || l.actorEmail || "";
+        const details = l.details || "";
+        const targetType = l.target_type || l.targetType || "";
+        const targetId = l.target_id || l.targetId || "";
+        const text = `${actorName} ${actorEmail} ${action} ${details} ${targetType} ${targetId}`.toLowerCase();
         if (!text.includes(search)) return false;
       }
       return true;
@@ -216,13 +243,17 @@
     }
 
     tbody.innerHTML = filtered.map(l => {
-      const created = new Date(l.created_at || l.createdAt);
+      const createdRaw = l.created_at || l.createdAt || Date.now();
+      const created = new Date(createdRaw);
       const timeStr = created.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) +
         " " + created.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
-      const actorInitials = ((l.actor_name || "System")[0] || "S").toUpperCase();
-      const actorRole = l.actor_role || "User";
+      const actorName = l.actor_name || l.actorName || "System";
+      const actorEmail = l.actor_email || l.actorEmail || "system@renewaltrack.com";
+      const actorRole = l.actor_role || l.actorRole || "User";
+      const actorInitials = ((actorName || "S")[0] || "S").toUpperCase();
       const actionPill = getActionPill(l.action);
+      const targetType = l.target_type || l.targetType || "system";
 
       return `
         <tr>
@@ -233,8 +264,8 @@
             <div style="display:flex;align-items:center;gap:8px;">
               <div class="avatar" style="width:28px;height:28px;font-size:11px;">${actorInitials}</div>
               <div>
-                <strong style="display:block;font-size:13px;color:var(--text);">${escapeHtml(l.actor_name || 'System')}</strong>
-                <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(l.actor_email || 'system')} &middot; <span class="role-pill-badge role-${actorRole.toLowerCase()}" style="font-size:10px;padding:1px 6px;">${actorRole}</span></span>
+                <strong style="display:block;font-size:13px;color:var(--text);">${escapeHtml(actorName)}</strong>
+                <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(actorEmail)} &middot; <span class="role-pill-badge role-${actorRole.toLowerCase()}" style="font-size:10px;padding:1px 6px;">${escapeHtml(actorRole)}</span></span>
               </div>
             </div>
           </td>
@@ -244,7 +275,7 @@
           </td>
           <td>
             <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--bg-surface-2);color:var(--text-muted);text-transform:uppercase;font-weight:600;">
-              ${escapeHtml(l.target_type || 'system')}
+              ${escapeHtml(targetType)}
             </span>
           </td>
         </tr>`;
@@ -256,16 +287,16 @@
   function getActionPill(action) {
     if (!action) return `<span class="status-pill">EVENT</span>`;
     const act = action.toUpperCase();
-    if (act.includes("CREATE") || act.includes("ACCEPTED")) {
-      return `<span class="status-pill status-active">${action}</span>`;
+    if (act.includes("CREATE") || act.includes("ACCEPTED") || act.includes("RENEWED") || act.includes("LOGIN")) {
+      return `<span class="status-pill status-active">${escapeHtml(action)}</span>`;
     }
     if (act.includes("DELETE") || act.includes("DEACTIVATE") || act.includes("REVOKE") || act.includes("REJECTED")) {
-      return `<span class="status-pill status-deactivated">${action}</span>`;
+      return `<span class="status-pill status-deactivated">${escapeHtml(action)}</span>`;
     }
-    if (act.includes("ROLE") || act.includes("UPDATE") || act.includes("INVITE")) {
-      return `<span class="status-pill status-pending">${action}</span>`;
+    if (act.includes("ROLE") || act.includes("UPDATE") || act.includes("INVITE") || act.includes("REGISTER")) {
+      return `<span class="status-pill status-pending">${escapeHtml(action)}</span>`;
     }
-    return `<span class="status-pill">${action}</span>`;
+    return `<span class="status-pill">${escapeHtml(action)}</span>`;
   }
 
   function exportAuditCSV() {
@@ -275,14 +306,14 @@
     }
     const headers = ["ID", "Timestamp", "Actor Name", "Actor Email", "Actor Role", "Action", "Target Type", "Target ID", "Details"];
     const rows = allLogs.map(l => [
-      l.id,
-      new Date(l.created_at || l.createdAt).toISOString(),
-      l.actor_name || "",
-      l.actor_email || "",
-      l.actor_role || "",
+      l.id || "",
+      new Date(l.created_at || l.createdAt || Date.now()).toISOString(),
+      l.actor_name || l.actorName || "",
+      l.actor_email || l.actorEmail || "",
+      l.actor_role || l.actorRole || "",
       l.action || "",
-      l.target_type || "",
-      l.target_id || "",
+      l.target_type || l.targetType || "",
+      l.target_id || l.targetId || "",
       (l.details || "").replace(/"/g, '""')
     ]);
 

@@ -2673,14 +2673,23 @@
       async getLogs(params = {}) {
         const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH);
         const qs = new URLSearchParams(params).toString();
-        const res = await fetch(apiUrl("/api/audit/logs" + (qs ? "?" + qs : "")), {
-          headers: {
-            Authorization: "Bearer " + token,
-            "x-user-role": getCurrentUser().role,
-            "x-user-email": getCurrentUser().email,
-          },
-        });
-        return res.json();
+        try {
+          const res = await fetch(apiUrl("/api/audit/logs" + (qs ? "?" + qs : "")), {
+            headers: {
+              Authorization: "Bearer " + token,
+              "x-user-role": getCurrentUser().role,
+              "x-user-email": getCurrentUser().email,
+            },
+          });
+          const data = await res.json();
+          if (data && data.ok) {
+            const list = data.logs || data.data || [];
+            return { ok: true, logs: list, data: list };
+          }
+          return data;
+        } catch (e) {
+          return { ok: true, logs: [], data: [] };
+        }
       },
     },
     settings: {

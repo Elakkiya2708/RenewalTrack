@@ -945,11 +945,19 @@ const db = {
     const store = getLocalStore();
     let logs = store.audit_logs || [];
     if (action && action !== "ALL") {
-      logs = logs.filter((l) => l.action === action);
+      const act = action.toUpperCase();
+      logs = logs.filter((l) => (l.action || "").toUpperCase().includes(act));
     }
     if (search) {
       const q = search.toLowerCase();
-      logs = logs.filter((l) => (l.details || "").toLowerCase().includes(q) || (l.actorName || "").toLowerCase().includes(q) || (l.actorEmail || "").toLowerCase().includes(q));
+      logs = logs.filter(
+        (l) =>
+          (l.details || "").toLowerCase().includes(q) ||
+          (l.actorName || "").toLowerCase().includes(q) ||
+          (l.actorEmail || "").toLowerCase().includes(q) ||
+          (l.action || "").toLowerCase().includes(q) ||
+          (l.targetType || "").toLowerCase().includes(q)
+      );
     }
     return logs.slice(0, limit);
   },
