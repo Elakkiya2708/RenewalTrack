@@ -90,28 +90,6 @@
       RTS.toast("Welcome back! Redirecting to your dashboard…", "success");
       setTimeout(() => (window.location.href = "dashboard.html"), 400);
     });
-
-    const demoBtn = document.getElementById("fillDemoBtn");
-    if (demoBtn) {
-      demoBtn.addEventListener("click", () => {
-        document.getElementById("loginEmail").value = "elakkiyaohai@gmail.com";
-        document.getElementById("loginPassword").value = "Admin@1234";
-        RTS.toast("Primary Admin credentials filled in.", "info");
-      });
-    }
-
-    document.querySelectorAll(".demo-role-chip").forEach((chip) => {
-      chip.addEventListener("click", () => {
-        const email = chip.getAttribute("data-email");
-        const pass = chip.getAttribute("data-pass");
-        document.getElementById("loginEmail").value = email;
-        document.getElementById("loginPassword").value = pass;
-        const roleLabel = chip.querySelector(".role-pill-badge")
-          ? chip.querySelector(".role-pill-badge").textContent
-          : "User";
-        RTS.toast(`Selected ${roleLabel} credentials (${email}).`, "info");
-      });
-    });
   }
 
   async function initRegisterPage() {
