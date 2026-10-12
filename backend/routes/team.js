@@ -76,6 +76,10 @@ router.post("/invites", async (req, res) => {
     res.status(201).json({
       ok: true,
       data: invite,
+      invitation: invite,
+      inviteUrl: invite.inviteUrl,
+      emailSent: invite.emailSent,
+      emailSimulated: invite.emailSimulated,
       message: `Invitation successfully dispatched to ${email}.`,
     });
   } catch (err) {
@@ -87,7 +91,7 @@ router.post("/invites", async (req, res) => {
 router.get("/invites", async (req, res) => {
   try {
     const invites = await db.getInvitations();
-    res.json({ ok: true, data: invites });
+    res.json({ ok: true, data: invites, invitations: invites });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }

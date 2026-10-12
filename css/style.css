@@ -1825,7 +1825,8 @@ table.data-table tbody tr:hover {
    Modal
    ========================================================================== */
 
-.modal-overlay {
+.modal-overlay,
+.modal-backdrop {
   position: fixed;
   inset: 0;
   background: var(--overlay);
@@ -1837,8 +1838,9 @@ table.data-table tbody tr:hover {
   overflow-y: auto;
 }
 
-.modal-overlay.open {
-  display: flex;
+.modal-overlay.open,
+.modal-backdrop.open {
+  display: flex !important;
 }
 
 .modal {

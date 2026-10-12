@@ -213,14 +213,14 @@
 </div>
 
 <!-- Modal: Invite Member -->
-<div class="modal-backdrop" id="inviteModal" style="display:none;">
-  <div class="modal-box" style="max-width:520px;">
+<div class="modal-overlay" id="inviteModal">
+  <div class="modal" style="max-width:520px;">
     <div class="modal-header">
       <h3 style="display:flex;align-items:center;gap:8px;">
         <i data-lucide="user-plus" class="icon" style="color:var(--accent);"></i>
         Invite New Team Member
       </h3>
-      <button class="modal-close" data-modal-close>&times;</button>
+      <button class="modal-close" data-close-modal="inviteModal" aria-label="Close modal">&times;</button>
     </div>
     <div class="modal-body">
       <p style="font-size:13px;color:var(--text-mid);margin-bottom:16px;">
@@ -257,8 +257,8 @@
 
         <div id="inviteResultBox" style="display:none;margin-bottom:16px;"></div>
 
-        <div class="modal-footer" style="padding:0;margin-top:20px;border-top:none;display:flex;justify-content:flex-end;gap:8px;">
-          <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+        <div class="modal-footer" style="padding:16px 0 0 0;margin-top:16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;">
+          <button type="button" class="btn btn-secondary" data-close-modal="inviteModal">Cancel</button>
           <button type="submit" class="btn btn-primary" id="sendInviteBtn">
             <i data-lucide="send" class="icon"></i>Send Invitation
           </button>
@@ -269,14 +269,14 @@
 </div>
 
 <!-- Modal: Change Role -->
-<div class="modal-backdrop" id="roleModal" style="display:none;">
-  <div class="modal-box" style="max-width:440px;">
+<div class="modal-overlay" id="roleModal">
+  <div class="modal" style="max-width:440px;">
     <div class="modal-header">
       <h3 style="display:flex;align-items:center;gap:8px;">
         <i data-lucide="shield" class="icon" style="color:var(--accent);"></i>
         Modify Member Role
       </h3>
-      <button class="modal-close" data-modal-close>&times;</button>
+      <button class="modal-close" data-close-modal="roleModal" aria-label="Close modal">&times;</button>
     </div>
     <div class="modal-body">
       <p style="font-size:13px;color:var(--text-mid);margin-bottom:14px;">
@@ -296,8 +296,8 @@
         ⚠️ Granting Administrator role gives full team and renewal management privileges.
       </div>
 
-      <div class="modal-footer" style="padding:0;margin-top:20px;border-top:none;display:flex;justify-content:flex-end;gap:8px;">
-        <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+      <div class="modal-footer" style="padding:16px 0 0 0;margin-top:16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;">
+        <button type="button" class="btn btn-secondary" data-close-modal="roleModal">Cancel</button>
         <button type="button" class="btn btn-primary" id="saveRoleBtn">
           Save Role
         </button>
@@ -307,21 +307,21 @@
 </div>
 
 <!-- Modal: Toggle Status (Deactivate / Reactivate) -->
-<div class="modal-backdrop" id="statusModal" style="display:none;">
-  <div class="modal-box" style="max-width:440px;">
+<div class="modal-overlay" id="statusModal">
+  <div class="modal" style="max-width:440px;">
     <div class="modal-header">
       <h3 id="statusModalTitle" style="display:flex;align-items:center;gap:8px;">
         <i data-lucide="alert-triangle" class="icon" style="color:var(--danger);"></i>
         Confirm Account Status Change
       </h3>
-      <button class="modal-close" data-modal-close>&times;</button>
+      <button class="modal-close" data-close-modal="statusModal" aria-label="Close modal">&times;</button>
     </div>
     <div class="modal-body">
       <p id="statusModalDesc" style="font-size:13px;color:var(--text-mid);margin-bottom:16px;">
         Are you sure you want to deactivate this account? The user will immediately be barred from signing in.
       </p>
-      <div class="modal-footer" style="padding:0;margin-top:20px;border-top:none;display:flex;justify-content:flex-end;gap:8px;">
-        <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+      <div class="modal-footer" style="padding:16px 0 0 0;margin-top:16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;">
+        <button type="button" class="btn btn-secondary" data-close-modal="statusModal">Cancel</button>
         <button type="button" class="btn btn-danger" id="confirmStatusBtn">
           Confirm
         </button>
@@ -393,8 +393,9 @@
   async function loadInvites() {
     try {
       const res = await RTS.team.getInvites();
-      if (res.ok && Array.isArray(res.invitations)) {
-        allInvites = res.invitations;
+      const list = (res && (res.invitations || res.data)) || [];
+      if (res && res.ok && Array.isArray(list)) {
+        allInvites = list;
         renderInvites();
         updateStats();
       }
@@ -605,7 +606,13 @@
           await navigator.clipboard.writeText(url);
           RTS.toast("Invitation link copied to clipboard!", "success");
         } catch (e) {
-          prompt("Copy invitation link:", url);
+          const temp = document.createElement("input");
+          temp.value = url;
+          document.body.appendChild(temp);
+          temp.select();
+          document.execCommand("copy");
+          document.body.removeChild(temp);
+          RTS.toast("Invitation link copied to clipboard!", "success");
         }
       });
     });
@@ -664,6 +671,15 @@
       RTS.toast("Invitations refreshed.", "info");
     });
 
+    function handleInviteHash() {
+      if (window.location.hash === "#invite") {
+        document.getElementById("inviteResultBox").style.display = "none";
+        document.getElementById("inviteEmailError").style.display = "none";
+        document.getElementById("inviteForm").reset();
+        RTS.modal.open("inviteModal");
+      }
+    }
+
     document.getElementById("openInviteModalBtn").addEventListener("click", () => {
       document.getElementById("inviteResultBox").style.display = "none";
       document.getElementById("inviteEmailError").style.display = "none";
@@ -671,11 +687,19 @@
       RTS.modal.open("inviteModal");
     });
 
-    // Check if URL has #invite hash
-    if (window.location.hash === "#invite") {
-      setTimeout(() => {
+    // Check if URL has #invite hash & listen for hash changes
+    handleInviteHash();
+    window.addEventListener("hashchange", handleInviteHash);
+
+    // Also handle any click on sidebar invite link
+    const sideInvite = document.getElementById("sidebarInviteLink");
+    if (sideInvite) {
+      sideInvite.addEventListener("click", () => {
+        document.getElementById("inviteResultBox").style.display = "none";
+        document.getElementById("inviteEmailError").style.display = "none";
+        document.getElementById("inviteForm").reset();
         RTS.modal.open("inviteModal");
-      }, 300);
+      });
     }
 
     document.getElementById("newRoleSelect").addEventListener("change", (e) => {
@@ -744,35 +768,48 @@
         btn.innerHTML = `<i data-lucide="send" class="icon"></i>Send Invitation`;
         RTS.refreshIcons();
 
-        if (res.ok) {
-          const inviteUrl = res.inviteUrl || `${window.location.origin}/register.html?invite=${encodeURIComponent(res.invitation ? res.invitation.token : '')}`;
+        if (res && res.ok) {
+          const inv = res.invitation || res.data || {};
+          const token = inv.token || res.token || "";
+          const inviteUrl = res.inviteUrl || inv.inviteUrl || `${window.location.origin}/register.html?invite=${encodeURIComponent(token)}`;
+          const emailSent = res.emailSent !== undefined ? res.emailSent : (inv.emailSent !== undefined ? inv.emailSent : true);
+
           const resultBox = document.getElementById("inviteResultBox");
           resultBox.style.display = "block";
           resultBox.innerHTML = `
-            <div class="copy-link-box">
-              <strong style="display:block;font-size:12px;margin-bottom:4px;color:var(--text);">
+            <div class="copy-link-box" style="background:var(--bg-surface-2);padding:14px;border-radius:8px;border:1px solid var(--border-color);margin-bottom:12px;">
+              <strong style="display:block;font-size:12px;margin-bottom:6px;color:var(--text);">
                 ✅ Invitation Created! Secure Registration Link:
               </strong>
               <div style="display:flex;gap:6px;align-items:center;">
-                <input type="text" class="input" readonly value="${escapeHtml(inviteUrl)}" id="generatedInviteInput" style="height:32px;font-size:12px;" />
+                <input type="text" class="input" readonly value="${escapeHtml(inviteUrl)}" id="generatedInviteInput" style="height:34px;font-size:12px;" />
                 <button type="button" class="btn btn-secondary btn-sm" id="copyGeneratedInviteBtn" style="white-space:nowrap;">
                   Copy Link
                 </button>
               </div>
-              <p style="font-size:11px;color:var(--text-muted);margin:4px 0 0;">
-                ${res.emailSent ? "Email notification dispatched to recipient." : "Email delivery simulated. You can also share the direct link above."}
+              <p style="font-size:11px;color:var(--text-muted);margin:6px 0 0;">
+                ${emailSent ? "Email notification dispatched to recipient." : "Email delivery simulated. You can also share the direct link above."}
               </p>
             </div>
           `;
           document.getElementById("copyGeneratedInviteBtn").addEventListener("click", async () => {
-            await navigator.clipboard.writeText(inviteUrl);
-            RTS.toast("Link copied to clipboard!", "success");
+            try {
+              await navigator.clipboard.writeText(inviteUrl);
+              RTS.toast("Link copied to clipboard!", "success");
+            } catch (copyErr) {
+              const inp = document.getElementById("generatedInviteInput");
+              if (inp) {
+                inp.select();
+                document.execCommand("copy");
+                RTS.toast("Link copied to clipboard!", "success");
+              }
+            }
           });
 
           RTS.toast("Invitation generated successfully!", "success");
           loadInvites();
         } else {
-          errEl.textContent = res.error || "Failed to create invitation.";
+          errEl.textContent = (res && res.error) || "Failed to create invitation.";
           errEl.style.display = "block";
         }
       } catch (err) {

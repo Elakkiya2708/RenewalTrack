@@ -730,8 +730,8 @@ const db = {
       email: cleanEmail,
       fullName: (fullName || "").trim(),
       role: cleanRole,
-      invitedBy: actor.email || "demo@renewaltrack.com",
-      invitedByName: actor.fullName || "Administrator",
+      invitedBy: actor.email || "elakkiyaohai@gmail.com",
+      invitedByName: actor.fullName || "Elakkiya",
       token,
       status: "pending",
       expiresAt,
@@ -762,9 +762,9 @@ const db = {
     });
 
     await this.logAudit({
-      actorId: actor.id || "admin",
-      actorName: actor.fullName || "Administrator",
-      actorEmail: actor.email || "demo@renewaltrack.com",
+      actorId: actor.id || "usr-admin-elakkiya",
+      actorName: actor.fullName || "Elakkiya",
+      actorEmail: actor.email || "elakkiyaohai@gmail.com",
       actorRole: actor.role || "Admin",
       action: "MEMBER_INVITED",
       targetType: "invitation",
@@ -878,9 +878,9 @@ const db = {
     }
 
     await this.logAudit({
-      actorId: actor.id || "admin",
-      actorName: actor.fullName || "Administrator",
-      actorEmail: actor.email || "demo@renewaltrack.com",
+      actorId: actor.id || "usr-admin-elakkiya",
+      actorName: actor.fullName || "Elakkiya",
+      actorEmail: actor.email || "elakkiyaohai@gmail.com",
       actorRole: actor.role || "Admin",
       action: "INVITE_REVOKED",
       targetType: "invitation",

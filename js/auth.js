@@ -110,8 +110,8 @@
       try {
         const res = await fetch(RTS.apiUrl(`/api/auth/invite-info/${encodeURIComponent(inviteToken)}`));
         const data = await res.json();
-        if (data.ok && data.invitation) {
-          const inv = data.invitation;
+        const inv = data && (data.invitation || data.invite);
+        if (data && data.ok && inv) {
           if (banner) {
             banner.style.display = "block";
             const badge = document.getElementById("invitedRoleBadge");

@@ -301,15 +301,17 @@ router.get("/invite-info/:token", async (req, res) => {
     if (invite.status !== "pending") {
       return res.status(400).json({ ok: false, error: `This invitation has already been ${invite.status}.` });
     }
+    const info = {
+      email: invite.email,
+      fullName: invite.fullName,
+      role: invite.role,
+      invitedByName: invite.invitedByName,
+      expiresAt: invite.expiresAt,
+    };
     res.json({
       ok: true,
-      invite: {
-        email: invite.email,
-        fullName: invite.fullName,
-        role: invite.role,
-        invitedByName: invite.invitedByName,
-        expiresAt: invite.expiresAt,
-      },
+      invite: info,
+      invitation: info,
     });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });

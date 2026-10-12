@@ -1241,6 +1241,7 @@
     const el = document.getElementById(id);
     if (!el) return;
     el.classList.add("open");
+    el.style.display = "flex";
     document.body.style.overflow = "hidden";
     refreshIcons();
   }
@@ -1249,21 +1250,30 @@
     const el = document.getElementById(id);
     if (!el) return;
     el.classList.remove("open");
+    el.style.display = "none";
     document.body.style.overflow = "";
   }
 
   function initModalDismiss() {
-    document.querySelectorAll(".modal-overlay").forEach((overlay) => {
+    document.querySelectorAll(".modal-overlay, .modal-backdrop").forEach((overlay) => {
       overlay.addEventListener("click", (e) => {
         if (e.target === overlay) closeModal(overlay.id);
       });
     });
-    document.querySelectorAll("[data-close-modal]").forEach((btn) => {
-      btn.addEventListener("click", () => closeModal(btn.getAttribute("data-close-modal")));
+    document.querySelectorAll("[data-close-modal], [data-modal-close]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-close-modal") || btn.getAttribute("data-modal-close");
+        if (id) {
+          closeModal(id);
+        } else {
+          const parentOverlay = btn.closest(".modal-overlay, .modal-backdrop");
+          if (parentOverlay) closeModal(parentOverlay.id);
+        }
+      });
     });
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
-        document.querySelectorAll(".modal-overlay.open").forEach((o) => closeModal(o.id));
+        document.querySelectorAll(".modal-overlay.open, .modal-backdrop.open").forEach((o) => closeModal(o.id));
       }
     });
   }
