@@ -23,9 +23,24 @@
 @media (max-width: 900px) {
   .auth-shell {
     grid-template-columns: 1fr;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    max-height: none;
+    overflow-y: auto;
   }
   .auth-visual {
     display: none;
+  }
+  .auth-panel {
+    padding: 24px 18px;
+    height: auto;
+    min-height: 100vh;
+  }
+  .auth-card {
+    max-width: 100%;
+    box-shadow: var(--shadow-1);
+    padding: 22px 20px;
   }
 
   .sidebar {
@@ -121,6 +136,10 @@
   }
   .auth-panel {
     padding: 24px 18px;
+  }
+  .auth-card .field-row {
+    grid-template-columns: 1fr;
+    gap: 9px;
   }
 }
 
