@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" type="image/png" href="assets/favicon.png" data-img-indigo="assets/favicon.png" data-img-gold="assets/favicon-gold.png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Documents — Renewal Tracking System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/responsive.css" />
+<script src="js/app.js"></script>
+<script>RTS.auth.requireAuth();</script>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img class="brand-mark" src="assets/logo.png" data-img-indigo="assets/logo.png" data-img-gold="assets/logo-gold.png" alt="RenewalTrack logo" />
+      <span>RenewalTrack</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Main</div>
+      <a href="dashboard.html" class="nav-link"><i data-lucide="layout-dashboard" class="icon"></i>Dashboard</a>
+      <a href="records.html" class="nav-link"><i data-lucide="file-text" class="icon"></i>Renewal Records</a>
+      <a href="calendar.html" class="nav-link"><i data-lucide="calendar" class="icon"></i>Calendar</a>
+      <a href="reminders.html" class="nav-link"><i data-lucide="bell" class="icon"></i>Reminders</a>
+      <a href="history.html" class="nav-link"><i data-lucide="history" class="icon"></i>Renewal History</a>
+      <a href="documents.html" class="nav-link"><i data-lucide="folder" class="icon"></i>Documents</a>
+      <a href="reports.html" class="nav-link"><i data-lucide="bar-chart-2" class="icon"></i>Reports</a>
+      <div class="sidebar-section-label">Account</div>
+      <a href="settings.html" class="nav-link"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </nav>
+    <div class="sidebar-footer">© 2026 RenewalTrack Inc.</div>
+  </aside>
+  <div class="sidebar-overlay"></div>
+
+  <div class="main-area">
+    <header class="topbar">
+      <button class="sidebar-toggle" aria-label="Toggle menu"><i data-lucide="menu" class="icon"></i></button>
+      <div class="topbar-actions">
+        <div class="dropdown-wrap">
+          <button class="icon-btn" data-dropdown-trigger="notifPanel" aria-label="Notifications">
+            <i data-lucide="bell" class="icon"></i>
+            <span class="dot" id="notifDot" style="display:none;"></span>
+          </button>
+          <div class="dropdown-panel" id="notifPanel">
+            <div class="dropdown-header"><strong>Notifications</strong> <span id="notifCount">0</span> urgent renewal(s)</div>
+            <div class="notif-list" id="notifList"></div>
+          </div>
+        </div>
+        <div class="dropdown-wrap">
+          <div class="user-menu-trigger" data-dropdown-trigger="userPanel">
+            <div class="avatar" data-user-initials>—</div>
+            <span class="uname" data-user-name>User</span>
+            <i data-lucide="chevron-down" class="icon" style="width:14px;height:14px;"></i>
+          </div>
+          <div class="dropdown-panel" id="userPanel">
+            <div class="dropdown-header"><strong data-user-name>User</strong><span data-user-email>—</span></div>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="user" class="icon"></i>Profile Settings</a>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="settings" class="icon"></i>App Settings</a>
+            <div class="dropdown-item" data-logout><i data-lucide="log-out" class="icon"></i>Logout</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="page-header">
+        <div>
+          <h1>Documents</h1>
+          <p>Every file attached to a renewal record, in one library.</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" id="openUploadBtn"><i data-lucide="upload-cloud" class="icon"></i>Upload Document</button>
+        </div>
+      </div>
+
+      <div class="table-toolbar">
+        <div class="topbar-search">
+          <i data-lucide="search" class="icon"></i>
+          <input type="text" id="docSearch" placeholder="Search documents…" />
+        </div>
+        <select class="select-filter" id="filterDocType">
+          <option value="">All File Types</option>
+          <option value="PDF">PDF</option>
+          <option value="Image">Image</option>
+          <option value="Word">Word</option>
+          <option value="Spreadsheet">Spreadsheet</option>
+          <option value="File">Other</option>
+        </select>
+        <div class="table-toolbar-spacer"></div>
+        <span class="text-mid" id="docCount" style="font-size:12.5px;"></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Document Name</th>
+              <th>Related Renewal</th>
+              <th>File Type</th>
+              <th>Size</th>
+              <th>Upload Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="docsTableBody"></tbody>
+        </table>
+        <div id="docsEmptyState" class="empty-state hidden">
+          <i data-lucide="folder-open" class="icon"></i>
+          <h4>No documents found</h4>
+          <p>Upload a document or adjust your search and filters.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal-overlay" id="uploadModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3>Upload Document</h3>
+      <button class="modal-close" data-close-modal="uploadModal"><i data-lucide="x" class="icon"></i></button>
+    </div>
+    <form id="docUploadForm" novalidate>
+      <div class="modal-body">
+        <div class="field" id="uf_renewal">
+          <label for="uf_renewalSelect">Related Renewal Record <span class="req">*</span></label>
+          <select class="input" id="uf_renewalSelect"></select>
+          <span class="error-msg">Select a renewal record.</span>
+        </div>
+        <div class="field" id="uf_file">
+          <label>File <span class="req">*</span></label>
+          <div class="upload-zone" id="docUploadZone">
+            <i data-lucide="upload-cloud" class="icon"></i>
+            <strong>Click to choose a file</strong>
+            <span>PDF, JPG, PNG, DOCX, XLSX up to 10MB</span>
+          </div>
+          <input type="file" id="docFileInput" style="display:none;" />
+          <div class="upload-file-list" id="docFileList"></div>
+          <span class="error-msg">Please choose a file to upload.</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="uploadModal">Cancel</button>
+        <button type="submit" class="btn btn-primary">Upload</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Delete Confirm -->
+<div class="modal-overlay" id="deleteDocModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3>Delete Document?</h3>
+      <button class="modal-close" data-close-modal="deleteDocModal"><i data-lucide="x" class="icon"></i></button>
+    </div>
+    <div class="modal-body">
+      <p class="text-mid">This document will be permanently removed from its renewal record.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close-modal="deleteDocModal">Cancel</button>
+      <button class="btn btn-danger" id="confirmDeleteDocBtn"><i data-lucide="trash-2" class="icon"></i>Delete</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/documents.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>RTS.refreshIcons();</script>
+</body>
+</html>

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" type="image/png" href="assets/favicon.png" data-img-indigo="assets/favicon.png" data-img-gold="assets/favicon-gold.png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Renewal Details — Renewal Tracking System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/responsive.css" />
+<script src="js/app.js"></script>
+<script>RTS.auth.requireAuth();</script>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img class="brand-mark" src="assets/logo.png" data-img-indigo="assets/logo.png" data-img-gold="assets/logo-gold.png" alt="RenewalTrack logo" />
+      <span>RenewalTrack</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Main</div>
+      <a href="dashboard.html" class="nav-link"><i data-lucide="layout-dashboard" class="icon"></i>Dashboard</a>
+      <a href="records.html" class="nav-link"><i data-lucide="file-text" class="icon"></i>Renewal Records</a>
+      <a href="calendar.html" class="nav-link"><i data-lucide="calendar" class="icon"></i>Calendar</a>
+      <a href="reminders.html" class="nav-link"><i data-lucide="bell" class="icon"></i>Reminders</a>
+      <a href="history.html" class="nav-link"><i data-lucide="history" class="icon"></i>Renewal History</a>
+      <a href="documents.html" class="nav-link"><i data-lucide="folder" class="icon"></i>Documents</a>
+      <a href="reports.html" class="nav-link"><i data-lucide="bar-chart-2" class="icon"></i>Reports</a>
+      <div class="sidebar-section-label">Account</div>
+      <a href="settings.html" class="nav-link"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </nav>
+    <div class="sidebar-footer">© 2026 RenewalTrack Inc.</div>
+  </aside>
+  <div class="sidebar-overlay"></div>
+
+  <div class="main-area">
+    <header class="topbar">
+      <button class="sidebar-toggle" aria-label="Toggle menu"><i data-lucide="menu" class="icon"></i></button>
+      <div class="topbar-actions">
+        <div class="dropdown-wrap">
+          <button class="icon-btn" data-dropdown-trigger="notifPanel" aria-label="Notifications">
+            <i data-lucide="bell" class="icon"></i>
+            <span class="dot" id="notifDot" style="display:none;"></span>
+          </button>
+          <div class="dropdown-panel" id="notifPanel">
+            <div class="dropdown-header"><strong>Notifications</strong> <span id="notifCount">0</span> urgent renewal(s)</div>
+            <div class="notif-list" id="notifList"></div>
+          </div>
+        </div>
+        <div class="dropdown-wrap">
+          <div class="user-menu-trigger" data-dropdown-trigger="userPanel">
+            <div class="avatar" data-user-initials>—</div>
+            <span class="uname" data-user-name>User</span>
+            <i data-lucide="chevron-down" class="icon" style="width:14px;height:14px;"></i>
+          </div>
+          <div class="dropdown-panel" id="userPanel">
+            <div class="dropdown-header"><strong data-user-name>User</strong><span data-user-email>—</span></div>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="user" class="icon"></i>Profile Settings</a>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="settings" class="icon"></i>App Settings</a>
+            <div class="dropdown-item" data-logout><i data-lucide="log-out" class="icon"></i>Logout</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content" id="detailContent">
+      <a href="records.html" class="link" style="display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;"><i data-lucide="arrow-left" class="icon" style="width:15px;height:15px;"></i>Back to Renewal Records</a>
+
+      <div class="page-header">
+        <div>
+          <div class="detail-title-row">
+            <h1 id="dName">Loading…</h1>
+            <span id="dStatusBadge"></span>
+          </div>
+          <p id="dSubtitle">—</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary" id="exportIcsBtn"><i data-lucide="calendar" class="icon"></i><span data-i18n="exportCalendar">Export to Calendar</span></button>
+          <button class="btn btn-secondary" id="editBtn"><i data-lucide="edit-3" class="icon"></i>Edit</button>
+          <button class="btn btn-danger" id="deleteBtn"><i data-lucide="trash-2" class="icon"></i>Delete</button>
+          <button class="btn btn-primary" id="renewBtn"><i data-lucide="refresh-cw" class="icon"></i>Mark as Renewed</button>
+        </div>
+      </div>
+
+      <div class="detail-grid">
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div class="card">
+            <div class="card-header"><h3>Record Information</h3></div>
+            <div class="info-grid" id="infoGrid"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><h3>Attached Documents</h3></div>
+            <div class="doc-list" id="docList"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><h3>Renewal Timeline &amp; History</h3></div>
+            <div class="timeline" id="timelineList"></div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div class="card days-remaining-card">
+            <div class="value" id="daysValue">—</div>
+            <div class="label" id="daysLabel">days remaining</div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>At a Glance</h3></div>
+            <div class="info-grid" style="grid-template-columns:1fr;gap:14px;">
+              <div class="info-item"><span>Priority</span><strong id="glancePriority"></strong></div>
+              <div class="info-item"><span>Category</span><strong id="glanceCategory"></strong></div>
+              <div class="info-item"><span>Recurring Cycle</span><strong id="glanceCycle">—</strong></div>
+              <div class="info-item"><span>Record ID</span><strong id="glanceCode"></strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Mark as Renewed Modal -->
+<div class="modal-overlay" id="renewModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3>Mark as Renewed</h3>
+      <button class="modal-close" data-close-modal="renewModal"><i data-lucide="x" class="icon"></i></button>
+    </div>
+    <form id="renewForm" novalidate>
+      <div class="modal-body">
+        <div class="field" style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label style="margin:0;font-size:12.5px;color:var(--text-mid);">Quick Recurrence Presets:</label>
+            <span id="renewCycleNotice" style="font-size:11.5px;color:var(--accent);font-weight:600;"></span>
+          </div>
+          <div class="cycle-btn-group" id="cyclePresetGroup">
+            <button type="button" class="btn btn-ghost btn-sm" data-add-months="1">+1M</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-add-months="3">+3M</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-add-years="1">+1 Year</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-add-years="2">+2 Years</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-add-years="3">+3 Years</button>
+          </div>
+        </div>
+
+        <div class="field" id="rf_newExpiry">
+          <label for="renew_newExpiry">New Expiry Date <span class="req">*</span></label>
+          <input class="input" type="date" id="renew_newExpiry" />
+          <span class="error-msg">New expiry date must be after the current expiry date.</span>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="renew_cost">Renewal Cost</label>
+            <input class="input" type="number" min="0" step="0.01" id="renew_cost" />
+          </div>
+          <div class="field">
+            <label for="renew_currency">Currency</label>
+            <select class="input" id="renew_currency"></select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="renew_recurringCycle" data-i18n="recurringCycle">Renewal Cycle</label>
+          <select class="input" id="renew_recurringCycle"></select>
+        </div>
+        <div class="field" id="rf_renewedBy">
+          <label for="renew_renewedBy">Renewed By <span class="req">*</span></label>
+          <input class="input" id="renew_renewedBy" />
+          <span class="error-msg">Enter who processed this renewal.</span>
+        </div>
+        <div class="field">
+          <label for="renew_notes">Notes</label>
+          <textarea class="input" id="renew_notes" placeholder="Notes about this renewal"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="renewModal">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i data-lucide="check" class="icon"></i>Confirm Renewal</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3>Delete Renewal Record?</h3>
+      <button class="modal-close" data-close-modal="deleteModal"><i data-lucide="x" class="icon"></i></button>
+    </div>
+    <div class="modal-body">
+      <p class="text-mid">This will permanently remove this record and all of its history and documents. This action cannot be undone.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close-modal="deleteModal">Cancel</button>
+      <button class="btn btn-danger" id="confirmDeleteBtn"><i data-lucide="trash-2" class="icon"></i>Delete Record</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/details.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>RTS.refreshIcons();</script>
+</body>
+</html>

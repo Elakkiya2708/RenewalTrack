@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" type="image/png" href="assets/favicon.png" data-img-indigo="assets/favicon.png" data-img-gold="assets/favicon-gold.png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Settings — Renewal Tracking System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/responsive.css" />
+<script src="js/app.js"></script>
+<script>RTS.auth.requireAuth();</script>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img class="brand-mark" src="assets/logo.png" data-img-indigo="assets/logo.png" data-img-gold="assets/logo-gold.png" alt="RenewalTrack logo" />
+      <span>RenewalTrack</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Main</div>
+      <a href="dashboard.html" class="nav-link"><i data-lucide="layout-dashboard" class="icon"></i>Dashboard</a>
+      <a href="records.html" class="nav-link"><i data-lucide="file-text" class="icon"></i>Renewal Records</a>
+      <a href="calendar.html" class="nav-link"><i data-lucide="calendar" class="icon"></i>Calendar</a>
+      <a href="reminders.html" class="nav-link"><i data-lucide="bell" class="icon"></i>Reminders</a>
+      <a href="history.html" class="nav-link"><i data-lucide="history" class="icon"></i>Renewal History</a>
+      <a href="documents.html" class="nav-link"><i data-lucide="folder" class="icon"></i>Documents</a>
+      <a href="reports.html" class="nav-link"><i data-lucide="bar-chart-2" class="icon"></i>Reports</a>
+      <div class="sidebar-section-label">Account</div>
+      <a href="settings.html" class="nav-link"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </nav>
+    <div class="sidebar-footer">© 2026 RenewalTrack Inc.</div>
+  </aside>
+  <div class="sidebar-overlay"></div>
+
+  <div class="main-area">
+    <header class="topbar">
+      <button class="sidebar-toggle" aria-label="Toggle menu"><i data-lucide="menu" class="icon"></i></button>
+      <div class="topbar-actions">
+        <div class="dropdown-wrap">
+          <button class="icon-btn" data-dropdown-trigger="notifPanel" aria-label="Notifications">
+            <i data-lucide="bell" class="icon"></i>
+            <span class="dot" id="notifDot" style="display:none;"></span>
+          </button>
+          <div class="dropdown-panel" id="notifPanel">
+            <div class="dropdown-header"><strong>Notifications</strong> <span id="notifCount">0</span> urgent renewal(s)</div>
+            <div class="notif-list" id="notifList"></div>
+          </div>
+        </div>
+        <div class="dropdown-wrap">
+          <div class="user-menu-trigger" data-dropdown-trigger="userPanel">
+            <div class="avatar" data-user-initials>—</div>
+            <span class="uname" data-user-name>User</span>
+            <i data-lucide="chevron-down" class="icon" style="width:14px;height:14px;"></i>
+          </div>
+          <div class="dropdown-panel" id="userPanel">
+            <div class="dropdown-header"><strong data-user-name>User</strong><span data-user-email>—</span></div>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="user" class="icon"></i>Profile Settings</a>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="settings" class="icon"></i>App Settings</a>
+            <div class="dropdown-item" data-logout><i data-lucide="log-out" class="icon"></i>Logout</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="page-header">
+        <div>
+          <h1>Settings</h1>
+          <p>Manage your profile, preferences and security.</p>
+        </div>
+      </div>
+
+      <div class="settings-layout">
+        <div class="settings-tabs">
+          <div class="settings-tab active" data-tab="profile">Profile</div>
+          <div class="settings-tab" data-tab="application">Application</div>
+          <div class="settings-tab" data-tab="reminders">Reminder Preferences</div>
+          <div class="settings-tab" data-tab="notifications">Notifications</div>
+          <div class="settings-tab" data-tab="team">Team &amp; Roles</div>
+          <div class="settings-tab" data-tab="smartdoc">AI SmartDoc</div>
+          <div class="settings-tab" data-tab="audit">Audit Log &amp; Channels</div>
+          <div class="settings-tab" data-tab="security">Change Password</div>
+        </div>
+
+        <div>
+          <!-- Profile -->
+          <div class="settings-panel active card" id="panel-profile">
+            <div class="card-header"><h3>User Profile</h3></div>
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:22px;">
+              <div class="avatar avatar-lg" data-user-initials>—</div>
+              <div>
+                <strong style="display:block;font-size:15px;" data-user-name>User</strong>
+                <span class="text-mid" style="font-size:12.5px;" data-user-email>—</span>
+              </div>
+            </div>
+            <form id="profileForm" novalidate>
+              <div class="field-row">
+                <div class="field" id="pf_name">
+                  <label for="profileName">Full Name <span class="req">*</span></label>
+                  <input class="input" id="profileName" />
+                  <span class="error-msg">Enter your full name.</span>
+                </div>
+                <div class="field" id="pf_mobile">
+                  <label for="profileMobile">Mobile Number</label>
+                  <input class="input" id="profileMobile" />
+                </div>
+              </div>
+              <div class="field" id="pf_email">
+                <label for="profileEmail">Email Address</label>
+                <input class="input" id="profileEmail" disabled />
+              </div>
+              <button type="submit" class="btn btn-primary">Save Profile</button>
+            </form>
+          </div>
+
+          <!-- Application -->
+          <div class="settings-panel card" id="panel-application">
+            <div class="card-header"><h3>Application Settings</h3></div>
+            <div class="setting-row">
+              <div class="setting-row-text">
+                <strong>Theme</strong>
+                <span>Choose the colour theme for the whole app. The sidebar stays dark in every theme.</span>
+              </div>
+              <select class="select-filter" id="themeSelect">
+                <option value="indigo">Indigo (light)</option>
+                <option value="indigo-dark">Indigo (dark)</option>
+                <option value="gold">Black &amp; Gold</option>
+                <option value="gold-light">Ivory &amp; Gold</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <div class="setting-row-text">
+                <strong>Language / மொழி</strong>
+                <span>Interface language across all dashboards and records.</span>
+              </div>
+              <select class="select-filter" id="languageSelect">
+                <option value="en">English (US)</option>
+                <option value="ta">தமிழ் (Tamil)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Reminders -->
+          <div class="settings-panel card" id="panel-reminders">
+            <div class="card-header"><h3>Reminder Preferences</h3></div>
+            <p class="text-mid" style="font-size:13px;margin-bottom:14px;">Choose how many days before an expiry date you'd like automated email reminders sent.</p>
+            <div class="setting-row">
+              <div class="setting-row-text"><strong>30 days before expiry</strong><span>Early heads-up notice</span></div>
+              <label class="switch"><input type="checkbox" id="rem30" /><span class="slider"></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="setting-row-text"><strong>15 days before expiry</strong><span>Preparation & approval reminder</span></div>
+              <label class="switch"><input type="checkbox" id="rem15" /><span class="slider"></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="setting-row-text"><strong>7 days before expiry</strong><span>Urgent deadline warning</span></div>
+              <label class="switch"><input type="checkbox" id="rem7" /><span class="slider"></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="setting-row-text"><strong>On expiry date (0 days)</strong><span>Critical alert sent on the exact day of expiry</span></div>
+              <label class="switch"><input type="checkbox" id="rem0" /><span class="slider"></span></label>
+            </div>
+            <button type="button" class="btn btn-primary" id="saveRemindersBtn" style="margin-top:16px;">Save Preferences</button>
+          </div>
+
+          <!-- Notifications -->
+          <div class="settings-panel card" id="panel-notifications">
+            <div class="card-header"><h3>Notification &amp; Email Delivery Preferences</h3></div>
+            <div class="setting-row">
+              <div class="setting-row-text">
+                <strong>Real Email Reminders</strong>
+                <span>Send automated email notifications via Nodemailer or Resend for upcoming renewals.</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="notifyEmail" /><span class="slider"></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="setting-row-text">
+                <strong>Browser Notifications</strong>
+                <span>Show alerts inside the app when renewals are due.</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="notifyBrowser" /><span class="slider"></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="setting-row-text">
+                <strong>Weekly Digest</strong>
+                <span>A weekly summary of upcoming and overdue renewals.</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="notifyDigest" /><span class="slider"></span></label>
+            </div>
+
+            <!-- Email Delivery Configuration & Diagnostics -->
+            <div style="margin-top:24px;padding:16px;background:var(--bg-surface-2);border-radius:var(--r-md);border:1px solid var(--border);">
+              <h4 style="font-size:13.5px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+                <i data-lucide="mail" class="icon" style="color:var(--accent);"></i>
+                Automated Email Delivery Engine Status
+              </h4>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:10px;margin-bottom:16px;">
+                <div style="padding:10px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r-sm);">
+                  <span style="font-size:11px;color:var(--text-low);display:block;">Email Provider</span>
+                  <strong style="font-size:13px;" id="statEmailProvider">Nodemailer</strong>
+                </div>
+                <div style="padding:10px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r-sm);">
+                  <span style="font-size:11px;color:var(--text-low);display:block;">Delivery Mode</span>
+                  <strong style="font-size:13px;" id="statEmailMode">Simulation / Safe</strong>
+                </div>
+                <div style="padding:10px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r-sm);">
+                  <span style="font-size:11px;color:var(--text-low);display:block;">Background Cron</span>
+                  <strong style="font-size:13px;" id="statCronSchedule">Daily @ 08:00 AM</strong>
+                </div>
+                <div style="padding:10px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r-sm);">
+                  <span style="font-size:11px;color:var(--text-low);display:block;">Duplicate Prevention</span>
+                  <strong style="font-size:13px;color:var(--success);">Active in DB</strong>
+                </div>
+              </div>
+
+              <div class="field" style="margin-bottom:16px;">
+                <label for="notifyEmailFallback" style="font-size:12.5px;font-weight:600;display:block;margin-bottom:4px;">
+                  Default / Fallback Notification Email
+                </label>
+                <div style="display:flex;gap:8px;">
+                  <input type="email" class="input" id="notifyEmailFallback" placeholder="alerts@yourcompany.com" style="max-width:320px;" />
+                  <button type="button" class="btn btn-secondary btn-sm" id="btnSaveFallbackEmail">Save Email</button>
+                </div>
+                <span class="cell-sub" style="margin-top:4px;">Used when a renewal has no assigned person or invalid email.</span>
+              </div>
+
+              <!-- Live Test Actions -->
+              <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnSendTestEmail">
+                  <i data-lucide="send" class="icon"></i> Send Test Reminder Email
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" id="btnTriggerReminderCheck">
+                  <i data-lucide="play" class="icon"></i> Run Reminder Check Now
+                </button>
+              </div>
+              <div id="emailTestFeedback" style="display:none;margin-top:12px;padding:10px 14px;border-radius:var(--r-sm);font-size:12.5px;"></div>
+            </div>
+          </div>
+
+          <!-- Team & Roles -->
+          <div class="settings-panel card" id="panel-team">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <h3>Multi-User Team &amp; Roles</h3>
+                <p style="font-size:12.5px;color:var(--text-mid);margin:2px 0 0;">Manage access, roles (Admin / Editor / Viewer), and renewal assignments.</p>
+              </div>
+              <button type="button" class="btn btn-primary btn-sm" id="inviteMemberBtn"><i data-lucide="user-plus" class="icon"></i>Invite Member</button>
+            </div>
+            <div class="table-wrap" style="margin-top:14px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Member Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Assigned Renewals</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="teamMembersBody">
+                  <tr>
+                    <td><strong>Anita Sharma</strong> (You)</td>
+                    <td>demo@renewaltrack.com</td>
+                    <td><span class="badge badge-active">Admin</span></td>
+                    <td>8 records</td>
+                    <td><span class="badge badge-due-soon">Active</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>David Kim</strong></td>
+                    <td>david.kim@renewaltrack.com</td>
+                    <td><span class="badge badge-renewed">Editor</span></td>
+                    <td>5 records</td>
+                    <td><span class="badge badge-due-soon">Active</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Priya Nair</strong></td>
+                    <td>priya.nair@renewaltrack.com</td>
+                    <td><span class="badge badge-due-soon">Viewer</span></td>
+                    <td>2 records</td>
+                    <td><span class="badge badge-due-soon">Active</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Wei Zhang</strong></td>
+                    <td>wei.zhang@renewaltrack.com</td>
+                    <td><span class="badge badge-renewed">Editor</span></td>
+                    <td>4 records</td>
+                    <td><span class="badge badge-due-soon">Active</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- AI SmartDoc Scanner -->
+          <div class="settings-panel card" id="panel-smartdoc">
+            <div class="card-header">
+              <h3><i data-lucide="sparkles" class="icon" style="color:var(--accent);"></i> AI SmartDoc Scanner</h3>
+              <p style="font-size:12.5px;color:var(--text-mid);margin:4px 0 0;">Upload any contract, warranty, or certificate. AI SmartDoc extracts vendor, expiry date, and cost automatically.</p>
+            </div>
+
+            <div class="upload-dropzone" id="smartDocDropzone" style="margin-top:14px;">
+              <i data-lucide="file-text" class="dropzone-icon" style="width:40px;height:40px;color:var(--accent);"></i>
+              <div class="dropzone-text">
+                <strong style="display:block;margin-bottom:4px;">Upload contract or certificate for AI analysis</strong>
+                <span style="font-size:12px;color:var(--text-low);">Supports PDF, PNG, JPG scans up to 15MB</span>
+              </div>
+              <input type="file" id="smartDocFileInput" accept=".pdf,.png,.jpg,.jpeg" style="display:none;" />
+              <button type="button" class="btn btn-secondary btn-sm" id="testAiScanBtn" style="margin-top:12px;">
+                <i data-lucide="play" class="icon"></i> Test Sample Contract Extraction
+              </button>
+            </div>
+
+            <div id="aiScanResult" style="display:none;margin-top:20px;padding:16px;background:var(--bg-surface-2);border-radius:var(--r-md);border:1px solid var(--border);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <strong style="color:var(--text-hi);font-size:14px;display:flex;align-items:center;gap:6px;">
+                  <i data-lucide="check-circle-2" class="icon" style="color:var(--success);"></i> AI SmartDoc Extraction Successful
+                </strong>
+                <span class="badge badge-active">98.4% Confidence</span>
+              </div>
+              <div class="info-grid" style="grid-template-columns:repeat(2,1fr);gap:12px;">
+                <div class="info-item"><span>Detected Title</span><strong id="aiTitle">Cloudflare Enterprise SLA Agreement</strong></div>
+                <div class="info-item"><span>Detected Expiry Date</span><strong id="aiExpiry" style="color:var(--accent);">2027-09-30</strong></div>
+                <div class="info-item"><span>Detected Provider</span><strong id="aiOrg">Cloudflare, Inc.</strong></div>
+                <div class="info-item"><span>Detected Value / Cost</span><strong id="aiCost">$24,000.00 USD</strong></div>
+              </div>
+              <div style="margin-top:14px;display:flex;gap:10px;">
+                <button type="button" class="btn btn-primary btn-sm" id="saveAiRecordBtn">
+                  <i data-lucide="plus" class="icon"></i> Save as Tracked Renewal Record
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Audit Log & Channels -->
+          <div class="settings-panel card" id="panel-audit">
+            <div class="card-header">
+              <h3>Audit Trail &amp; Notification Integrations</h3>
+              <p style="font-size:12.5px;color:var(--text-mid);margin:4px 0 0;">Complete changelog of record updates and configured external alert channels.</p>
+            </div>
+
+            <div style="margin-top:14px;">
+              <h4 style="font-size:13.5px;font-weight:600;margin-bottom:10px;">External Alert Channels</h4>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:12px;margin-bottom:20px;">
+                <div style="padding:12px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--bg-surface-2);">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <strong>Email (SendGrid/Resend)</strong>
+                    <span class="badge badge-active">Ready</span>
+                  </div>
+                  <span style="font-size:11.5px;color:var(--text-mid);">Daily reminder cron dispatch</span>
+                </div>
+                <div style="padding:12px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--bg-surface-2);">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <strong>WhatsApp / SMS (Twilio)</strong>
+                    <span class="badge badge-due-soon">Connected</span>
+                  </div>
+                  <span style="font-size:11.5px;color:var(--text-mid);">Critical 7-day urgent alerts</span>
+                </div>
+                <div style="padding:12px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--bg-surface-2);">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <strong>Slack / Teams Webhook</strong>
+                    <span class="badge badge-active">Active</span>
+                  </div>
+                  <span style="font-size:11.5px;color:var(--text-mid);">#renewals-alerts channel</span>
+                </div>
+                <div style="padding:12px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--bg-surface-2);">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <strong>Supabase Cloud Storage</strong>
+                    <span class="badge badge-active">Synced</span>
+                  </div>
+                  <span style="font-size:11.5px;color:var(--text-mid);">Encrypted PDF contract vault</span>
+                </div>
+              </div>
+
+              <h4 style="font-size:13.5px;font-weight:600;margin-bottom:10px;">Recent Audit Activity</h4>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Timestamp</th>
+                      <th>User</th>
+                      <th>Action</th>
+                      <th>Record</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Just now</td>
+                      <td>Anita Sharma</td>
+                      <td><span class="badge badge-renewed">Updated</span></td>
+                      <td>Microsoft 365 Enterprise License</td>
+                    </tr>
+                    <tr>
+                      <td>Today, 09:15</td>
+                      <td>David Kim</td>
+                      <td><span class="badge badge-active">Renewed</span></td>
+                      <td>Fleet Vehicle Insurance</td>
+                    </tr>
+                    <tr>
+                      <td>Yesterday, 16:40</td>
+                      <td>Wei Zhang</td>
+                      <td><span class="badge badge-due-soon">Imported</span></td>
+                      <td>AWS Cloud Infrastructure Subscription</td>
+                    </tr>
+                    <tr>
+                      <td>3 days ago</td>
+                      <td>Marcus Chen</td>
+                      <td><span class="badge badge-expired">Uploaded Doc</span></td>
+                      <td>Fire Safety Operating Permit</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Security -->
+          <div class="settings-panel card" id="panel-security">
+            <div class="card-header"><h3>Change Password</h3></div>
+            <form id="passwordForm" novalidate>
+              <div class="field" id="sec_current">
+                <label for="currentPassword">Current Password <span class="req">*</span></label>
+                <input class="input" type="password" id="currentPassword" />
+                <span class="error-msg">Enter your current password.</span>
+              </div>
+              <div class="field-row">
+                <div class="field" id="sec_new">
+                  <label for="newPassword">New Password <span class="req">*</span></label>
+                  <input class="input" type="password" id="newPassword" />
+                  <span class="error-msg">Must be at least 8 characters.</span>
+                </div>
+                <div class="field" id="sec_confirm">
+                  <label for="confirmPassword">Confirm New Password <span class="req">*</span></label>
+                  <input class="input" type="password" id="confirmPassword" />
+                  <span class="error-msg">Passwords do not match.</span>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary">Update Password</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="js/settings.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>RTS.refreshIcons();</script>
+</body>
+</html>

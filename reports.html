@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" type="image/png" href="assets/favicon.png" data-img-indigo="assets/favicon.png" data-img-gold="assets/favicon-gold.png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Reports — Renewal Tracking System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/responsive.css" />
+<script src="js/app.js"></script>
+<script>RTS.auth.requireAuth();</script>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img class="brand-mark" src="assets/logo.png" data-img-indigo="assets/logo.png" data-img-gold="assets/logo-gold.png" alt="RenewalTrack logo" />
+      <span>RenewalTrack</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Main</div>
+      <a href="dashboard.html" class="nav-link"><i data-lucide="layout-dashboard" class="icon"></i>Dashboard</a>
+      <a href="records.html" class="nav-link"><i data-lucide="file-text" class="icon"></i>Renewal Records</a>
+      <a href="calendar.html" class="nav-link"><i data-lucide="calendar" class="icon"></i>Calendar</a>
+      <a href="reminders.html" class="nav-link"><i data-lucide="bell" class="icon"></i>Reminders</a>
+      <a href="history.html" class="nav-link"><i data-lucide="history" class="icon"></i>Renewal History</a>
+      <a href="documents.html" class="nav-link"><i data-lucide="folder" class="icon"></i>Documents</a>
+      <a href="reports.html" class="nav-link"><i data-lucide="bar-chart-2" class="icon"></i>Reports</a>
+      <div class="sidebar-section-label">Account</div>
+      <a href="settings.html" class="nav-link"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </nav>
+    <div class="sidebar-footer">© 2026 RenewalTrack Inc.</div>
+  </aside>
+  <div class="sidebar-overlay"></div>
+
+  <div class="main-area">
+    <header class="topbar">
+      <button class="sidebar-toggle" aria-label="Toggle menu"><i data-lucide="menu" class="icon"></i></button>
+      <div class="topbar-actions">
+        <div class="dropdown-wrap">
+          <button class="icon-btn" data-dropdown-trigger="notifPanel" aria-label="Notifications">
+            <i data-lucide="bell" class="icon"></i>
+            <span class="dot" id="notifDot" style="display:none;"></span>
+          </button>
+          <div class="dropdown-panel" id="notifPanel">
+            <div class="dropdown-header"><strong>Notifications</strong> <span id="notifCount">0</span> urgent renewal(s)</div>
+            <div class="notif-list" id="notifList"></div>
+          </div>
+        </div>
+        <div class="dropdown-wrap">
+          <div class="user-menu-trigger" data-dropdown-trigger="userPanel">
+            <div class="avatar" data-user-initials>—</div>
+            <span class="uname" data-user-name>User</span>
+            <i data-lucide="chevron-down" class="icon" style="width:14px;height:14px;"></i>
+          </div>
+          <div class="dropdown-panel" id="userPanel">
+            <div class="dropdown-header"><strong data-user-name>User</strong><span data-user-email>—</span></div>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="user" class="icon"></i>Profile Settings</a>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="settings" class="icon"></i>App Settings</a>
+            <div class="dropdown-item" data-logout><i data-lucide="log-out" class="icon"></i>Logout</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="page-header">
+        <div>
+          <h1>Reports</h1>
+          <p>Summaries and exports for audits and leadership reviews.</p>
+        </div>
+        <div class="page-header-actions no-print">
+          <button class="btn btn-secondary" id="exportIcsBtn"><i data-lucide="calendar" class="icon"></i><span data-i18n="exportCalendar">Export Calendar (.ics)</span></button>
+          <button class="btn btn-secondary" id="printBtn"><i data-lucide="printer" class="icon"></i>Print Report</button>
+          <button class="btn btn-primary" id="exportBtn"><i data-lucide="download" class="icon"></i>Export CSV</button>
+        </div>
+      </div>
+
+      <!-- Executive Cost Forecast & Budget Planning Card -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+          <div>
+            <h3 style="display:flex;align-items:center;gap:8px;">
+              <i data-lucide="trending-up" class="icon" style="color:var(--accent);"></i>
+              <span data-i18n="costForecast">Cost Forecast &amp; Budget Planning</span>
+            </h3>
+            <p style="font-size:12.5px;color:var(--text-mid);margin:4px 0 0;">Projected renewal expenditure by timeframe and category for leadership &amp; finance.</p>
+          </div>
+          <div class="forecast-tabs no-print" id="forecastTabs">
+            <button type="button" class="tab-pill" data-days="30" data-i18n="next30Days">Next 30 Days</button>
+            <button type="button" class="tab-pill active" data-days="90" data-i18n="next90Days">Next 90 Days</button>
+            <button type="button" class="tab-pill" data-days="365" data-i18n="next365Days">Next 365 Days (1 Year)</button>
+            <button type="button" class="tab-pill" data-days="9999" data-i18n="allUpcoming">All Upcoming</button>
+          </div>
+        </div>
+
+        <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);margin:16px 0;">
+          <div class="stat-card" style="--stat-color:var(--accent);--stat-bg:var(--accent-dim);">
+            <div class="stat-top"><div class="stat-icon"><i data-lucide="dollar-sign" class="icon"></i></div></div>
+            <div class="stat-value" id="forecastTotalCost">$0.00</div>
+            <div class="stat-label" data-i18n="projectedCost">Projected Renewal Cost</div>
+          </div>
+          <div class="stat-card" style="--stat-color:var(--warning);--stat-bg:var(--warning-dim);">
+            <div class="stat-top"><div class="stat-icon"><i data-lucide="calendar" class="icon"></i></div></div>
+            <div class="stat-value" id="forecastRecordCount">0</div>
+            <div class="stat-label" data-i18n="renewalsDue">Renewals Due in Window</div>
+          </div>
+          <div class="stat-card" style="--stat-color:var(--danger);--stat-bg:var(--danger-dim);">
+            <div class="stat-top"><div class="stat-icon"><i data-lucide="alert-octagon" class="icon"></i></div></div>
+            <div class="stat-value" id="forecastHighPriorityCost">$0.00</div>
+            <div class="stat-label" data-i18n="highPriorityCost">High-Priority Spend</div>
+          </div>
+          <div class="stat-card" style="--stat-color:var(--success);--stat-bg:var(--success-dim);">
+            <div class="stat-top"><div class="stat-icon"><i data-lucide="pie-chart" class="icon"></i></div></div>
+            <div class="stat-value" id="forecastAvgCost">$0.00</div>
+            <div class="stat-label" data-i18n="avgRenewalCost">Average Spend / Record</div>
+          </div>
+        </div>
+
+        <div class="report-grid" style="margin-top:16px;">
+          <div>
+            <h4 style="font-size:13.5px;font-weight:600;margin-bottom:12px;color:var(--text-hi);" data-i18n="categoryBreakdown">Category Spending Breakdown</h4>
+            <div id="forecastCategoryBars"></div>
+          </div>
+          <div>
+            <h4 style="font-size:13.5px;font-weight:600;margin-bottom:12px;color:var(--text-hi);" data-i18n="topUpcoming">Top Costly Renewals in Window</h4>
+            <div id="forecastTopRenewals"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="report-grid" style="margin-bottom:16px;">
+        <div class="card">
+          <div class="card-header"><h3>Renewal Status Summary</h3></div>
+          <div id="statusSummary"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Category Summary</h3></div>
+          <div id="categorySummary"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><h3>Monthly Renewal Trends — Next 12 Months</h3></div>
+        <div class="bar-chart" id="trendChart" style="height:180px;"></div>
+      </div>
+
+      <div class="report-grid">
+        <div class="card">
+          <div class="card-header"><h3>Expired Records</h3></div>
+          <div id="expiredReport"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Due Soon (Next 30 Days)</h3></div>
+          <div id="dueSoonReport"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="js/reports.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>RTS.refreshIcons();</script>
+</body>
+</html>

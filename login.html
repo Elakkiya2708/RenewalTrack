@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" type="image/png" href="assets/favicon.png" data-img-indigo="assets/favicon.png" data-img-gold="assets/favicon-gold.png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sign In — Renewal Tracking System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/responsive.css" />
+</head>
+<body>
+
+<div class="auth-shell">
+  <section class="auth-visual" aria-hidden="true">
+    <div class="auth-visual-content">
+      <a href="index.html" class="brand brand-light" aria-label="RenewalTrack home" tabindex="-1">
+        <img class="brand-mark" src="assets/logo.png" data-img-indigo="assets/logo.png" data-img-gold="assets/logo-gold.png" alt="RenewalTrack logo" />
+        <span>RenewalTrack</span>
+      </a>
+    </div>
+
+    <div class="auth-visual-quote">
+      <p>Every contract, license and policy — tracked in one place, renewed on time.</p>
+      <span>Centralized renewal management for compliance-driven teams.</span>
+    </div>
+
+    <div class="auth-stats">
+      <div><strong>2,400+</strong><span>Renewals tracked</span></div>
+      <div><strong>99.2%</strong><span>On-time renewal rate</span></div>
+      <div><strong>18k</strong><span>Documents stored</span></div>
+    </div>
+  </section>
+
+  <section class="auth-panel">
+    <div class="auth-card">
+      <a href="index.html" class="brand" style="margin-bottom:28px;" aria-label="RenewalTrack home">
+        <img class="brand-mark" src="assets/logo.png" data-img-indigo="assets/logo.png" data-img-gold="assets/logo-gold.png" alt="RenewalTrack logo" />
+        <span>RenewalTrack</span>
+      </a>
+
+      <h1>Welcome back</h1>
+      <p class="subtitle">Sign in to manage your renewals and reminders.</p>
+
+      <form id="loginForm" novalidate>
+        <div class="field" id="loginEmailField">
+          <label for="loginEmail">Email address <span class="req">*</span></label>
+          <input class="input" type="email" id="loginEmail" placeholder="you@company.com" autocomplete="username" />
+          <span class="error-msg">Enter a valid email address.</span>
+        </div>
+
+        <div class="field" id="loginPasswordField">
+          <label for="loginPassword">Password <span class="req">*</span></label>
+          <div class="password-field">
+            <input class="input" type="password" id="loginPassword" placeholder="Enter your password" autocomplete="current-password" />
+            <button type="button" class="toggle-visibility" data-target="loginPassword" aria-label="Show password">
+              <i data-lucide="eye" class="icon"></i>
+            </button>
+          </div>
+          <span class="error-msg">Password is required.</span>
+        </div>
+
+        <div class="form-row-between">
+          <label class="checkbox-row">
+            <input type="checkbox" id="rememberMe" />
+            Remember me
+          </label>
+          <a class="link" href="#" id="forgotPasswordLink">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+        <button type="button" id="fillDemoBtn" class="btn btn-ghost btn-block" style="margin-top:10px;">Use demo credentials</button>
+      </form>
+
+      <p class="auth-footer-link">Don't have an account? <a href="register.html">Create one</a></p>
+    </div>
+  </section>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/auth.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+  document.getElementById("forgotPasswordLink").addEventListener("click", function (e) {
+    e.preventDefault();
+    RTS.toast("Password reset link sent to your email (demo).", "info");
+  });
+  RTS.refreshIcons();
+</script>
+<script>
+/* If the stylesheet is missing, the page was opened without its css/js folders
+   (e.g. double-clicked from inside the .zip). Show a clear fix. */
+window.addEventListener("load", function () {
+  var ok = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+  if (ok) return;
+  var b = document.createElement("div");
+  b.setAttribute("style", "position:fixed;top:0;left:0;right:0;z-index:99999;background:#fef3c7;color:#78350f;border-bottom:2px solid #f59e0b;padding:14px 18px;font:15px/1.5 Arial,sans-serif;");
+  b.innerHTML = "<b>Some files are missing.</b> This page was opened from inside the .zip, so the css/js/assets folders were not extracted. " +
+    "Fix: right-click the .zip &rarr; <b>Extract All</b>, then open the extracted folder and double-click <b>start.bat</b> (or open index.html from there).";
+  document.body.appendChild(b);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" type="image/png" href="assets/favicon.png" data-img-indigo="assets/favicon.png" data-img-gold="assets/favicon-gold.png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Create Account — Renewal Tracking System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/responsive.css" />
+</head>
+<body>
+
+<div class="auth-shell">
+  <section class="auth-visual" aria-hidden="true">
+    <div class="auth-visual-content">
+      <a href="index.html" class="brand brand-light" aria-label="RenewalTrack home" tabindex="-1">
+        <img class="brand-mark" src="assets/logo.png" data-img-indigo="assets/logo.png" data-img-gold="assets/logo-gold.png" alt="RenewalTrack logo" />
+        <span>RenewalTrack</span>
+      </a>
+    </div>
+
+    <div class="auth-visual-quote">
+      <p>Set up your workspace in minutes and never miss a renewal deadline again.</p>
+      <span>Trusted by compliance and operations teams.</span>
+    </div>
+
+    <div class="auth-stats">
+      <div><strong>8</strong><span>Renewal categories</span></div>
+      <div><strong>Auto</strong><span>Status calculation</span></div>
+      <div><strong>Free</strong><span>To get started</span></div>
+    </div>
+  </section>
+
+  <section class="auth-panel">
+    <div class="auth-card">
+      <a href="index.html" class="brand" style="margin-bottom:24px;" aria-label="RenewalTrack home">
+        <img class="brand-mark" src="assets/logo.png" data-img-indigo="assets/logo.png" data-img-gold="assets/logo-gold.png" alt="RenewalTrack logo" />
+        <span>RenewalTrack</span>
+      </a>
+
+      <h1>Create your account</h1>
+      <p class="subtitle">Start tracking renewals across your organization.</p>
+
+      <form id="registerForm" novalidate>
+        <div class="field" id="regNameField">
+          <label for="regName">Full name <span class="req">*</span></label>
+          <input class="input" type="text" id="regName" placeholder="Jane Cooper" autocomplete="name" />
+          <span class="error-msg">Enter your full name.</span>
+        </div>
+
+        <div class="field" id="regEmailField">
+          <label for="regEmail">Email address <span class="req">*</span></label>
+          <input class="input" type="email" id="regEmail" placeholder="you@company.com" autocomplete="email" />
+          <span class="error-msg">Enter a valid email address.</span>
+        </div>
+
+        <div class="field" id="regMobileField">
+          <label for="regMobile">Mobile number <span class="req">*</span></label>
+          <input class="input" type="tel" id="regMobile" placeholder="+1 555 123 4567" autocomplete="tel" />
+          <span class="error-msg">Enter a valid mobile number.</span>
+        </div>
+
+        <div class="field-row">
+          <div class="field" id="regPasswordField">
+            <label for="regPassword">Password <span class="req">*</span></label>
+            <div class="password-field">
+              <input class="input" type="password" id="regPassword" placeholder="Min. 8 characters" autocomplete="new-password" />
+              <button type="button" class="toggle-visibility" data-target="regPassword" aria-label="Show password">
+                <i data-lucide="eye" class="icon"></i>
+              </button>
+            </div>
+            <span class="error-msg">Password must be at least 8 characters.</span>
+          </div>
+
+          <div class="field" id="regConfirmField">
+            <label for="regConfirm">Confirm password <span class="req">*</span></label>
+            <div class="password-field">
+              <input class="input" type="password" id="regConfirm" placeholder="Repeat password" autocomplete="new-password" />
+              <button type="button" class="toggle-visibility" data-target="regConfirm" aria-label="Show password">
+                <i data-lucide="eye" class="icon"></i>
+              </button>
+            </div>
+            <span class="error-msg">Passwords do not match.</span>
+          </div>
+        </div>
+
+        <div class="field" id="regTermsField" style="margin-bottom:22px;">
+          <label class="checkbox-row">
+            <input type="checkbox" id="regTerms" />
+            I agree to the <a class="link" href="#" onclick="return false;">Terms &amp; Conditions</a> and <a class="link" href="#" onclick="return false;">Privacy Policy</a>
+          </label>
+          <span class="error-msg">You must accept the Terms &amp; Conditions.</span>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Create Account</button>
+      </form>
+
+      <p class="auth-footer-link">Already have an account? <a href="login.html">Sign in</a></p>
+    </div>
+  </section>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/auth.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>RTS.refreshIcons();</script>
+<script>
+/* If the stylesheet is missing, the page was opened without its css/js folders
+   (e.g. double-clicked from inside the .zip). Show a clear fix. */
+window.addEventListener("load", function () {
+  var ok = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+  if (ok) return;
+  var b = document.createElement("div");
+  b.setAttribute("style", "position:fixed;top:0;left:0;right:0;z-index:99999;background:#fef3c7;color:#78350f;border-bottom:2px solid #f59e0b;padding:14px 18px;font:15px/1.5 Arial,sans-serif;");
+  b.innerHTML = "<b>Some files are missing.</b> This page was opened from inside the .zip, so the css/js/assets folders were not extracted. " +
+    "Fix: right-click the .zip &rarr; <b>Extract All</b>, then open the extracted folder and double-click <b>start.bat</b> (or open index.html from there).";
+  document.body.appendChild(b);
+});
+</script>
+</body>
+</html>

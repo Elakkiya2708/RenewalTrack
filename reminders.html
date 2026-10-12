@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" type="image/png" href="assets/favicon.png" data-img-indigo="assets/favicon.png" data-img-gold="assets/favicon-gold.png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Reminders — Renewal Tracking System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/responsive.css" />
+<script src="js/app.js"></script>
+<script>RTS.auth.requireAuth();</script>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img class="brand-mark" src="assets/logo.png" data-img-indigo="assets/logo.png" data-img-gold="assets/logo-gold.png" alt="RenewalTrack logo" />
+      <span>RenewalTrack</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Main</div>
+      <a href="dashboard.html" class="nav-link"><i data-lucide="layout-dashboard" class="icon"></i>Dashboard</a>
+      <a href="records.html" class="nav-link"><i data-lucide="file-text" class="icon"></i>Renewal Records</a>
+      <a href="calendar.html" class="nav-link"><i data-lucide="calendar" class="icon"></i>Calendar</a>
+      <a href="reminders.html" class="nav-link"><i data-lucide="bell" class="icon"></i>Reminders</a>
+      <a href="history.html" class="nav-link"><i data-lucide="history" class="icon"></i>Renewal History</a>
+      <a href="documents.html" class="nav-link"><i data-lucide="folder" class="icon"></i>Documents</a>
+      <a href="reports.html" class="nav-link"><i data-lucide="bar-chart-2" class="icon"></i>Reports</a>
+      <div class="sidebar-section-label">Account</div>
+      <a href="settings.html" class="nav-link"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </nav>
+    <div class="sidebar-footer">© 2026 RenewalTrack Inc.</div>
+  </aside>
+  <div class="sidebar-overlay"></div>
+
+  <div class="main-area">
+    <header class="topbar">
+      <button class="sidebar-toggle" aria-label="Toggle menu"><i data-lucide="menu" class="icon"></i></button>
+      <div class="topbar-actions">
+        <div class="dropdown-wrap">
+          <button class="icon-btn" data-dropdown-trigger="notifPanel" aria-label="Notifications">
+            <i data-lucide="bell" class="icon"></i>
+            <span class="dot" id="notifDot" style="display:none;"></span>
+          </button>
+          <div class="dropdown-panel" id="notifPanel">
+            <div class="dropdown-header"><strong>Notifications</strong> <span id="notifCount">0</span> urgent renewal(s)</div>
+            <div class="notif-list" id="notifList"></div>
+          </div>
+        </div>
+        <div class="dropdown-wrap">
+          <div class="user-menu-trigger" data-dropdown-trigger="userPanel">
+            <div class="avatar" data-user-initials>—</div>
+            <span class="uname" data-user-name>User</span>
+            <i data-lucide="chevron-down" class="icon" style="width:14px;height:14px;"></i>
+          </div>
+          <div class="dropdown-panel" id="userPanel">
+            <div class="dropdown-header"><strong data-user-name>User</strong><span data-user-email>—</span></div>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="user" class="icon"></i>Profile Settings</a>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="settings" class="icon"></i>App Settings</a>
+            <div class="dropdown-item" data-logout><i data-lucide="log-out" class="icon"></i>Logout</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h1>Reminders</h1>
+          <p>Stay ahead of every renewal deadline with automated email alerts.</p>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button type="button" class="btn btn-secondary btn-sm" id="btnViewEmailLogs">
+            <i data-lucide="mail-check" class="icon"></i> Sent Email Logs
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" id="btnRunCheckFromReminders">
+            <i data-lucide="send" class="icon"></i> Run Reminder Check
+          </button>
+        </div>
+      </div>
+
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;">
+        <div class="stat-card" style="--stat-color:var(--warning);--stat-bg:var(--warning-dim);">
+          <div class="stat-top"><div class="stat-icon"><i data-lucide="alarm-clock" class="icon"></i></div></div>
+          <div class="stat-value" id="statUpcoming">0</div>
+          <div class="stat-label">Upcoming Reminders</div>
+        </div>
+        <div class="stat-card" style="--stat-color:var(--danger);--stat-bg:var(--danger-dim);">
+          <div class="stat-top"><div class="stat-icon"><i data-lucide="alert-triangle" class="icon"></i></div></div>
+          <div class="stat-value" id="statOverdue">0</div>
+          <div class="stat-label">Overdue Reminders</div>
+        </div>
+        <div class="stat-card" style="--stat-color:var(--success);--stat-bg:var(--success-dim);">
+          <div class="stat-top"><div class="stat-icon"><i data-lucide="check-circle-2" class="icon"></i></div></div>
+          <div class="stat-value" id="statCompleted">0</div>
+          <div class="stat-label">Completed</div>
+        </div>
+      </div>
+
+      <div class="table-toolbar">
+        <div class="topbar-search">
+          <i data-lucide="search" class="icon"></i>
+          <input type="text" id="reminderSearch" placeholder="Search reminders…" />
+        </div>
+        <select class="select-filter" id="filterReminderStatus">
+          <option value="">All Reminders</option>
+          <option value="Overdue">Overdue</option>
+          <option value="Upcoming">Upcoming</option>
+          <option value="Completed">Completed</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Renewal Record</th>
+              <th>Category</th>
+              <th>Reminder Date</th>
+              <th>Expiry Date</th>
+              <th>Reminder Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="remindersTableBody"></tbody>
+        </table>
+        <div id="remindersEmptyState" class="empty-state hidden">
+          <i data-lucide="bell-off" class="icon"></i>
+          <h4>No reminders match your filters</h4>
+          <p>Try a different filter or search term.</p>
+        </div>
+      </div>
+    </main>
+<!-- Snooze Modal -->
+<div class="modal-overlay" id="snoozeModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3 style="display:flex;align-items:center;gap:8px;">
+        <i data-lucide="clock" class="icon" style="color:var(--accent);"></i>
+        <span>Snooze Reminder</span>
+      </h3>
+      <button class="modal-close" data-close-modal="snoozeModal"><i data-lucide="x" class="icon"></i></button>
+    </div>
+    <div class="modal-body">
+      <p class="text-mid" style="font-size:13px;margin-bottom:14px;">Select how long to postpone the reminder for <strong id="snoozeRecordName" style="color:var(--text-hi);"></strong>:</p>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button type="button" class="btn btn-secondary" onclick="RemindersPage.confirmSnooze(1)">
+          <i data-lucide="clock" class="icon"></i> Snooze 1 Day (+1 day)
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="RemindersPage.confirmSnooze(7)">
+          <i data-lucide="calendar" class="icon"></i> Snooze 1 Week (+7 days)
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="RemindersPage.confirmSnooze(30)">
+          <i data-lucide="calendar-days" class="icon"></i> Snooze 1 Month (+30 days)
+        </button>
+      </div>
+      <div style="margin-top:16px;">
+        <label for="customSnoozeDate" style="font-size:12px;color:var(--text-mid);display:block;margin-bottom:4px;">Or choose custom date:</label>
+        <div style="display:flex;gap:8px;">
+          <input type="date" class="input" id="customSnoozeDate" />
+          <button type="button" class="btn btn-primary" onclick="RemindersPage.confirmCustomSnooze()">Apply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Email Activity Logs Modal -->
+<div class="modal-overlay" id="emailLogsModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 style="display:flex;align-items:center;gap:8px;">
+        <i data-lucide="mail-check" class="icon" style="color:var(--accent);"></i>
+        <span>Sent Email Reminders Activity Log</span>
+      </h3>
+      <button class="modal-close" data-close-modal="emailLogsModal"><i data-lucide="x" class="icon"></i></button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span class="cell-sub" id="emailLogsSubtitle">Audit trail of sent notifications recorded in Supabase / Database.</span>
+        <button type="button" class="btn btn-ghost btn-sm" id="btnRefreshEmailLogs">
+          <i data-lucide="refresh-cw" class="icon"></i> Refresh
+        </button>
+      </div>
+      <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Renewal Record</th>
+              <th>Interval</th>
+              <th>Recipient</th>
+              <th>Status</th>
+              <th>Provider</th>
+            </tr>
+          </thead>
+          <tbody id="emailLogsTableBody">
+            <tr><td colspan="6" style="text-align:center;padding:24px;">Loading logs...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/reminders.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>RTS.refreshIcons();</script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" type="image/png" href="assets/favicon.png" data-img-indigo="assets/favicon.png" data-img-gold="assets/favicon-gold.png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard — Renewal Tracking System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/responsive.css" />
+<script src="js/app.js"></script>
+<script>RTS.auth.requireAuth();</script>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img class="brand-mark" src="assets/logo.png" data-img-indigo="assets/logo.png" data-img-gold="assets/logo-gold.png" alt="RenewalTrack logo" />
+      <span>RenewalTrack</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Main</div>
+      <a href="dashboard.html" class="nav-link"><i data-lucide="layout-dashboard" class="icon"></i>Dashboard</a>
+      <a href="records.html" class="nav-link"><i data-lucide="file-text" class="icon"></i>Renewal Records</a>
+      <a href="calendar.html" class="nav-link"><i data-lucide="calendar" class="icon"></i>Calendar</a>
+      <a href="reminders.html" class="nav-link"><i data-lucide="bell" class="icon"></i>Reminders</a>
+      <a href="history.html" class="nav-link"><i data-lucide="history" class="icon"></i>Renewal History</a>
+      <a href="documents.html" class="nav-link"><i data-lucide="folder" class="icon"></i>Documents</a>
+      <a href="reports.html" class="nav-link"><i data-lucide="bar-chart-2" class="icon"></i>Reports</a>
+      <div class="sidebar-section-label">Account</div>
+      <a href="settings.html" class="nav-link"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </nav>
+    <div class="sidebar-footer">© 2026 RenewalTrack Inc.</div>
+  </aside>
+  <div class="sidebar-overlay"></div>
+
+  <div class="main-area">
+    <header class="topbar">
+      <button class="sidebar-toggle" aria-label="Toggle menu"><i data-lucide="menu" class="icon"></i></button>
+      <div class="topbar-actions">
+        <div class="dropdown-wrap">
+          <button class="icon-btn" data-dropdown-trigger="notifPanel" aria-label="Notifications">
+            <i data-lucide="bell" class="icon"></i>
+            <span class="dot" id="notifDot" style="display:none;"></span>
+          </button>
+          <div class="dropdown-panel" id="notifPanel">
+            <div class="dropdown-header"><strong>Notifications</strong> <span id="notifCount">0</span> urgent renewal(s)</div>
+            <div class="notif-list" id="notifList"></div>
+          </div>
+        </div>
+        <div class="dropdown-wrap">
+          <div class="user-menu-trigger" data-dropdown-trigger="userPanel">
+            <div class="avatar" data-user-initials>—</div>
+            <span class="uname" data-user-name>User</span>
+            <i data-lucide="chevron-down" class="icon" style="width:14px;height:14px;"></i>
+          </div>
+          <div class="dropdown-panel" id="userPanel">
+            <div class="dropdown-header"><strong data-user-name>User</strong><span data-user-email>—</span></div>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="user" class="icon"></i>Profile Settings</a>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="settings" class="icon"></i>App Settings</a>
+            <div class="dropdown-item" data-logout><i data-lucide="log-out" class="icon"></i>Logout</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="page-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p>Overview of all renewal activity across your organization.</p>
+        </div>
+        <div class="page-header-actions">
+          <a href="records.html#add" class="btn btn-primary"><i data-lucide="plus" class="icon"></i>Quick Add Renewal</a>
+        </div>
+      </div>
+
+      <div class="stat-grid" id="statGrid">
+        <div class="stat-card" style="--stat-color:var(--accent);--stat-bg:var(--accent-dim);">
+          <div class="stat-top"><div class="stat-icon"><i data-lucide="layers" class="icon"></i></div></div>
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-label">Total Records</div>
+        </div>
+        <div class="stat-card" style="--stat-color:var(--success);--stat-bg:var(--success-dim);">
+          <div class="stat-top"><div class="stat-icon"><i data-lucide="check-circle-2" class="icon"></i></div></div>
+          <div class="stat-value" id="statActive">0</div>
+          <div class="stat-label">Active</div>
+        </div>
+        <div class="stat-card" style="--stat-color:var(--warning);--stat-bg:var(--warning-dim);">
+          <div class="stat-top"><div class="stat-icon"><i data-lucide="alarm-clock" class="icon"></i></div></div>
+          <div class="stat-value" id="statDueSoon">0</div>
+          <div class="stat-label">Due Soon</div>
+        </div>
+        <div class="stat-card" style="--stat-color:var(--danger);--stat-bg:var(--danger-dim);">
+          <div class="stat-top"><div class="stat-icon"><i data-lucide="octagon-x" class="icon"></i></div></div>
+          <div class="stat-value" id="statExpired">0</div>
+          <div class="stat-label">Expired</div>
+        </div>
+        <div class="stat-card" style="--stat-color:var(--blue);--stat-bg:var(--blue-dim);">
+          <div class="stat-top"><div class="stat-icon"><i data-lucide="refresh-cw" class="icon"></i></div></div>
+          <div class="stat-value" id="statRenewedMonth">0</div>
+          <div class="stat-label">Renewed This Month</div>
+        </div>
+        <div class="stat-card" style="--stat-color:var(--text-mid);--stat-bg:var(--bg-surface-2);">
+          <div class="stat-top"><div class="stat-icon"><i data-lucide="folder" class="icon"></i></div></div>
+          <div class="stat-value" id="statDocs">0</div>
+          <div class="stat-label">Total Documents</div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid" style="margin-bottom:16px;">
+        <div class="card">
+          <div class="card-header">
+            <h3>Upcoming Renewals</h3>
+            <a href="records.html" class="card-header-link">View all</a>
+          </div>
+          <div id="upcomingList"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Renewal Status</h3></div>
+          <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+            <div id="statusDonut" style="width:130px;height:130px;border-radius:50%;flex-shrink:0;"></div>
+            <div class="chart-legend" id="statusLegend" style="margin-top:0;flex-direction:column;gap:10px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid" style="margin-bottom:16px;">
+        <div class="card">
+          <div class="card-header"><h3>Category Distribution</h3></div>
+          <div class="bar-chart" id="categoryChart"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Recent Activity</h3></div>
+          <div id="activityList"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 id="miniCalTitle">Renewal Calendar — This Month</h3>
+          <a href="calendar.html" class="card-header-link">Open full calendar</a>
+        </div>
+        <div class="calendar-grid" id="miniCalendar"></div>
+        <div class="calendar-legend">
+          <span class="chart-legend-item"><span class="chart-legend-swatch" style="background:var(--success);"></span>Active</span>
+          <span class="chart-legend-item"><span class="chart-legend-swatch" style="background:var(--warning);"></span>Due Soon</span>
+          <span class="chart-legend-item"><span class="chart-legend-swatch" style="background:var(--danger);"></span>Expired</span>
+          <span class="chart-legend-item"><span class="chart-legend-swatch" style="background:var(--blue);"></span>Renewed</span>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="js/dashboard.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>RTS.refreshIcons();</script>
+</body>
+</html>

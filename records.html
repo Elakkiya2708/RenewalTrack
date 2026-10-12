@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" type="image/png" href="assets/favicon.png" data-img-indigo="assets/favicon.png" data-img-gold="assets/favicon-gold.png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Renewal Records — Renewal Tracking System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/responsive.css" />
+<script src="js/app.js"></script>
+<script>RTS.auth.requireAuth();</script>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img class="brand-mark" src="assets/logo.png" data-img-indigo="assets/logo.png" data-img-gold="assets/logo-gold.png" alt="RenewalTrack logo" />
+      <span>RenewalTrack</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Main</div>
+      <a href="dashboard.html" class="nav-link"><i data-lucide="layout-dashboard" class="icon"></i>Dashboard</a>
+      <a href="records.html" class="nav-link"><i data-lucide="file-text" class="icon"></i>Renewal Records</a>
+      <a href="calendar.html" class="nav-link"><i data-lucide="calendar" class="icon"></i>Calendar</a>
+      <a href="reminders.html" class="nav-link"><i data-lucide="bell" class="icon"></i>Reminders</a>
+      <a href="history.html" class="nav-link"><i data-lucide="history" class="icon"></i>Renewal History</a>
+      <a href="documents.html" class="nav-link"><i data-lucide="folder" class="icon"></i>Documents</a>
+      <a href="reports.html" class="nav-link"><i data-lucide="bar-chart-2" class="icon"></i>Reports</a>
+      <div class="sidebar-section-label">Account</div>
+      <a href="settings.html" class="nav-link"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </nav>
+    <div class="sidebar-footer">© 2026 RenewalTrack Inc.</div>
+  </aside>
+  <div class="sidebar-overlay"></div>
+
+  <div class="main-area">
+    <header class="topbar">
+      <button class="sidebar-toggle" aria-label="Toggle menu"><i data-lucide="menu" class="icon"></i></button>
+      <div class="topbar-actions">
+        <div class="dropdown-wrap">
+          <button class="icon-btn" data-dropdown-trigger="notifPanel" aria-label="Notifications">
+            <i data-lucide="bell" class="icon"></i>
+            <span class="dot" id="notifDot" style="display:none;"></span>
+          </button>
+          <div class="dropdown-panel" id="notifPanel">
+            <div class="dropdown-header"><strong>Notifications</strong> <span id="notifCount">0</span> urgent renewal(s)</div>
+            <div class="notif-list" id="notifList"></div>
+          </div>
+        </div>
+        <div class="dropdown-wrap">
+          <div class="user-menu-trigger" data-dropdown-trigger="userPanel">
+            <div class="avatar" data-user-initials>—</div>
+            <span class="uname" data-user-name>User</span>
+            <i data-lucide="chevron-down" class="icon" style="width:14px;height:14px;"></i>
+          </div>
+          <div class="dropdown-panel" id="userPanel">
+            <div class="dropdown-header"><strong data-user-name>User</strong><span data-user-email>—</span></div>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="user" class="icon"></i>Profile Settings</a>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="settings" class="icon"></i>App Settings</a>
+            <div class="dropdown-item" data-logout><i data-lucide="log-out" class="icon"></i>Logout</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="page-header">
+        <div>
+          <h1>Renewal Records</h1>
+          <p>Every contract, license and policy your organization tracks.</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary" id="openImportBtn"><i data-lucide="upload-cloud" class="icon"></i><span data-i18n="importCsv">Import CSV</span></button>
+          <button class="btn btn-primary" id="openAddBtn"><i data-lucide="plus" class="icon"></i><span data-i18n="addNewRenewal">Add New Renewal</span></button>
+        </div>
+      </div>
+
+      <div class="table-toolbar">
+        <div class="topbar-search">
+          <i data-lucide="search" class="icon"></i>
+          <input type="text" id="recordSearch" placeholder="Search by name, organization, reference…" />
+        </div>
+        <select class="select-filter" id="filterCategory">
+          <option value="">All Categories</option>
+        </select>
+        <select class="select-filter" id="filterStatus">
+          <option value="">All Statuses</option>
+          <option value="active">Active</option>
+          <option value="due-soon">Due Soon</option>
+          <option value="expired">Expired</option>
+          <option value="renewed">Renewed</option>
+        </select>
+        <select class="select-filter" id="filterPriority">
+          <option value="">All Priorities</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+        <div class="table-toolbar-spacer"></div>
+        <span class="text-mid" id="resultCount" style="font-size:12.5px;"></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width:38px;text-align:center;"><input type="checkbox" id="selectAllRecords" title="Select all" style="cursor:pointer;" /></th>
+              <th data-i18n="recordId">Record ID</th>
+              <th data-i18n="recordName">Record Name</th>
+              <th data-i18n="category">Category</th>
+              <th data-i18n="organization">Organization</th>
+              <th data-i18n="issueDate">Issue Date</th>
+              <th id="sortExpiry"><span data-i18n="expiryDate">Expiry Date</span> <i data-lucide="arrow-up-down" class="sort-icon"></i></th>
+              <th data-i18n="reminderDate">Reminder Date</th>
+              <th data-i18n="recurringCycle">Cycle</th>
+              <th data-i18n="status">Status</th>
+              <th data-i18n="priority">Priority</th>
+              <th data-i18n="actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="recordsTableBody"></tbody>
+        </table>
+        <div id="recordsEmptyState" class="empty-state hidden">
+          <i data-lucide="inbox" class="icon"></i>
+          <h4>No renewal records found</h4>
+          <p>Try adjusting your search or filters, or add a new renewal record.</p>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+
+      <!-- Bulk Action Bar -->
+      <div class="bulk-action-bar" id="bulkActionBar" style="display:none;">
+        <div class="bulk-count">
+          <strong id="bulkSelectedCount">0</strong>
+          <span data-i18n="selectedCount">records selected</span>
+        </div>
+        <div class="bulk-actions">
+          <button type="button" class="btn btn-sm btn-secondary" id="bulkRenewBtn"><i data-lucide="refresh-cw" class="icon"></i><span data-i18n="renewSelected">Renew Selected</span></button>
+          <button type="button" class="btn btn-sm btn-secondary" id="bulkExportCsvBtn"><i data-lucide="download" class="icon"></i><span data-i18n="exportSelectedCsv">Export CSV</span></button>
+          <button type="button" class="btn btn-sm btn-secondary" id="bulkExportIcsBtn"><i data-lucide="calendar" class="icon"></i><span data-i18n="exportSelectedIcs">Export .ics</span></button>
+          <button type="button" class="btn btn-sm btn-danger" id="bulkDeleteBtn"><i data-lucide="trash-2" class="icon"></i><span data-i18n="deleteSelected">Delete</span></button>
+          <button type="button" class="btn btn-sm btn-ghost" id="bulkClearBtn"><span data-i18n="clearSelection">Clear</span></button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Add / Edit Renewal Modal -->
+<div class="modal-overlay" id="renewalModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="renewalModalTitle">Add New Renewal</h3>
+      <button class="modal-close" data-close-modal="renewalModal"><i data-lucide="x" class="icon"></i></button>
+    </div>
+    <form id="renewalForm" novalidate>
+      <div class="modal-body">
+        <input type="hidden" id="renewalId" />
+
+        <div class="form-section-title">Basic Information</div>
+        <div class="field" id="f_name">
+          <label for="in_name">Record Name <span class="req">*</span></label>
+          <input class="input" id="in_name" placeholder="e.g. Office Fire Insurance Policy" />
+          <span class="error-msg">Record name is required.</span>
+        </div>
+        <div class="field-row">
+          <div class="field" id="f_category">
+            <label for="in_category">Category <span class="req">*</span></label>
+            <select class="input" id="in_category"></select>
+            <span class="error-msg">Select a category.</span>
+          </div>
+          <div class="field" id="f_priority">
+            <label for="in_priority">Priority <span class="req">*</span></label>
+            <select class="input" id="in_priority">
+              <option value="High">High</option>
+              <option value="Medium" selected>Medium</option>
+              <option value="Low">Low</option>
+            </select>
+            <span class="error-msg">Select a priority.</span>
+          </div>
+        </div>
+        <div class="field" id="f_description">
+          <label for="in_description">Description</label>
+          <textarea class="input" id="in_description" placeholder="Brief description of what this renewal covers"></textarea>
+        </div>
+
+        <div class="form-section-title">Provider &amp; Reference</div>
+        <div class="field-row">
+          <div class="field" id="f_organization">
+            <label for="in_organization">Organization / Provider <span class="req">*</span></label>
+            <input class="input" id="in_organization" placeholder="e.g. Allied Insurance Co." />
+            <span class="error-msg">Organization / provider is required.</span>
+          </div>
+          <div class="field" id="f_reference">
+            <label for="in_reference">Reference Number</label>
+            <input class="input" id="in_reference" placeholder="e.g. POL-2025-001" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field" id="f_responsible">
+            <label for="in_responsible">Responsible Person <span class="req">*</span></label>
+            <input class="input" id="in_responsible" placeholder="e.g. Anita Sharma" />
+            <span class="error-msg">Responsible person is required.</span>
+          </div>
+          <div class="field" id="f_responsibleEmail">
+            <label for="in_responsibleEmail">Alert Email Address</label>
+            <input class="input" type="email" id="in_responsibleEmail" placeholder="e.g. anita@renewaltrack.com" />
+            <span class="cell-sub" style="font-size:11px;margin-top:2px;">Receives automated email reminders</span>
+          </div>
+        </div>
+
+        <div class="form-section-title">Dates &amp; Cost</div>
+        <div class="field-row">
+          <div class="field" id="f_issueDate">
+            <label for="in_issueDate">Issue Date <span class="req">*</span></label>
+            <input class="input" type="date" id="in_issueDate" />
+            <span class="error-msg">Issue date is required.</span>
+          </div>
+          <div class="field" id="f_expiryDate">
+            <label for="in_expiryDate">Expiry Date <span class="req">*</span></label>
+            <input class="input" type="date" id="in_expiryDate" />
+            <span class="error-msg">Expiry date must be after the issue date.</span>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field" id="f_reminderDate">
+            <label for="in_reminderDate">Reminder Date</label>
+            <input class="input" type="date" id="in_reminderDate" />
+            <span class="error-msg">Reminder date should be on or before the expiry date.</span>
+          </div>
+          <div class="field" id="f_cost">
+            <label for="in_cost">Renewal Cost</label>
+            <input class="input" type="number" min="0" step="0.01" id="in_cost" placeholder="0.00" />
+            <span class="error-msg">Enter a valid, non-negative amount.</span>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field" id="f_currency" style="max-width:180px;">
+            <label for="in_currency">Currency</label>
+            <select class="input" id="in_currency"></select>
+          </div>
+          <div class="field" id="f_recurringCycle">
+            <label for="in_recurringCycle" data-i18n="recurringCycle">Recurring Renewal Cycle</label>
+            <select class="input" id="in_recurringCycle"></select>
+          </div>
+        </div>
+
+        <div class="form-section-title">Notes &amp; Documents</div>
+        <div class="field" id="f_notes">
+          <label for="in_notes">Notes</label>
+          <textarea class="input" id="in_notes" placeholder="Additional notes for this renewal"></textarea>
+        </div>
+        <div class="field">
+          <label>Attach Documents</label>
+          <div class="upload-zone" id="uploadZone">
+            <i data-lucide="upload-cloud" class="icon"></i>
+            <strong>Click to upload files</strong>
+            <span>PDF, JPG, PNG, DOCX, XLSX up to 10MB each</span>
+          </div>
+          <input type="file" id="fileInput" multiple style="display:none;" />
+          <div class="upload-file-list" id="uploadFileList"></div>
+        </div>
+      </div>
+      <div class="modal-footer modal-footer-between">
+        <button type="button" class="btn btn-ghost" id="resetFormBtn">Reset</button>
+        <div style="display:flex;gap:10px;">
+          <button type="button" class="btn btn-secondary" data-close-modal="renewalModal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Renewal</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3>Delete Renewal Record?</h3>
+      <button class="modal-close" data-close-modal="deleteModal"><i data-lucide="x" class="icon"></i></button>
+    </div>
+    <div class="modal-body">
+      <p class="text-mid">This will permanently remove <strong id="deleteRecordName" style="color:var(--text-hi);"></strong> and all of its history and documents. This action cannot be undone.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close-modal="deleteModal">Cancel</button>
+      <button class="btn btn-danger" id="confirmDeleteBtn"><i data-lucide="trash-2" class="icon"></i>Delete Record</button>
+    </div>
+  </div>
+</div>
+
+<!-- CSV / Excel Import Modal -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 style="display:flex;align-items:center;gap:8px;">
+        <i data-lucide="upload-cloud" class="icon" style="color:var(--accent);"></i>
+        <span data-i18n="importCsv">Import Renewal Records (Spreadsheet / CSV)</span>
+      </h3>
+      <button class="modal-close" data-close-modal="importModal"><i data-lucide="x" class="icon"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="import-help-box">
+        <div>
+          <strong style="color:var(--text-hi);font-size:14px;">Bulk Upload Spreadsheet</strong>
+          <p style="margin:4px 0 0;font-size:12.5px;color:var(--text-mid);">Seamlessly migrate from Excel or Google Sheets. All records will be imported with auto-generated IDs.</p>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" id="downloadTemplateBtn" style="white-space:nowrap;">
+          <i data-lucide="download" class="icon"></i> Download Sample CSV
+        </button>
+      </div>
+
+      <div class="upload-dropzone" id="importDropzone">
+        <i data-lucide="file-spreadsheet" class="dropzone-icon" style="color:var(--accent);width:40px;height:40px;margin-bottom:8px;"></i>
+        <div class="dropzone-text">
+          <strong style="display:block;font-size:14px;color:var(--text-hi);margin-bottom:4px;">Drag &amp; drop your CSV spreadsheet here, or <label for="csvFileInput" class="dropzone-browse" style="color:var(--accent);cursor:pointer;text-decoration:underline;">browse files</label></strong>
+          <span style="font-size:12px;color:var(--text-low);">Accepted format: .csv with columns for Name, Category, Provider, Expiry Date, Cost, Priority</span>
+        </div>
+        <input type="file" id="csvFileInput" accept=".csv,text/csv" style="display:none;" />
+      </div>
+
+      <div id="importPreviewSection" style="display:none;margin-top:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <strong style="color:var(--text-hi);font-size:13.5px;">Parsed Preview (<span id="parsedRowCount">0</span> records ready)</strong>
+          <span class="badge badge-active" id="validRowCount">0 valid</span>
+        </div>
+        <div class="table-wrap" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r-md);">
+          <table class="data-table" id="importPreviewTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Record Name</th>
+                <th>Category</th>
+                <th>Organization</th>
+                <th>Expiry Date</th>
+                <th>Cost</th>
+                <th>Cycle</th>
+                <th>Priority</th>
+              </tr>
+            </thead>
+            <tbody id="importPreviewBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer modal-footer-between">
+      <button type="button" class="btn btn-secondary" data-close-modal="importModal">Cancel</button>
+      <button type="button" class="btn btn-primary" id="confirmImportBtn" disabled>
+        <i data-lucide="check" class="icon"></i> <span id="confirmImportText">Import Records</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Confirm Modal -->
+<div class="modal-overlay" id="bulkConfirmModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3 id="bulkConfirmTitle">Bulk Action</h3>
+      <button class="modal-close" data-close-modal="bulkConfirmModal"><i data-lucide="x" class="icon"></i></button>
+    </div>
+    <div class="modal-body">
+      <p class="text-mid" id="bulkConfirmMessage"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close-modal="bulkConfirmModal">Cancel</button>
+      <button class="btn btn-primary" id="bulkConfirmProceedBtn">Proceed</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/records.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>RTS.refreshIcons();</script>
+</body>
+</html>
