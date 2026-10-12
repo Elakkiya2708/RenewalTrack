@@ -263,7 +263,7 @@
                 <strong>Assigned to You:</strong> <span>You are currently assigned to <strong>${assigned.length}</strong> renewal record(s).</span>
               </div>
             </div>
-            <a href="records.html?assigned=me" class="btn btn-secondary btn-sm"><i data-lucide="list-filter" class="icon"></i>Manage Assigned Renewals</a>
+            <a href="assigned.html" class="btn btn-secondary btn-sm"><i data-lucide="list-filter" class="icon"></i>Manage Assigned Renewals</a>
           </div>
         `;
       }

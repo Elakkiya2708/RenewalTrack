@@ -310,7 +310,19 @@ const db = {
   // 3. Save / Upsert renewal
   async saveRenewal(renewalData) {
     const id = renewalData.id || `ren-${Date.now()}`;
-    const record = { ...renewalData, id };
+    const assignedToId = renewalData.assignedToId || renewalData.assigned_to_id || null;
+    const assignedToName = renewalData.assignedToName || renewalData.assigned_to_name || renewalData.responsiblePerson || null;
+    const assignedToEmail = renewalData.assignedToEmail || renewalData.assigned_to_email || renewalData.responsibleEmail || null;
+
+    const record = {
+      ...renewalData,
+      id,
+      assignedToId,
+      assignedToName,
+      assignedToEmail,
+      responsiblePerson: renewalData.responsiblePerson || assignedToName || "",
+      responsibleEmail: renewalData.responsibleEmail || assignedToEmail || "",
+    };
 
     if (isConfigured()) {
       try {
@@ -520,6 +532,14 @@ const db = {
 
   // 10. User directory lookup (to resolve responsiblePerson to email address)
   async resolveRecipientEmail(responsiblePerson, renewal = {}) {
+    // 0. Explicit assigned employee email on renewal record
+    if (renewal.assignedToEmail && renewal.assignedToEmail.includes("@")) {
+      return renewal.assignedToEmail.trim();
+    }
+    if (renewal.assigned_to_email && renewal.assigned_to_email.includes("@")) {
+      return renewal.assigned_to_email.trim();
+    }
+
     // 1. Explicit email on renewal record
     if (renewal.responsibleEmail && renewal.responsibleEmail.includes("@")) {
       return renewal.responsibleEmail.trim();
@@ -598,6 +618,22 @@ const db = {
     if (clean === "demo@renewaltrack.com") return null;
     const users = await this.getUsers();
     return users.find((u) => (u.email || "").toLowerCase() === clean) || null;
+  },
+
+  // 13b. Get active employees (for assignment picker)
+  async getActiveEmployees() {
+    const users = await this.getUsers();
+    return users
+      .filter((u) => u.status !== "deactivated" && (u.role === "Employee" || u.role === "Admin"))
+      .map((u) => ({
+        id: u.id,
+        fullName: u.fullName,
+        email: u.email,
+        role: u.role,
+        mobile: u.mobile || "",
+        assignedRenewalsCount: u.assignedRenewalsCount || 0,
+      }))
+      .sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""));
   },
 
   // 14. Save or upsert user
@@ -700,8 +736,10 @@ const db = {
     const renewals = await this.getRenewals();
     const counts = {};
     renewals.forEach((r) => {
-      const email = (r.responsibleEmail || r.responsible_email || "").trim().toLowerCase();
-      const person = (r.responsiblePerson || r.responsible_person || "").trim().toLowerCase();
+      const assignedId = (r.assignedToId || r.assigned_to_id || "").trim();
+      const email = (r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || r.responsible_email || "").trim().toLowerCase();
+      const person = (r.assignedToName || r.assigned_to_name || r.responsiblePerson || r.responsible_person || "").trim().toLowerCase();
+      if (assignedId) counts[assignedId] = (counts[assignedId] || 0) + 1;
       if (email) counts[email] = (counts[email] || 0) + 1;
       if (person) counts[person] = (counts[person] || 0) + 1;
     });

@@ -519,6 +519,114 @@ const emailService = {
       return { success: false, error: err.message, inviteUrl };
     }
   },
+
+  // 6. Send renewal assignment / reassignment notification email
+  async sendAssignmentNotification({ to, recipientName, renewal, assignedBy, isReassignment = false, previousAssignee = "" }) {
+    if (!isValidEmail(to)) {
+      return { success: false, error: `Invalid recipient email address: "${to}"` };
+    }
+
+    const appUrl = config.APP_URL || `http://localhost:${config.PORT}`;
+    const detailUrl = `${appUrl}/details.html?id=${encodeURIComponent(renewal.id || "")}`;
+    const actionWord = isReassignment ? "Reassigned" : "Assigned";
+    const subject = `Renewal ${actionWord}: ${renewal.name || "Renewal Record"}`;
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;line-height:1.5;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width:600px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07);border:1px solid #e2e8f0;">
+          <tr>
+            <td style="background-color:#0f172a;padding:24px 32px;border-bottom:3px solid #6366f1;">
+              <div style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
+                <span style="color:#818cf8;">Renew</span>Guard
+              </div>
+              <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
+                Renewal Assignment Notification
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 32px 24px;">
+              <h2 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#0f172a;">
+                Hello, ${escapeHtml(recipientName || "Team Member")}!
+              </h2>
+              <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">
+                You have been ${isReassignment ? "reassigned" : "assigned"} as the responsible owner for the renewal record <strong>${escapeHtml(renewal.name || "")}</strong> by <strong>${escapeHtml(assignedBy || "an Administrator")}</strong>.
+              </p>
+              <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:18px;margin-bottom:24px;">
+                <table role="presentation" width="100%">
+                  <tr>
+                    <td style="padding:4px 0;font-size:13px;color:#64748b;">Record Name:</td>
+                    <td style="padding:4px 0;font-size:13px;font-weight:600;color:#0f172a;">${escapeHtml(renewal.name || "—")}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:4px 0;font-size:13px;color:#64748b;">Category:</td>
+                    <td style="padding:4px 0;font-size:13px;font-weight:600;color:#4f46e5;">${escapeHtml(renewal.category || "General")}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:4px 0;font-size:13px;color:#64748b;">Expiry Date:</td>
+                    <td style="padding:4px 0;font-size:13px;font-weight:600;color:#dc2626;">${escapeHtml(renewal.expiryDate || "—")}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:4px 0;font-size:13px;color:#64748b;">Priority:</td>
+                    <td style="padding:4px 0;font-size:13px;font-weight:600;color:#0f172a;">${escapeHtml(renewal.priority || "Medium")}</td>
+                  </tr>
+                  ${isReassignment && previousAssignee ? `
+                  <tr>
+                    <td style="padding:4px 0;font-size:13px;color:#64748b;">Previous Owner:</td>
+                    <td style="padding:4px 0;font-size:13px;font-weight:600;color:#64748b;">${escapeHtml(previousAssignee)}</td>
+                  </tr>` : ""}
+                </table>
+              </div>
+              <div style="text-align:center;margin:28px 0;">
+                <a href="${detailUrl}" style="background-color:#4f46e5;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 28px;border-radius:6px;display:inline-block;box-shadow:0 2px 4px rgba(79,70,229,0.3);">
+                  View Renewal Details &rarr;
+                </a>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center;">
+              &copy; 2026 RenewGuard Inc. &bull; Assignment Alert
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    const text = `Hello ${recipientName},\n\nYou have been ${isReassignment ? "reassigned" : "assigned"} to manage renewal "${renewal.name}" (Expiry: ${renewal.expiryDate}) by ${assignedBy}.\n\nView details here: ${detailUrl}`;
+
+    if (!config.EMAIL_SEND_ENABLED) {
+      console.log(`[Email Simulation] Assignment notification to ${to} for renewal "${renewal.name}" (${actionWord})`);
+      return {
+        success: true,
+        simulated: true,
+        provider: "simulated",
+      };
+    }
+
+    try {
+      const from = config.EMAIL_FROM;
+      if (config.EMAIL_PROVIDER.toLowerCase() === "resend") {
+        return await this._sendViaResend({ from, to, subject, html, text, renewal });
+      } else {
+        return await this._sendViaNodemailer({ from, to, subject, html, text, renewal });
+      }
+    } catch (err) {
+      console.error(`[Assignment Email Error] ${err.message}`);
+      return { success: false, error: err.message };
+    }
+  },
 };
 
 module.exports = emailService;

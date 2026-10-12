@@ -39,21 +39,39 @@
     document.getElementById("daysValue").style.color =
       status === "expired" ? "var(--danger)" : status === "due-soon" ? "var(--warning)" : "var(--success)";
 
+    const assignedName = record.assignedToName || record.assigned_to_name || record.responsiblePerson || record.responsible_person || "Unassigned";
+    const assignedEmail = record.assignedToEmail || record.assigned_to_email || record.responsibleEmail || "";
+    const initials = assignedName && assignedName !== "Unassigned"
+      ? assignedName.split(" ").filter(Boolean).map((p) => p[0]).slice(0, 2).join("").toUpperCase()
+      : "U";
+
     document.getElementById("glancePriority").innerHTML = RTS.priorityBadgeHtml(record.priority);
     document.getElementById("glanceCategory").textContent = record.category;
+    const glanceAssignedEl = document.getElementById("glanceAssigned");
+    if (glanceAssignedEl) glanceAssignedEl.textContent = assignedName;
     const glanceCycleEl = document.getElementById("glanceCycle");
     if (glanceCycleEl) glanceCycleEl.textContent = cycleTxt;
     document.getElementById("glanceCode").textContent = record.code;
 
+    const assigneeHtml = assignedName !== "Unassigned"
+      ? `<div style="display:inline-flex;align-items:center;gap:8px;margin-top:3px;">
+          <span style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg, #6366f1, #8b5cf6);color:#ffffff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">${initials}</span>
+          <div style="line-height:1.2;">
+            <div style="font-size:13px;font-weight:600;color:var(--text-primary);">${RTS.escapeHtml(assignedName)}</div>
+            ${assignedEmail ? `<div style="font-size:11.5px;color:var(--text-mid);font-weight:400;">${RTS.escapeHtml(assignedEmail)}</div>` : ""}
+          </div>
+        </div>`
+      : `<span style="color:var(--text-mid);font-weight:400;">Unassigned</span>`;
+
     document.getElementById("infoGrid").innerHTML = `
       <div class="info-item"><span>Organization / Provider</span><strong>${RTS.escapeHtml(record.organization || "—")}</strong></div>
       <div class="info-item"><span>Reference Number</span><strong>${RTS.escapeHtml(record.referenceNumber || "—")}</strong></div>
+      <div class="info-item"><span>Assigned Employee</span><div>${assigneeHtml}</div></div>
       <div class="info-item"><span>Issue Date</span><strong>${RTS.formatDate(record.issueDate)}</strong></div>
       <div class="info-item"><span>Expiry Date</span><strong>${RTS.formatDate(record.expiryDate)}</strong></div>
       <div class="info-item"><span>Reminder Date</span><strong>${RTS.formatDate(record.reminderDate)}</strong></div>
       <div class="info-item"><span>Renewal Cost</span><strong>${RTS.formatCurrency(record.cost, record.currency)}</strong></div>
       <div class="info-item"><span>Renewal Cycle</span><strong><i data-lucide="repeat" style="width:13px;height:13px;display:inline-block;vertical-align:-1px;margin-right:3px;"></i>${RTS.escapeHtml(cycleTxt)}</strong></div>
-      <div class="info-item"><span>Responsible Person</span><strong>${RTS.escapeHtml(record.responsiblePerson || "—")}${record.responsibleEmail ? ` <span style="font-size:12px;color:var(--text-mid);font-weight:400;">(${RTS.escapeHtml(record.responsibleEmail)})</span>` : ""}</strong></div>
       <div class="info-item" style="grid-column:1/-1;"><span>Description</span><strong style="font-weight:400;">${RTS.escapeHtml(record.description) || "—"}</strong></div>
       <div class="info-item" style="grid-column:1/-1;"><span>Notes</span><strong style="font-weight:400;">${RTS.escapeHtml(record.notes) || "—"}</strong></div>
     `;

@@ -28,6 +28,8 @@
   let selectedIds = new Set();
   let stagedImportRecords = [];
 
+  let assignableEmployees = [];
+
   function fileTypeFromName(name) {
     const ext = (name.split(".").pop() || "").toLowerCase();
     if (ext === "pdf") return "PDF";
@@ -35,6 +37,59 @@
     if (["doc", "docx"].includes(ext)) return "Word";
     if (["xls", "xlsx", "csv"].includes(ext)) return "Spreadsheet";
     return "File";
+  }
+
+  async function loadAssignableEmployees() {
+    try {
+      if (RTS.team && RTS.team.getAssignableEmployees) {
+        assignableEmployees = await RTS.team.getAssignableEmployees();
+      }
+    } catch (e) {
+      console.warn("Could not load assignees:", e);
+    }
+    populateAssigneeSelect();
+  }
+
+  function populateAssigneeSelect() {
+    const sel = document.getElementById("in_assignedTo");
+    if (!sel) return;
+    const currentVal = sel.value;
+    sel.innerHTML = `<option value="">Select Employee…</option>`;
+    assignableEmployees.forEach((emp) => {
+      const name = emp.fullName || emp.name || "Employee";
+      const email = emp.email || "";
+      const role = emp.role ? ` (${emp.role})` : "";
+      sel.insertAdjacentHTML(
+        "beforeend",
+        `<option value="${emp.id}" data-name="${RTS.escapeHtml(name)}" data-email="${RTS.escapeHtml(email)}">${RTS.escapeHtml(name)}${role} — ${RTS.escapeHtml(email)}</option>`
+      );
+    });
+    if (currentVal) {
+      sel.value = currentVal;
+    }
+  }
+
+  function renderAssigneeCell(r) {
+    const name = r.assignedToName || r.assigned_to_name || r.responsiblePerson || r.responsible_person || "";
+    const email = r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || "";
+    if (!name || name === "Unassigned") {
+      return `<span class="cell-sub" style="color:var(--text-muted);display:inline-flex;align-items:center;gap:4px;font-size:12px;">Unassigned</span>`;
+    }
+    const initials = name
+      .split(" ")
+      .filter(Boolean)
+      .map((p) => p[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "U";
+    return `
+      <div style="display:inline-flex;align-items:center;gap:7px;max-width:160px;" title="${RTS.escapeHtml(name + (email ? ' (' + email + ')' : ''))}">
+        <span style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg, #6366f1, #8b5cf6);color:#ffffff;font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">${initials}</span>
+        <div style="min-width:0;line-height:1.2;">
+          <div style="font-size:12px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${RTS.escapeHtml(name)}</div>
+          ${email ? `<div style="font-size:10px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${RTS.escapeHtml(email)}</div>` : ""}
+        </div>
+      </div>`;
   }
 
   function populateSelects() {
@@ -64,6 +119,8 @@
         cycleInput.insertAdjacentHTML("beforeend", `<option value="${c}">${RTS.cycleLabel(c)}</option>`);
       });
     }
+
+    loadAssignableEmployees();
   }
 
   function getFilteredSorted() {
@@ -85,11 +142,14 @@
       const curUser = RTS.auth.getCurrentUser();
       const uEmail = (curUser.email || "").toLowerCase();
       const uName = (curUser.fullName || "").toLowerCase();
+      const uId = curUser.id || "";
       list = list.filter((r) => {
-        const respEmail = (r.responsibleEmail || r.responsible_email || "").toLowerCase();
-        const respName = (r.responsiblePerson || r.responsible_person || "").toLowerCase();
+        const assignedId = r.assignedToId || r.assigned_to_id || "";
+        const respEmail = (r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || r.responsible_email || "").toLowerCase();
+        const respName = (r.assignedToName || r.assigned_to_name || r.responsiblePerson || r.responsible_person || "").toLowerCase();
         const createdBy = (r.createdBy || "").toLowerCase();
         return (
+          (uId && assignedId === uId) ||
           (uEmail && respEmail === uEmail) ||
           (uName && respName === uName) ||
           (uName && respName.includes(uName)) ||
@@ -178,6 +238,7 @@
             </td>
             <td>${RTS.escapeHtml(r.category)}</td>
             <td>${RTS.escapeHtml(r.organization || "—")}</td>
+            <td>${renderAssigneeCell(r)}</td>
             <td>${RTS.formatDate(r.issueDate)}</td>
             <td>${RTS.formatDate(r.expiryDate)}</td>
             <td>${RTS.formatDate(r.reminderDate)}</td>
@@ -257,13 +318,38 @@
     }
     editingId = null;
     resetForm();
+    populateAssigneeSelect();
+
+    const sel = document.getElementById("in_assignedTo");
+    const help = document.getElementById("assignedToHelp");
+    const respInput = document.getElementById("in_responsible");
+    const emailInput = document.getElementById("in_responsibleEmail");
+
     if (RTS.auth.isEmployee()) {
       const u = RTS.auth.getCurrentUser();
-      const respInput = document.getElementById("in_responsible");
-      const emailInput = document.getElementById("in_responsibleEmail");
-      if (respInput && !respInput.value) respInput.value = u.fullName || "";
-      if (emailInput && !emailInput.value) emailInput.value = u.email || "";
+      const matched = assignableEmployees.find((e) => String(e.id) === String(u.id) || (e.email && e.email.toLowerCase() === (u.email || "").toLowerCase()));
+      const empId = matched ? matched.id : u.id;
+      if (sel) {
+        sel.value = empId || "";
+        sel.disabled = true;
+      }
+      if (help) {
+        help.textContent = "Automatically assigned to your employee account.";
+      }
+      if (respInput) respInput.value = (matched && (matched.fullName || matched.name)) || u.fullName || u.name || "";
+      if (emailInput) emailInput.value = (matched && matched.email) || u.email || "";
+    } else {
+      if (sel) {
+        sel.disabled = false;
+        sel.value = "";
+      }
+      if (help) {
+        help.textContent = "Employee responsible for managing this renewal.";
+      }
+      if (respInput) respInput.value = "";
+      if (emailInput) emailInput.value = "";
     }
+
     document.getElementById("renewalModalTitle").textContent = RTS.i18n.t("addNewRenewal", "Add New Renewal");
     RTS.modal.open("renewalModal");
   }
@@ -281,6 +367,30 @@
     }
     editingId = id;
     resetForm();
+    populateAssigneeSelect();
+
+    const sel = document.getElementById("in_assignedTo");
+    const help = document.getElementById("assignedToHelp");
+
+    let targetAssigneeId = record.assignedToId || record.assigned_to_id || "";
+    if (!targetAssigneeId) {
+      const email = (record.assignedToEmail || record.assigned_to_email || record.responsibleEmail || record.responsible_email || "").toLowerCase();
+      const name = (record.assignedToName || record.assigned_to_name || record.responsiblePerson || record.responsible_person || "").toLowerCase();
+      const found = assignableEmployees.find((e) => (e.email && e.email.toLowerCase() === email) || ((e.fullName || e.name || "").toLowerCase() === name));
+      if (found) targetAssigneeId = found.id;
+    }
+
+    if (sel) {
+      sel.value = targetAssigneeId || "";
+      if (RTS.auth.isEmployee()) {
+        sel.disabled = true;
+        if (help) help.textContent = "Assignment is locked. Only Admins can reassign renewals.";
+      } else {
+        sel.disabled = false;
+        if (help) help.textContent = "Employee responsible for managing this renewal.";
+      }
+    }
+
     document.getElementById("renewalModalTitle").textContent = "Edit Renewal";
     document.getElementById("in_name").value = record.name || "";
     document.getElementById("in_category").value = record.category || "";
@@ -288,9 +398,9 @@
     document.getElementById("in_description").value = record.description || "";
     document.getElementById("in_organization").value = record.organization || "";
     document.getElementById("in_reference").value = record.referenceNumber || "";
-    document.getElementById("in_responsible").value = record.responsiblePerson || "";
+    document.getElementById("in_responsible").value = record.assignedToName || record.assigned_to_name || record.responsiblePerson || "";
     const emailField = document.getElementById("in_responsibleEmail");
-    if (emailField) emailField.value = record.responsibleEmail || record.responsible_email || "";
+    if (emailField) emailField.value = record.assignedToEmail || record.assigned_to_email || record.responsibleEmail || record.responsible_email || "";
     document.getElementById("in_issueDate").value = record.issueDate || "";
     document.getElementById("in_expiryDate").value = record.expiryDate || "";
     document.getElementById("in_reminderDate").value = record.reminderDate || "";
@@ -353,15 +463,17 @@
     clearFieldErrors();
     let valid = true;
     const req = (id, fieldId) => {
-      if (!document.getElementById(id).value.trim()) {
-        document.getElementById(fieldId).classList.add("has-error");
+      const el = document.getElementById(id);
+      if (!el || !el.value.trim()) {
+        const f = document.getElementById(fieldId);
+        if (f) f.classList.add("has-error");
         valid = false;
       }
     };
     req("in_name", "f_name");
     req("in_category", "f_category");
     req("in_organization", "f_organization");
-    req("in_responsible", "f_responsible");
+    req("in_assignedTo", "f_assignedTo");
     req("in_issueDate", "f_issueDate");
     req("in_expiryDate", "f_expiryDate");
 
@@ -393,7 +505,14 @@
       RTS.toast("Please fix the highlighted fields.", "error");
       return;
     }
+
     const cycleInput = document.getElementById("in_recurringCycle");
+    const sel = document.getElementById("in_assignedTo");
+    const assignedId = sel ? sel.value : null;
+    const matchedEmp = assignableEmployees.find((emp) => String(emp.id) === String(assignedId));
+    const assignedName = matchedEmp ? (matchedEmp.fullName || matchedEmp.name) : (document.getElementById("in_responsible") ? document.getElementById("in_responsible").value.trim() : "");
+    const assignedEmail = matchedEmp ? (matchedEmp.email || "") : (document.getElementById("in_responsibleEmail") ? document.getElementById("in_responsibleEmail").value.trim() : "");
+
     const data = {
       name: document.getElementById("in_name").value.trim(),
       category: document.getElementById("in_category").value,
@@ -402,8 +521,11 @@
       description: document.getElementById("in_description").value.trim(),
       organization: document.getElementById("in_organization").value.trim(),
       referenceNumber: document.getElementById("in_reference").value.trim(),
-      responsiblePerson: document.getElementById("in_responsible").value.trim(),
-      responsibleEmail: document.getElementById("in_responsibleEmail") ? document.getElementById("in_responsibleEmail").value.trim() : "",
+      assignedToId: assignedId || null,
+      assignedToName: assignedName,
+      assignedToEmail: assignedEmail,
+      responsiblePerson: assignedName,
+      responsibleEmail: assignedEmail,
       issueDate: document.getElementById("in_issueDate").value,
       expiryDate: document.getElementById("in_expiryDate").value,
       reminderDate: document.getElementById("in_reminderDate").value,
@@ -511,6 +633,8 @@
           { label: "Name", value: "name" },
           { label: "Category", value: "category" },
           { label: "Organization", value: "organization" },
+          { label: "Assigned To", value: (r) => r.assignedToName || r.assigned_to_name || r.responsiblePerson || "Unassigned" },
+          { label: "Assigned Email", value: (r) => r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || "" },
           { label: "Expiry Date", value: "expiryDate" },
           { label: "Cost", value: "cost" },
           { label: "Currency", value: "currency" },
@@ -856,6 +980,23 @@
     if (renewalForm) renewalForm.addEventListener("submit", handleSubmit);
     const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
     if (confirmDeleteBtn) confirmDeleteBtn.addEventListener("click", confirmDelete);
+
+    const assignedSelect = document.getElementById("in_assignedTo");
+    if (assignedSelect) {
+      assignedSelect.addEventListener("change", () => {
+        const selectedId = assignedSelect.value;
+        const emp = assignableEmployees.find((e) => String(e.id) === String(selectedId));
+        const respHidden = document.getElementById("in_responsible");
+        const emailInput = document.getElementById("in_responsibleEmail");
+        if (emp) {
+          if (respHidden) respHidden.value = emp.fullName || emp.name || "";
+          if (emailInput) emailInput.value = emp.email || "";
+        } else {
+          if (respHidden) respHidden.value = "";
+          if (emailInput) emailInput.value = "";
+        }
+      });
+    }
   }
 
   function applyUrlParams() {

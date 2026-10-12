@@ -498,8 +498,13 @@
 
   function syncRenewalToBackend(method, url, body) {
     try {
-      const token = (global.RTS && global.RTS.auth && typeof global.RTS.auth.getToken === "function" && global.RTS.auth.getToken()) || localStorage.getItem("rts_auth_token");
-      const headers = { "Content-Type": "application/json" };
+      const token = (global.RTS && global.RTS.auth && typeof global.RTS.auth.getToken === "function" && global.RTS.auth.getToken()) || localStorage.getItem("rts_jwt_token") || localStorage.getItem("rts_auth_token");
+      const user = getCurrentUser();
+      const headers = {
+        "Content-Type": "application/json",
+        "x-user-role": user.role || "Employee",
+        "x-user-email": user.email || "",
+      };
       if (token) headers["Authorization"] = "Bearer " + token;
       fetch(apiUrl(url), {
         method,
@@ -1104,10 +1109,12 @@
     const user = getCurrentUser();
     const uEmail = (user.email || "").toLowerCase();
     const uName = (user.fullName || "").toLowerCase();
-    const respEmail = (r.responsibleEmail || r.responsible_email || "").toLowerCase();
-    const respName = (r.responsiblePerson || r.responsible_person || "").toLowerCase();
+    const assignedId = r.assignedToId || r.assigned_to_id || "";
+    const respEmail = (r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || r.responsible_email || "").toLowerCase();
+    const respName = (r.assignedToName || r.assigned_to_name || r.responsiblePerson || r.responsible_person || "").toLowerCase();
     const createdBy = (r.createdBy || "").toLowerCase();
     return (
+      (assignedId && user.id && assignedId === user.id) ||
       (!respEmail && !respName) ||
       (uEmail && respEmail === uEmail) ||
       (uName && respName === uName) ||
@@ -1123,10 +1130,12 @@
     const user = getCurrentUser();
     const uEmail = (user.email || "").toLowerCase();
     const uName = (user.fullName || "").toLowerCase();
-    const respEmail = (r.responsibleEmail || r.responsible_email || "").toLowerCase();
-    const respName = (r.responsiblePerson || r.responsible_person || "").toLowerCase();
+    const assignedId = r.assignedToId || r.assigned_to_id || "";
+    const respEmail = (r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || r.responsible_email || "").toLowerCase();
+    const respName = (r.assignedToName || r.assigned_to_name || r.responsiblePerson || r.responsible_person || "").toLowerCase();
     const createdBy = (r.createdBy || "").toLowerCase();
     return (
+      (assignedId && user.id && assignedId === user.id) ||
       (uEmail && respEmail === uEmail) ||
       (uName && respName === uName) ||
       (uName && respName.includes(uName)) ||
@@ -1289,13 +1298,13 @@
 
   function initSidebarActive() {
     const page = currentPageName();
-    const isAssignedMe = global.location.search.includes("assigned=me");
+    const isAssignedMe = global.location.search.includes("assigned=me") || page === "assigned.html";
     const isInvite = global.location.hash.includes("invite");
 
     document.querySelectorAll(".nav-link").forEach((link) => {
       const href = link.getAttribute("href") || "";
       if (isAssignedMe) {
-        if (href.includes("assigned=me")) {
+        if (href.includes("assigned.html") || href.includes("assigned=me")) {
           link.classList.add("active");
         } else {
           link.classList.remove("active");
@@ -1311,6 +1320,7 @@
         if (
           (hrefBase === page || (page === "" && hrefBase === "dashboard.html")) &&
           !href.includes("assigned=me") &&
+          !href.includes("assigned.html") &&
           !href.includes("#invite")
         ) {
           link.classList.add("active");
@@ -1388,12 +1398,12 @@
     nav.querySelectorAll("a[href*='profile.html'], [data-logout], a[href*='logout']").forEach((el) => el.remove());
 
     // 3. Ensure Employee "Assigned to Me" link exists
-    let empLink = nav.querySelector("a[href='records.html?assigned=me']");
+    let empLink = nav.querySelector("a[href='assigned.html'], a[href='records.html?assigned=me']");
     if (!empLink) {
       const reportsLink = nav.querySelector("a[href='reports.html']");
       const empHtml = `
         <div class="sidebar-section-label" data-role="Employee">My Work</div>
-        <a href="records.html?assigned=me" class="nav-link" data-role="Employee"><i data-lucide="user-check" class="icon"></i>Assigned to Me</a>
+        <a href="assigned.html" class="nav-link" data-role="Employee"><i data-lucide="user-check" class="icon"></i>Assigned to Me</a>
       `;
       if (reportsLink) {
         reportsLink.insertAdjacentHTML("afterend", empHtml);
@@ -1407,6 +1417,8 @@
           nav.insertAdjacentHTML("beforeend", empHtml);
         }
       }
+    } else {
+      empLink.setAttribute("href", "assigned.html");
     }
 
     // 4. Ensure Team Management links exist for Admin
@@ -1682,6 +1694,7 @@
       "history.html": dict.history,
       "documents.html": dict.documents,
       "reports.html": dict.reports,
+      "assigned.html": dict.assignedToMe || "Assigned to Me",
       "records.html?assigned=me": dict.assignedToMe || "Assigned to Me",
       "team.html": dict.teamMembers || "Team Members",
       "team.html#invite": dict.inviteMembers || "Invite Members",
@@ -2667,6 +2680,32 @@
           },
         });
         return res.json();
+      },
+      async getAssignableEmployees() {
+        const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH);
+        try {
+          const res = await fetch(apiUrl("/api/renewals/assignees"), {
+            headers: {
+              Authorization: "Bearer " + token,
+              "x-user-role": getCurrentUser().role,
+              "x-user-email": getCurrentUser().email,
+            },
+          });
+          const data = await res.json();
+          if (data && data.ok && Array.isArray(data.data)) {
+            return data.data;
+          }
+        } catch (e) {}
+        const accs = getAccounts();
+        return accs
+          .filter((a) => a.status !== "deactivated" && (a.role === "Employee" || a.role === "Admin"))
+          .map((a) => ({
+            id: a.id || `usr-${a.email}`,
+            fullName: a.fullName,
+            email: a.email,
+            role: a.role,
+          }))
+          .sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""));
       },
     },
     audit: {

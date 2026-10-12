@@ -31,7 +31,7 @@
       <a href="reports.html" class="nav-link"><i data-lucide="bar-chart-2" class="icon"></i>Reports</a>
 
       <div class="sidebar-section-label" data-role="Employee">My Work</div>
-      <a href="records.html?assigned=me" class="nav-link" data-role="Employee"><i data-lucide="user-check" class="icon"></i>Assigned to Me</a>
+      <a href="assigned.html" class="nav-link" data-role="Employee"><i data-lucide="user-check" class="icon"></i>Assigned to Me</a>
 
       <div class="sidebar-section-label" data-role="Admin">Team Management</div>
       <a href="team.html" class="nav-link" data-role="Admin"><i data-lucide="users" class="icon"></i>Team Members</a>
@@ -123,6 +123,7 @@
               <th data-i18n="recordName">Record Name</th>
               <th data-i18n="category">Category</th>
               <th data-i18n="organization">Organization</th>
+              <th data-i18n="assignedTo">Assigned To</th>
               <th data-i18n="issueDate">Issue Date</th>
               <th id="sortExpiry"><span data-i18n="expiryDate">Expiry Date</span> <i data-lucide="arrow-up-down" class="sort-icon"></i></th>
               <th data-i18n="reminderDate">Reminder Date</th>
@@ -211,17 +212,21 @@
           </div>
         </div>
         <div class="field-row">
-          <div class="field" id="f_responsible">
-            <label for="in_responsible">Responsible Person <span class="req">*</span></label>
-            <input class="input" id="in_responsible" placeholder="e.g. Elakkiya" />
-            <span class="error-msg">Responsible person is required.</span>
+          <div class="field" id="f_assignedTo">
+            <label for="in_assignedTo">Assigned To (Employee) <span class="req">*</span></label>
+            <select class="input" id="in_assignedTo">
+              <option value="">Select Employee…</option>
+            </select>
+            <span class="cell-sub" id="assignedToHelp" style="font-size:11px;margin-top:2px;">Employee responsible for managing this renewal</span>
+            <span class="error-msg">Please select an assigned employee.</span>
           </div>
           <div class="field" id="f_responsibleEmail">
-            <label for="in_responsibleEmail">Alert Email Address</label>
-            <input class="input" type="email" id="in_responsibleEmail" placeholder="e.g. elakkiyaohai@gmail.com" />
-            <span class="cell-sub" style="font-size:11px;margin-top:2px;">Receives automated email reminders</span>
+            <label for="in_responsibleEmail">Alert / Notification Email</label>
+            <input class="input" type="email" id="in_responsibleEmail" placeholder="Auto-filled from assigned employee" />
+            <span class="cell-sub" style="font-size:11px;margin-top:2px;">Receives assignment alerts &amp; reminders</span>
           </div>
         </div>
+        <input type="hidden" id="in_responsible" />
 
         <div class="form-section-title">Dates &amp; Cost</div>
         <div class="field-row">
