@@ -679,15 +679,19 @@
     syncRenewalToBackend('DELETE', '/api/renewals');
   }
 
+  const PRIMARY_ADMIN_EMAIL = "elakkiyaohai@gmail.com";
+  const PRIMARY_ADMIN_NAME = "Elakkiya";
+
   const DEFAULT_ACCOUNTS = [
     {
-      id: "usr-1",
-      fullName: "Anita Sharma",
-      email: "demo@renewaltrack.com",
-      mobile: "+1 555 0102",
-      password: "Demo@1234",
+      id: "usr-admin-elakkiya",
+      fullName: PRIMARY_ADMIN_NAME,
+      email: PRIMARY_ADMIN_EMAIL,
+      mobile: "+91 98765 43210",
+      password: "Admin@1234",
       role: "Admin",
       status: "active",
+      isPrimaryAdmin: true,
     },
     {
       id: "usr-2",
@@ -711,10 +715,27 @@
 
   function seedAccount() {
     let accounts = readJSON(STORAGE_KEYS.ACCOUNTS, null);
+
+    // Completely purge unwanted demo account from localStorage
+    if (accounts && Array.isArray(accounts)) {
+      const filtered = accounts.filter(
+        (a) => a.email && a.email.toLowerCase() !== "demo@renewaltrack.com"
+      );
+      if (filtered.length !== accounts.length) {
+        accounts = filtered;
+        writeJSON(STORAGE_KEYS.ACCOUNTS, accounts);
+      }
+    }
+
+    // Purge unwanted demo user from current user session
+    const currentStored = readJSON(STORAGE_KEYS.USER, null);
+    if (currentStored && currentStored.email && currentStored.email.toLowerCase() === "demo@renewaltrack.com") {
+      writeJSON(STORAGE_KEYS.USER, DEFAULT_ACCOUNTS[0]);
+    }
+
     if (!accounts || !accounts.length) {
       writeJSON(STORAGE_KEYS.ACCOUNTS, DEFAULT_ACCOUNTS);
     } else {
-      // Ensure all 3 default role accounts exist in storage
       let changed = false;
       DEFAULT_ACCOUNTS.forEach((def) => {
         const found = accounts.find((a) => a.email.toLowerCase() === def.email.toLowerCase());
@@ -752,8 +773,9 @@
 
   function getAccounts() {
     const accs = readJSON(STORAGE_KEYS.ACCOUNTS, []);
-    if (!accs.length) return DEFAULT_ACCOUNTS;
-    return accs;
+    const clean = accs.filter((a) => a.email && a.email.toLowerCase() !== "demo@renewaltrack.com");
+    if (!clean.length) return DEFAULT_ACCOUNTS;
+    return clean;
   }
 
   async function registerAccount({ fullName, email, mobile, password, inviteToken }) {
@@ -911,13 +933,17 @@
   }
 
   function getCurrentUser() {
-    return readJSON(STORAGE_KEYS.USER, {
-      fullName: "Anita Sharma",
-      email: "demo@renewaltrack.com",
-      mobile: "+1 555 0102",
-      role: "Admin",
-      status: "active",
-    });
+    const user = readJSON(STORAGE_KEYS.USER, DEFAULT_ACCOUNTS[0]);
+    if (!user || !user.email || user.email.toLowerCase() === "demo@renewaltrack.com") {
+      writeJSON(STORAGE_KEYS.USER, DEFAULT_ACCOUNTS[0]);
+      return DEFAULT_ACCOUNTS[0];
+    }
+    return user;
+  }
+
+  function isPrimaryAdmin() {
+    const u = getCurrentUser();
+    return (u.email || "").toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase();
   }
 
   function setCurrentUser(data) {
@@ -1199,6 +1225,40 @@
     // 4. Apply read-only protections if Viewer
     if (role === "Viewer") {
       applyViewerRestrictions();
+    }
+  }
+
+  function applyViewerRestrictions() {
+    const hideSelectors = [
+      "a[href*='#add']",
+      "a[href='records.html#add']",
+      "#openAddBtn",
+      "#openImportBtn",
+      "#bulkActionBar",
+      "#openUploadBtn",
+      "#editBtn",
+      "#deleteBtn",
+      "#renewBtn",
+      "#clearAllBtn",
+      ".btn-add",
+      ".btn-create",
+      ".btn-delete",
+      ".btn-edit",
+      ".change-role-btn",
+      ".toggle-status-btn"
+    ];
+
+    hideSelectors.forEach((sel) => {
+      document.querySelectorAll(sel).forEach((el) => {
+        el.style.display = "none";
+      });
+    });
+
+    const modalForm = document.getElementById("renewalForm");
+    if (modalForm) {
+      modalForm.querySelectorAll("input, select, textarea, button[type='submit']").forEach((input) => {
+        input.disabled = true;
+      });
     }
   }
 
@@ -2018,6 +2078,8 @@
       isAdmin,
       isEmployee,
       isViewer,
+      isPrimaryAdmin,
+      applyViewerRestrictions,
       canEditRenewal,
       redirectIfAuthed,
       registerAccount,

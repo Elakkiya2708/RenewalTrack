@@ -105,13 +105,18 @@
   function wireActions() {
     const id = getId();
     const record = RTS.data.getRenewalById(id);
-    if (!record) return;
+    const canEdit = RTS.auth.canEditRenewal(record);
+    const canDelete = RTS.auth.isAdmin() || (RTS.auth.isEmployee() && canEdit);
 
     const editBtn = document.getElementById("editBtn");
     if (editBtn) {
-      editBtn.addEventListener("click", () => {
-        window.location.href = "records.html?edit=" + encodeURIComponent(id);
-      });
+      if (!canEdit) {
+        editBtn.style.display = "none";
+      } else {
+        editBtn.addEventListener("click", () => {
+          window.location.href = "records.html?edit=" + encodeURIComponent(id);
+        });
+      }
     }
 
     const exportIcsBtn = document.getElementById("exportIcsBtn");
@@ -124,9 +129,13 @@
 
     const deleteBtn = document.getElementById("deleteBtn");
     if (deleteBtn) {
-      deleteBtn.addEventListener("click", () => {
-        RTS.modal.open("deleteModal");
-      });
+      if (!canDelete) {
+        deleteBtn.style.display = "none";
+      } else {
+        deleteBtn.addEventListener("click", () => {
+          RTS.modal.open("deleteModal");
+        });
+      }
     }
     const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
     if (confirmDeleteBtn) {
@@ -153,26 +162,30 @@
 
     const renewBtn = document.getElementById("renewBtn");
     if (renewBtn) {
-      renewBtn.addEventListener("click", () => {
-        const curRecord = RTS.data.getRenewalById(id);
-        if (!curRecord) return;
-        document.getElementById("renewForm").reset();
+      if (!canEdit) {
+        renewBtn.style.display = "none";
+      } else {
+        renewBtn.addEventListener("click", () => {
+          const curRecord = RTS.data.getRenewalById(id);
+          if (!curRecord) return;
+          document.getElementById("renewForm").reset();
 
-        const cycle = curRecord.recurringCycle || "Yearly";
-        if (cycleSelect) cycleSelect.value = cycle;
+          const cycle = curRecord.recurringCycle || "Yearly";
+          if (cycleSelect) cycleSelect.value = cycle;
 
-        const autoNewExpiry = RTS.calculateNextExpiry(curRecord.expiryDate, cycle);
-        document.getElementById("renew_newExpiry").value = autoNewExpiry;
-        document.getElementById("renew_currency").value = curRecord.currency || "USD";
-        document.getElementById("renew_cost").value = curRecord.cost != null ? curRecord.cost : "";
-        document.getElementById("renew_renewedBy").value = RTS.auth.getCurrentUser().fullName;
+          const autoNewExpiry = RTS.calculateNextExpiry(curRecord.expiryDate, cycle);
+          document.getElementById("renew_newExpiry").value = autoNewExpiry;
+          document.getElementById("renew_currency").value = curRecord.currency || "USD";
+          document.getElementById("renew_cost").value = curRecord.cost != null ? curRecord.cost : "";
+          document.getElementById("renew_renewedBy").value = RTS.auth.getCurrentUser().fullName;
 
-        const notice = document.getElementById("renewCycleNotice");
-        if (notice) notice.textContent = `Auto-calculated (${RTS.cycleLabel(cycle)})`;
+          const notice = document.getElementById("renewCycleNotice");
+          if (notice) notice.textContent = `Auto-calculated (${RTS.cycleLabel(cycle)})`;
 
-        document.querySelectorAll("#renewForm .field").forEach((f) => f.classList.remove("has-error"));
-        RTS.modal.open("renewModal");
-      });
+          document.querySelectorAll("#renewForm .field").forEach((f) => f.classList.remove("has-error"));
+          RTS.modal.open("renewModal");
+        });
+      }
     }
 
     // Wire quick recurrence presets

@@ -20,6 +20,7 @@
     category: "",
     status: "",
     priority: "",
+    assignment: "",
   };
   let editingId = null;
   let pendingDocs = []; // documents staged in the current modal session
@@ -80,6 +81,17 @@
     if (state.category) list = list.filter((r) => r.category === state.category);
     if (state.status) list = list.filter((r) => RTS.computeStatus(r) === state.status);
     if (state.priority) list = list.filter((r) => r.priority === state.priority);
+    if (state.assignment === "assigned") {
+      const curUser = RTS.auth.getCurrentUser();
+      const uEmail = (curUser.email || "").toLowerCase();
+      const uName = (curUser.fullName || "").toLowerCase();
+      list = list.filter((r) => {
+        const respEmail = (r.responsibleEmail || r.responsible_email || "").toLowerCase();
+        const respName = (r.responsiblePerson || r.responsible_person || "").toLowerCase();
+        const createdBy = (r.createdBy || "").toLowerCase();
+        return respEmail === uEmail || respName === uName || createdBy === uEmail;
+      });
+    }
 
     list.sort((a, b) => {
       if (a.expiryDate === b.expiryDate) return 0;
@@ -132,6 +144,8 @@
           const status = RTS.computeStatus(r);
           const isChecked = selectedIds.has(r.id);
           const cycleTxt = RTS.cycleLabel(r.recurringCycle || "Yearly");
+          const canEdit = RTS.auth.canEditRenewal(r);
+          const canDelete = RTS.auth.isAdmin() || (RTS.auth.isEmployee() && canEdit);
           return `
           <tr class="${isChecked ? "row-selected" : ""}">
             <td style="text-align:center;">
@@ -153,8 +167,8 @@
             <td>
               <div class="row-actions">
                 <a class="icon-btn" href="details.html?id=${r.id}" aria-label="View details" title="View details"><i data-lucide="eye" class="icon"></i></a>
-                <button class="icon-btn" aria-label="Edit" title="Edit" onclick="RecordsPage.openEdit('${r.id}')"><i data-lucide="edit-3" class="icon"></i></button>
-                <button class="icon-btn" aria-label="Delete" title="Delete" onclick="RecordsPage.openDelete('${r.id}')"><i data-lucide="trash-2" class="icon"></i></button>
+                ${canEdit ? `<button class="icon-btn" aria-label="Edit" title="Edit" onclick="RecordsPage.openEdit('${r.id}')"><i data-lucide="edit-3" class="icon"></i></button>` : ""}
+                ${canDelete ? `<button class="icon-btn" aria-label="Delete" title="Delete" onclick="RecordsPage.openDelete('${r.id}')"><i data-lucide="trash-2" class="icon"></i></button>` : ""}
               </div>
             </td>
           </tr>`;
@@ -619,14 +633,26 @@
       state.page = 1;
       renderTable();
     });
+    const filterAssignment = document.getElementById("filterAssignment");
+    if (filterAssignment) {
+      filterAssignment.addEventListener("change", (e) => {
+        state.assignment = e.target.value;
+        state.page = 1;
+        renderTable();
+      });
+    }
     document.getElementById("sortExpiry").addEventListener("click", () => {
       state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
       renderTable();
     });
-    document.getElementById("openAddBtn").addEventListener("click", openAdd);
-    document.getElementById("resetFormBtn").addEventListener("click", resetForm);
-    document.getElementById("renewalForm").addEventListener("submit", handleSubmit);
-    document.getElementById("confirmDeleteBtn").addEventListener("click", confirmDelete);
+    const openAddBtn = document.getElementById("openAddBtn");
+    if (openAddBtn) openAddBtn.addEventListener("click", openAdd);
+    const resetFormBtn = document.getElementById("resetFormBtn");
+    if (resetFormBtn) resetFormBtn.addEventListener("click", resetForm);
+    const renewalForm = document.getElementById("renewalForm");
+    if (renewalForm) renewalForm.addEventListener("submit", handleSubmit);
+    const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
+    if (confirmDeleteBtn) confirmDeleteBtn.addEventListener("click", confirmDelete);
   }
 
   function applyUrlParams() {
@@ -643,12 +669,12 @@
     }
     if (window.location.hash === "#add") {
       history.replaceState(null, "", window.location.pathname);
-      setTimeout(openAdd, 50);
+      if (!RTS.auth.isViewer()) setTimeout(openAdd, 50);
     } else if (window.location.hash === "#import") {
       history.replaceState(null, "", window.location.pathname);
       setTimeout(() => {
         const openBtn = document.getElementById("openImportBtn");
-        if (openBtn) openBtn.click();
+        if (openBtn && !RTS.auth.isViewer()) openBtn.click();
       }, 50);
     }
   }
@@ -662,6 +688,19 @@
     wireImport();
     applyUrlParams();
     renderTable();
+
+    if (RTS.auth.isViewer()) {
+      const openAddBtn = document.getElementById("openAddBtn");
+      const openImportBtn = document.getElementById("openImportBtn");
+      const bulkBar = document.getElementById("bulkActionBar");
+      if (openAddBtn) openAddBtn.style.display = "none";
+      if (openImportBtn) openImportBtn.style.display = "none";
+      if (bulkBar) bulkBar.style.display = "none";
+      if (RTS.auth.applyViewerRestrictions) {
+        RTS.auth.applyViewerRestrictions();
+      }
+    }
+
     RTS.refreshIcons();
 
     window.addEventListener("rts-language-changed", () => {

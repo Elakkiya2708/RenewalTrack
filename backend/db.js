@@ -18,6 +18,9 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+const PRIMARY_ADMIN_EMAIL = "elakkiyaohai@gmail.com";
+const PRIMARY_ADMIN_NAME = "Elakkiya";
+
 function addDays(isoDate, days) {
   const d = new Date(isoDate);
   d.setDate(d.getDate() + days);
@@ -62,21 +65,83 @@ function getLocalStore() {
         ];
         changed = true;
       }
-      if (!store.users || store.users.length === 0) {
-        store.users = [
-          { id: "usr-1", fullName: "Anita Sharma", email: "demo@renewaltrack.com", role: "Admin", status: "active", mobile: "+1 555 0102", password: "Demo@1234" },
-          { id: "usr-2", fullName: "David Kim", email: "david.kim@renewaltrack.com", role: "Employee", status: "active", mobile: "+1 555 0103", password: "Demo@1234" },
-          { id: "usr-3", fullName: "Priya Nair", email: "priya.nair@renewaltrack.com", role: "Viewer", status: "active", mobile: "+1 555 0104", password: "Demo@1234" },
-        ];
+
+      if (!store.users) {
+        store.users = [];
+        changed = true;
+      }
+
+      // Remove unwanted demo account (Anita Sharma / demo@renewaltrack.com)
+      const hadDemoUser = store.users.some(
+        (u) => u.email && u.email.toLowerCase() === "demo@renewaltrack.com"
+      );
+      if (hadDemoUser) {
+        store.users = store.users.filter(
+          (u) => !u.email || u.email.toLowerCase() !== "demo@renewaltrack.com"
+        );
+        changed = true;
+      }
+
+      // Ensure Primary Admin (Elakkiya / elakkiyaohai@gmail.com) exists with Admin role
+      let primaryAdmin = store.users.find(
+        (u) => u.email && u.email.toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase()
+      );
+      if (!primaryAdmin) {
+        primaryAdmin = {
+          id: "usr-admin-elakkiya",
+          fullName: PRIMARY_ADMIN_NAME,
+          email: PRIMARY_ADMIN_EMAIL,
+          role: "Admin",
+          status: "active",
+          mobile: "+91 98765 43210",
+          password: "Admin@1234",
+        };
+        store.users.unshift(primaryAdmin);
         changed = true;
       } else {
-        store.users.forEach((u) => {
-          if (u.role === "Editor") {
-            u.role = "Employee";
-            changed = true;
-          }
-          if (!u.status) {
-            u.status = "active";
+        if (primaryAdmin.role !== "Admin") {
+          primaryAdmin.role = "Admin";
+          changed = true;
+        }
+        if (primaryAdmin.status !== "active") {
+          primaryAdmin.status = "active";
+          changed = true;
+        }
+        if (!primaryAdmin.fullName) {
+          primaryAdmin.fullName = PRIMARY_ADMIN_NAME;
+          changed = true;
+        }
+      }
+
+      // Ensure remaining users have valid role and active status
+      store.users.forEach((u) => {
+        if (u.role === "Editor") {
+          u.role = "Employee";
+          changed = true;
+        }
+        if (!u.status) {
+          u.status = "active";
+          changed = true;
+        }
+      });
+
+      // Update settings default recipient
+      if (store.settings) {
+        if (
+          store.settings.defaultRecipientEmail === "demo@renewaltrack.com" ||
+          !store.settings.defaultRecipientEmail
+        ) {
+          store.settings.defaultRecipientEmail = PRIMARY_ADMIN_EMAIL;
+          changed = true;
+        }
+      }
+
+      // Reassign legacy demo references in invitations
+      if (store.invitations) {
+        store.invitations.forEach((inv) => {
+          if (inv.invitedBy && inv.invitedBy.toLowerCase() === "demo@renewaltrack.com") {
+            inv.invitedBy = PRIMARY_ADMIN_EMAIL;
+            inv.invitedByName = PRIMARY_ADMIN_NAME;
             changed = true;
           }
         });
@@ -115,15 +180,39 @@ function getLocalStore() {
       emailNotificationsEnabled: true,
       reminderDays: [30, 15, 7, 0],
       cronSchedule: config.CRON_SCHEDULE,
-      defaultRecipientEmail: config.ALERT_FALLBACK_EMAIL,
+      defaultRecipientEmail: PRIMARY_ADMIN_EMAIL,
       sendOnExpiryDay: true,
       emailProvider: config.EMAIL_PROVIDER,
       updatedAt: new Date().toISOString(),
     },
     users: [
-      { id: "usr-1", fullName: "Anita Sharma", email: "demo@renewaltrack.com", role: "Admin", status: "active", mobile: "+1 555 0102", password: "Demo@1234" },
-      { id: "usr-2", fullName: "David Kim", email: "david.kim@renewaltrack.com", role: "Employee", status: "active", mobile: "+1 555 0103", password: "Demo@1234" },
-      { id: "usr-3", fullName: "Priya Nair", email: "priya.nair@renewaltrack.com", role: "Viewer", status: "active", mobile: "+1 555 0104", password: "Demo@1234" },
+      {
+        id: "usr-admin-elakkiya",
+        fullName: PRIMARY_ADMIN_NAME,
+        email: PRIMARY_ADMIN_EMAIL,
+        role: "Admin",
+        status: "active",
+        mobile: "+91 98765 43210",
+        password: "Admin@1234",
+      },
+      {
+        id: "usr-emp",
+        fullName: "Team Employee",
+        email: "employee@renewaltrack.com",
+        role: "Employee",
+        status: "active",
+        mobile: "+1 555 0103",
+        password: "Demo@1234",
+      },
+      {
+        id: "usr-view",
+        fullName: "Team Viewer",
+        email: "viewer@renewaltrack.com",
+        role: "Viewer",
+        status: "active",
+        mobile: "+1 555 0104",
+        password: "Demo@1234",
+      },
     ],
   };
 
@@ -458,7 +547,7 @@ const db = {
 
     // 4. Fallback to configured alert recipient
     const settings = await this.getNotificationSettings();
-    return settings.defaultRecipientEmail || config.ALERT_FALLBACK_EMAIL || "demo@renewaltrack.com";
+    return settings.defaultRecipientEmail || config.ALERT_FALLBACK_EMAIL || PRIMARY_ADMIN_EMAIL;
   },
 
   // 11. Get all users (enriches with assigned renewals count)
@@ -481,19 +570,23 @@ const db = {
 
     // Tally renewal counts per user
     const counts = await this.getAssignedRenewalCounts();
-    return usersList.map((u) => {
-      const email = (u.email || "").toLowerCase();
-      const name = (u.fullName || "").toLowerCase();
-      const count = (counts[email] || 0) + (counts[name] || 0);
-      return {
-        ...u,
-        assignedRenewalsCount: count,
-      };
-    });
+    return usersList
+      .filter((u) => u.email && u.email.toLowerCase() !== "demo@renewaltrack.com")
+      .map((u) => {
+        const email = (u.email || "").toLowerCase();
+        const name = (u.fullName || "").toLowerCase();
+        const count = (counts[email] || 0) + (counts[name] || 0);
+        return {
+          ...u,
+          assignedRenewalsCount: count,
+          isPrimaryAdmin: email === PRIMARY_ADMIN_EMAIL.toLowerCase(),
+        };
+      });
   },
 
   // 12. Get user by ID
   async getUserById(id) {
+    if (id === "usr-1") return null;
     const users = await this.getUsers();
     return users.find((u) => u.id === id) || null;
   },
@@ -501,18 +594,23 @@ const db = {
   // 13. Get user by email
   async getUserByEmail(email) {
     if (!email) return null;
+    const clean = email.trim().toLowerCase();
+    if (clean === "demo@renewaltrack.com") return null;
     const users = await this.getUsers();
-    return users.find((u) => (u.email || "").toLowerCase() === email.trim().toLowerCase()) || null;
+    return users.find((u) => (u.email || "").toLowerCase() === clean) || null;
   },
 
   // 14. Save or upsert user
   async saveUser(userData) {
     const id = userData.id || `usr-${Date.now()}`;
+    const cleanEmail = (userData.email || "").trim().toLowerCase();
+    const isPrimary = cleanEmail === PRIMARY_ADMIN_EMAIL.toLowerCase();
+
     const record = {
       ...userData,
       id,
-      role: userData.role || "Employee",
-      status: userData.status || "active",
+      role: isPrimary ? "Admin" : (userData.role || "Employee"),
+      status: isPrimary ? "active" : (userData.status || "active"),
       updatedAt: new Date().toISOString(),
     };
     if (isConfigured()) {
@@ -523,7 +621,7 @@ const db = {
       }
     }
     const store = getLocalStore();
-    const idx = (store.users || []).findIndex((u) => u.id === id || (u.email && u.email.toLowerCase() === (record.email || "").toLowerCase()));
+    const idx = (store.users || []).findIndex((u) => u.id === id || (u.email && u.email.toLowerCase() === cleanEmail));
     if (idx >= 0) {
       store.users[idx] = { ...store.users[idx], ...record };
     } else {
@@ -533,7 +631,7 @@ const db = {
     return record;
   },
 
-  // 15. Update user role (Protects initial Admin)
+  // 15. Update user role (Protects Primary Admin)
   async updateUserRole(id, newRole, actor = {}) {
     const validRoles = ["Admin", "Employee", "Viewer"];
     if (!validRoles.includes(newRole)) {
@@ -543,9 +641,9 @@ const db = {
     const user = await this.getUserById(id);
     if (!user) throw new Error("User not found.");
 
-    // Primary Admin Protection: Cannot demote usr-1 or demo@renewaltrack.com
-    if ((user.id === "usr-1" || (user.email && user.email.toLowerCase() === "demo@renewaltrack.com")) && newRole !== "Admin") {
-      throw new Error("The initial Admin account is protected and cannot be demoted.");
+    // Primary Admin Protection: Cannot demote elakkiyaohai@gmail.com
+    if (user.email && user.email.toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase() && newRole !== "Admin") {
+      throw new Error(`The Primary Admin account (${PRIMARY_ADMIN_EMAIL}) is protected and cannot be demoted.`);
     }
 
     const oldRole = user.role;
@@ -555,7 +653,7 @@ const db = {
     await this.logAudit({
       actorId: actor.id || "admin",
       actorName: actor.fullName || actor.name || "Administrator",
-      actorEmail: actor.email || "demo@renewaltrack.com",
+      actorEmail: actor.email || PRIMARY_ADMIN_EMAIL,
       actorRole: actor.role || "Admin",
       action: "ROLE_CHANGED",
       targetType: "user",
@@ -566,7 +664,7 @@ const db = {
     return user;
   },
 
-  // 16. Update user status (active / deactivated) (Protects initial Admin)
+  // 16. Update user status (active / deactivated) (Protects Primary Admin)
   async setUserStatus(id, newStatus, actor = {}) {
     if (!["active", "deactivated"].includes(newStatus)) {
       throw new Error(`Invalid status "${newStatus}". Must be active or deactivated.`);
@@ -575,9 +673,9 @@ const db = {
     const user = await this.getUserById(id);
     if (!user) throw new Error("User not found.");
 
-    // Primary Admin Protection: Cannot deactivate usr-1 or demo@renewaltrack.com
-    if ((user.id === "usr-1" || (user.email && user.email.toLowerCase() === "demo@renewaltrack.com")) && newStatus === "deactivated") {
-      throw new Error("The initial Admin account is protected and cannot be deactivated.");
+    // Primary Admin Protection: Cannot deactivate elakkiyaohai@gmail.com
+    if (user.email && user.email.toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase() && newStatus === "deactivated") {
+      throw new Error(`The Primary Admin account (${PRIMARY_ADMIN_EMAIL}) is protected and cannot be deactivated.`);
     }
 
     user.status = newStatus;
@@ -586,7 +684,7 @@ const db = {
     await this.logAudit({
       actorId: actor.id || "admin",
       actorName: actor.fullName || actor.name || "Administrator",
-      actorEmail: actor.email || "demo@renewaltrack.com",
+      actorEmail: actor.email || PRIMARY_ADMIN_EMAIL,
       actorRole: actor.role || "Admin",
       action: newStatus === "deactivated" ? "ACCOUNT_DEACTIVATED" : "ACCOUNT_ACTIVATED",
       targetType: "user",

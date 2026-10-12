@@ -76,13 +76,15 @@
     <main class="content">
       <div class="page-header">
         <div>
-          <h1>Dashboard</h1>
-          <p>Overview of all renewal activity across your organization.</p>
+          <h1 id="dashboardTitle">Dashboard</h1>
+          <p id="dashboardSubtitle">Overview of all renewal activity across your organization.</p>
         </div>
-        <div class="page-header-actions">
-          <a href="records.html#add" class="btn btn-primary"><i data-lucide="plus" class="icon"></i>Quick Add Renewal</a>
+        <div class="page-header-actions" id="dashboardActions">
+          <a href="records.html#add" class="btn btn-primary" id="quickAddBtn"><i data-lucide="plus" class="icon"></i>Quick Add Renewal</a>
         </div>
       </div>
+
+      <div id="dashboardRoleNotice"></div>
 
       <div class="stat-grid" id="statGrid">
         <div class="stat-card" style="--stat-color:var(--accent);--stat-bg:var(--accent-dim);">

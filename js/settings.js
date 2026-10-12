@@ -110,7 +110,7 @@
     if (notifyDigestEl) notifyDigestEl.checked = !!settings.notifyReminderDigest;
     if (fallbackEmailInput) {
       const user = RTS.auth.getCurrentUser();
-      fallbackEmailInput.value = settings.defaultRecipientEmail || user.email || "demo@renewaltrack.com";
+      fallbackEmailInput.value = settings.defaultRecipientEmail || user.email || "elakkiyaohai@gmail.com";
     }
 
     // Save toggles immediately on change
@@ -314,15 +314,71 @@
   }
 
   function wireTeamAndAiScan() {
+    loadSettingsTeam();
+
     const inviteBtn = document.getElementById("inviteMemberBtn");
     if (inviteBtn) {
       inviteBtn.addEventListener("click", () => {
-        const email = prompt("Enter team member's email address:");
-        if (email && email.includes("@")) {
-          RTS.toast("Invitation link sent to " + email + " (Role: Editor).", "success");
+        if (RTS.auth.isAdmin()) {
+          window.location.href = "team.html#invite";
+        } else {
+          RTS.toast("Only Administrators can invite new team members.", "error");
         }
       });
     }
+
+  async function loadSettingsTeam() {
+    const tbody = document.getElementById("teamMembersBody");
+    if (!tbody) return;
+    try {
+      let members = [];
+      try {
+        const res = await RTS.team.getMembers();
+        members = (res.data || res.members || []).filter(
+          (u) => u.email && u.email.toLowerCase() !== "demo@renewaltrack.com"
+        );
+      } catch (e) {}
+
+      if (!members.length) {
+        members = RTS.auth
+          .getAccounts()
+          .filter((u) => u.email && u.email.toLowerCase() !== "demo@renewaltrack.com");
+      }
+
+      const currentUser = RTS.auth.getCurrentUser();
+      tbody.innerHTML = members
+        .map((m) => {
+          const isYou = (m.email || "").toLowerCase() === (currentUser.email || "").toLowerCase();
+          const role = m.role || "Employee";
+          const isPrimary = (m.email || "").toLowerCase() === "elakkiyaohai@gmail.com";
+          const count =
+            m.assignedRenewalsCount !== undefined
+              ? m.assignedRenewalsCount
+              : m.assignedRenewalCount || 0;
+          return `
+            <tr>
+              <td>
+                <strong>${RTS.escapeHtml(m.fullName || "User")}</strong> ${isYou ? "(You)" : ""}
+                ${
+                  isPrimary
+                    ? '<span class="role-pill-badge role-admin" style="font-size:10px;margin-left:6px;">Primary Admin</span>'
+                    : ""
+                }
+              </td>
+              <td>${RTS.escapeHtml(m.email)}</td>
+              <td><span class="role-pill-badge role-${role.toLowerCase()}">${role}</span></td>
+              <td>${count} record${count === 1 ? "" : "s"}</td>
+              <td><span class="badge ${
+                m.status === "deactivated" ? "badge-danger" : "badge-due-soon"
+              }">${m.status === "deactivated" ? "Deactivated" : "Active"}</span></td>
+            </tr>
+          `;
+        })
+        .join("");
+    } catch (err) {
+      console.warn("Could not load team members in settings:", err);
+    }
+  }
 
     const testBtn = document.getElementById("testAiScanBtn");
     const dropzone = document.getElementById("smartDocDropzone");

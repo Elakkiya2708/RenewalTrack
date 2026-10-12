@@ -30,17 +30,23 @@ Then pick one:
 
 Opening the site shows the public landing page; click **Login** to enter the app.
 
-## Demo login
+## Accounts & Roles
 
-```
-Email:    demo@renewaltrack.com
-Password: Demo@1234
-```
+### 1. Primary Admin Account
+- **Name:** Elakkiya
+- **Email:** `elakkiyaohai@gmail.com`
+- **Password:** `Admin@1234`
+- **Role:** `Admin` (Full Administrative Privileges, Team Management, Audit Logs)
 
-There's also a **"Use demo credentials"** button on the login page, and you
-can register a brand-new account instead if you'd rather start from scratch
-(new accounts start with the same 17 seeded mock renewal records — see
-"Mock data" below).
+### 2. Employee Account
+- **Email:** `david.kim@renewaltrack.com`
+- **Password:** `Demo@1234`
+- **Role:** `Employee` (Manage assigned renewals & team visibility)
+
+### 3. Viewer Account
+- **Email:** `priya.nair@renewaltrack.com`
+- **Password:** `Demo@1234`
+- **Role:** `Viewer` (Read-only access)
 
 ## Project structure
 

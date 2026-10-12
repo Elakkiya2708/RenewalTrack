@@ -340,14 +340,41 @@
   async function loadTeam() {
     try {
       const res = await RTS.team.getMembers();
-      if (res.ok && Array.isArray(res.members)) {
-        allMembers = res.members;
+      const list = res.data || res.members || [];
+      if (res.ok && Array.isArray(list)) {
+        allMembers = list
+          .filter(u => u.email && u.email.toLowerCase() !== "demo@renewaltrack.com")
+          .map(u => ({
+            ...u,
+            isPrimaryAdmin: (u.email || "").toLowerCase() === "elakkiyaohai@gmail.com",
+            assignedRenewalCount: u.assignedRenewalsCount !== undefined ? u.assignedRenewalsCount : (u.assignedRenewalCount || 0),
+          }));
         renderMembers();
         updateStats();
       } else {
         // Fallback to local accounts
         const localAccounts = RTS.auth.getAccounts();
-        allMembers = localAccounts.map(a => ({
+        allMembers = localAccounts
+          .filter(a => a.email && a.email.toLowerCase() !== "demo@renewaltrack.com")
+          .map(a => ({
+            id: a.id || "usr-" + a.email,
+            fullName: a.fullName,
+            email: a.email,
+            mobile: a.mobile,
+            role: a.role || "Employee",
+            status: a.status || "active",
+            assignedRenewalCount: 0,
+            isPrimaryAdmin: (a.email || "").toLowerCase() === "elakkiyaohai@gmail.com",
+          }));
+        renderMembers();
+        updateStats();
+      }
+    } catch (err) {
+      console.warn("Failed to load members via API, using local store:", err);
+      const localAccounts = RTS.auth.getAccounts();
+      allMembers = localAccounts
+        .filter(a => a.email && a.email.toLowerCase() !== "demo@renewaltrack.com")
+        .map(a => ({
           id: a.id || "usr-" + a.email,
           fullName: a.fullName,
           email: a.email,
@@ -355,24 +382,8 @@
           role: a.role || "Employee",
           status: a.status || "active",
           assignedRenewalCount: 0,
-          isPrimaryAdmin: a.email === "demo@renewaltrack.com"
+          isPrimaryAdmin: (a.email || "").toLowerCase() === "elakkiyaohai@gmail.com",
         }));
-        renderMembers();
-        updateStats();
-      }
-    } catch (err) {
-      console.warn("Failed to load members via API, using local store:", err);
-      const localAccounts = RTS.auth.getAccounts();
-      allMembers = localAccounts.map(a => ({
-        id: a.id || "usr-" + a.email,
-        fullName: a.fullName,
-        email: a.email,
-        mobile: a.mobile,
-        role: a.role || "Employee",
-        status: a.status || "active",
-        assignedRenewalCount: 0,
-        isPrimaryAdmin: a.email === "demo@renewaltrack.com"
-      }));
       renderMembers();
       updateStats();
     }
@@ -427,7 +438,7 @@
     }
 
     tbody.innerHTML = filtered.map(m => {
-      const isPrimary = m.isPrimaryAdmin || m.id === "usr-1" || m.email.toLowerCase() === "demo@renewaltrack.com";
+      const isPrimary = m.isPrimaryAdmin || (m.email || "").toLowerCase() === "elakkiyaohai@gmail.com";
       const roleBadge = `<span class="role-pill-badge role-${(m.role || 'employee').toLowerCase()}">${m.role || 'Employee'}</span>`;
       const statusBadge = `<span class="status-pill status-${m.status === 'deactivated' ? 'deactivated' : 'active'}">${m.status === 'deactivated' ? 'Deactivated' : 'Active'}</span>`;
       const assignedCount = m.assignedRenewalCount !== undefined ? m.assignedRenewalCount : 0;

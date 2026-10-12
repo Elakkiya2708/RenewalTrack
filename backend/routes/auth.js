@@ -9,45 +9,53 @@ const db = require("../db");
 
 const router = express.Router();
 
-// Middleware: Authenticate JWT Token
-function authenticateToken(req, res, next) {
+// Middleware: Authenticate JWT Token (Strict DB Verification)
+async function authenticateToken(req, res, next) {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
 
   if (!token) {
-    // If no token, check if client supplied x-user-role / x-user-email headers (for offline / direct demo testing)
-    const headerRole = req.headers["x-user-role"];
-    const headerEmail = req.headers["x-user-email"];
-    const headerName = req.headers["x-user-name"];
-    if (headerRole) {
-      req.user = {
-        id: "usr-header",
-        email: headerEmail || "user@renewaltrack.com",
-        fullName: headerName || "Header User",
-        role: headerRole,
-      };
-      return next();
-    }
-    return res.status(401).json({ ok: false, error: "Authentication required." });
+    return res.status(401).json({ ok: false, error: "Authentication required. Please log in." });
   }
 
   try {
     const decoded = jwt.verify(token, config.JWT_SECRET);
-    req.user = decoded;
+    if (!decoded || !decoded.email) {
+      return res.status(401).json({ ok: false, error: "Invalid token payload." });
+    }
+
+    const cleanEmail = decoded.email.trim().toLowerCase();
+    if (cleanEmail === "demo@renewaltrack.com") {
+      return res.status(403).json({
+        ok: false,
+        error: "The demo account (Anita Sharma) has been permanently removed.",
+      });
+    }
+
+    // Always fetch latest authoritative user record from trusted DB (never trust client/token claims blindly)
+    const user = await db.getUserByEmail(cleanEmail);
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "User account no longer exists." });
+    }
+
+    if (user.status === "deactivated") {
+      return res.status(403).json({
+        ok: false,
+        error: "Your account has been deactivated. Please contact an administrator.",
+      });
+    }
+
+    // Attach trusted user object from DB
+    req.user = {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role || "Employee",
+      status: user.status || "active",
+      isPrimaryAdmin: user.email.toLowerCase() === "elakkiyaohai@gmail.com",
+    };
     next();
   } catch (err) {
-    const headerRole = req.headers["x-user-role"];
-    const headerEmail = req.headers["x-user-email"];
-    const headerName = req.headers["x-user-name"];
-    if (headerRole) {
-      req.user = {
-        id: "usr-header",
-        email: headerEmail || "user@renewaltrack.com",
-        fullName: headerName || "Header User",
-        role: headerRole,
-      };
-      return next();
-    }
     return res.status(401).json({ ok: false, error: "Invalid or expired session token." });
   }
 }
@@ -77,6 +85,7 @@ function generateToken(user) {
       email: user.email,
       fullName: user.fullName,
       role: user.role || "Employee",
+      isPrimaryAdmin: (user.email || "").toLowerCase() === "elakkiyaohai@gmail.com",
     },
     config.JWT_SECRET,
     { expiresIn: config.JWT_EXPIRES_IN }
@@ -92,6 +101,15 @@ router.post("/login", async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+
+    // Reject unwanted demo account completely
+    if (cleanEmail === "demo@renewaltrack.com") {
+      return res.status(403).json({
+        ok: false,
+        error: "The demo account (Anita Sharma) has been permanently removed. Please log in with your registered account.",
+      });
+    }
+
     const user = await db.getUserByEmail(cleanEmail);
 
     if (!user || user.password !== password) {
@@ -139,6 +157,7 @@ router.post("/login", async (req, res) => {
         mobile: user.mobile || "",
         role: user.role,
         status: user.status || "active",
+        isPrimaryAdmin: user.email.toLowerCase() === "elakkiyaohai@gmail.com",
       },
     });
   } catch (err) {
@@ -156,6 +175,9 @@ router.post("/register", async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail === "demo@renewaltrack.com") {
+      return res.status(400).json({ ok: false, error: "Registration with the demo email address is not permitted." });
+    }
 
     // 1. If invited with a token, process invitation acceptance
     if (inviteToken) {

@@ -9,28 +9,29 @@ const db = require("../db");
 
 const router = express.Router();
 
-// Helper to extract authenticated user from token or headers
-function getReqUser(req) {
+// Helper to extract authenticated user from token (strictly verified against database)
+async function getReqUser(req) {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith("Bearer ")) {
     try {
       const decoded = jwt.verify(authHeader.split(" ")[1], config.JWT_SECRET);
-      if (decoded) return decoded;
+      if (decoded && decoded.email) {
+        const cleanEmail = decoded.email.trim().toLowerCase();
+        if (cleanEmail === "demo@renewaltrack.com") return null;
+        const user = await db.getUserByEmail(cleanEmail);
+        if (user && user.status !== "deactivated") {
+          return {
+            id: user.id,
+            role: user.role || "Employee",
+            email: user.email,
+            fullName: user.fullName,
+            isPrimaryAdmin: user.email.toLowerCase() === "elakkiyaohai@gmail.com",
+          };
+        }
+      }
     } catch (e) {}
   }
-  // Client header fallback (useful for tests or direct UI sync)
-  const headerRole = req.headers["x-user-role"];
-  const headerEmail = req.headers["x-user-email"];
-  const headerName = req.headers["x-user-name"];
-  if (headerRole) {
-    return {
-      role: headerRole,
-      email: (headerEmail || "user@renewaltrack.com").toLowerCase(),
-      fullName: headerName || "System User",
-    };
-  }
-  // Default to Admin if not specified (preserves backward compatibility for background cron / seed)
-  return { role: "Admin", email: "demo@renewaltrack.com", fullName: "Administrator" };
+  return null;
 }
 
 // GET /api/renewals — Get all renewals
@@ -59,7 +60,10 @@ router.get("/:id", async (req, res) => {
 // POST /api/renewals — Create new renewal
 router.post("/", async (req, res) => {
   try {
-    const actor = getReqUser(req);
+    const actor = await getReqUser(req);
+    if (!actor) {
+      return res.status(401).json({ ok: false, error: "Authentication required. Please log in." });
+    }
 
     // RBAC: Viewers cannot create renewals
     if (actor.role === "Viewer") {
@@ -106,7 +110,10 @@ router.post("/", async (req, res) => {
 // PUT /api/renewals/:id — Update renewal
 router.put("/:id", async (req, res) => {
   try {
-    const actor = getReqUser(req);
+    const actor = await getReqUser(req);
+    if (!actor) {
+      return res.status(401).json({ ok: false, error: "Authentication required. Please log in." });
+    }
 
     // RBAC: Viewers cannot update renewals
     if (actor.role === "Viewer") {
@@ -161,8 +168,8 @@ router.put("/:id", async (req, res) => {
 // DELETE /api/renewals — Clear all renewals (Admin only)
 router.delete("/", async (req, res) => {
   try {
-    const actor = getReqUser(req);
-    if (actor.role !== "Admin") {
+    const actor = await getReqUser(req);
+    if (!actor || actor.role !== "Admin") {
       return res.status(403).json({
         ok: false,
         error: "Access denied. Only Administrators can clear all renewals.",
@@ -190,7 +197,10 @@ router.delete("/", async (req, res) => {
 // DELETE /api/renewals/:id — Delete single renewal
 router.delete("/:id", async (req, res) => {
   try {
-    const actor = getReqUser(req);
+    const actor = await getReqUser(req);
+    if (!actor) {
+      return res.status(401).json({ ok: false, error: "Authentication required. Please log in." });
+    }
 
     // RBAC: Viewers cannot delete renewals
     if (actor.role === "Viewer") {
@@ -240,7 +250,10 @@ router.delete("/:id", async (req, res) => {
 // POST /api/renewals/:id/mark-renewed — Mark as renewed
 router.post("/:id/mark-renewed", async (req, res) => {
   try {
-    const actor = getReqUser(req);
+    const actor = await getReqUser(req);
+    if (!actor) {
+      return res.status(401).json({ ok: false, error: "Authentication required. Please log in." });
+    }
 
     if (actor.role === "Viewer") {
       return res.status(403).json({

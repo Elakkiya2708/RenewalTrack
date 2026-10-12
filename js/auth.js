@@ -94,9 +94,9 @@
     const demoBtn = document.getElementById("fillDemoBtn");
     if (demoBtn) {
       demoBtn.addEventListener("click", () => {
-        document.getElementById("loginEmail").value = "demo@renewaltrack.com";
-        document.getElementById("loginPassword").value = "Demo@1234";
-        RTS.toast("Demo credentials filled in.", "info");
+        document.getElementById("loginEmail").value = "elakkiyaohai@gmail.com";
+        document.getElementById("loginPassword").value = "Admin@1234";
+        RTS.toast("Primary Admin credentials filled in.", "info");
       });
     }
 

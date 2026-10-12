@@ -216,9 +216,83 @@
     document.getElementById("miniCalendar").innerHTML = html;
   }
 
+  function applyRoleDashboard(list) {
+    const user = RTS.auth.getCurrentUser();
+    const role = user.role || "Admin";
+
+    const titleEl = document.getElementById("dashboardTitle");
+    const subEl = document.getElementById("dashboardSubtitle");
+    const actionsEl = document.getElementById("dashboardActions");
+    const noticeEl = document.getElementById("dashboardRoleNotice");
+
+    if (role === "Admin") {
+      if (titleEl) titleEl.textContent = "Admin Dashboard";
+      if (subEl) subEl.textContent = "Full administrative overview of all renewals, team management, compliance, and audit logs.";
+      if (actionsEl) {
+        actionsEl.innerHTML = `
+          <a href="records.html#add" class="btn btn-primary"><i data-lucide="plus" class="icon"></i>Quick Add Renewal</a>
+          <a href="team.html" class="btn btn-secondary"><i data-lucide="users" class="icon"></i>Team Members</a>
+          <a href="audit.html" class="btn btn-secondary"><i data-lucide="clipboard-list" class="icon"></i>Audit Logs</a>
+        `;
+      }
+    } else if (role === "Employee") {
+      if (titleEl) titleEl.textContent = "Employee Dashboard";
+      if (subEl) subEl.textContent = "Team renewal overview. Manage and monitor your assigned renewals and compliance deadlines.";
+      if (actionsEl) {
+        actionsEl.innerHTML = `
+          <a href="records.html#add" class="btn btn-primary"><i data-lucide="plus" class="icon"></i>Add Renewal</a>
+        `;
+      }
+
+      // Check how many renewals are assigned to this employee
+      const userEmail = (user.email || "").toLowerCase();
+      const userName = (user.fullName || "").toLowerCase();
+      const assigned = list.filter((r) => {
+        const respEmail = (r.responsibleEmail || r.responsible_email || "").toLowerCase();
+        const respName = (r.responsiblePerson || r.responsible_person || "").toLowerCase();
+        const createdBy = (r.createdBy || "").toLowerCase();
+        return respEmail === userEmail || respName === userName || createdBy === userEmail;
+      });
+
+      if (noticeEl) {
+        noticeEl.innerHTML = `
+          <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-left:4px solid var(--accent);padding:12px 16px;border-radius:8px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <i data-lucide="briefcase" class="icon" style="color:var(--accent);width:20px;height:20px;"></i>
+              <div>
+                <strong>Assigned to You:</strong> <span>You are currently assigned to <strong>${assigned.length}</strong> renewal record(s).</span>
+              </div>
+            </div>
+            <a href="records.html" class="btn btn-secondary btn-sm"><i data-lucide="list-filter" class="icon"></i>Manage Assigned Renewals</a>
+          </div>
+        `;
+      }
+    } else if (role === "Viewer") {
+      if (titleEl) titleEl.textContent = "Viewer Dashboard (Read-Only)";
+      if (subEl) subEl.textContent = "Read-only overview of organization renewal records, calendar schedules, and documents.";
+      if (actionsEl) {
+        actionsEl.innerHTML = ""; // No create or add buttons
+      }
+      if (noticeEl) {
+        noticeEl.innerHTML = `
+          <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-left:4px solid var(--warning);padding:12px 16px;border-radius:8px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
+            <i data-lucide="shield-alert" class="icon" style="color:var(--warning);width:20px;height:20px;"></i>
+            <div>
+              <strong>Viewer Permissions:</strong> You have read-only access to view renewal statuses, calendar events, and documents. Adding, editing, and deleting records are restricted.
+            </div>
+          </div>
+        `;
+      }
+      if (RTS.auth.applyViewerRestrictions) {
+        RTS.auth.applyViewerRestrictions();
+      }
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     RTS.initLayout();
     const { list, statuses } = renderStats();
+    applyRoleDashboard(list);
     renderUpcoming(list);
     renderStatusChart(statuses);
     renderCategoryChart(list);

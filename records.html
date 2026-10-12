@@ -106,6 +106,10 @@
           <option value="Medium">Medium</option>
           <option value="Low">Low</option>
         </select>
+        <select class="select-filter" id="filterAssignment">
+          <option value="">All Team Renewals</option>
+          <option value="assigned">My Assigned Renewals</option>
+        </select>
         <div class="table-toolbar-spacer"></div>
         <span class="text-mid" id="resultCount" style="font-size:12.5px;"></span>
       </div>
@@ -209,12 +213,12 @@
         <div class="field-row">
           <div class="field" id="f_responsible">
             <label for="in_responsible">Responsible Person <span class="req">*</span></label>
-            <input class="input" id="in_responsible" placeholder="e.g. Anita Sharma" />
+            <input class="input" id="in_responsible" placeholder="e.g. Elakkiya" />
             <span class="error-msg">Responsible person is required.</span>
           </div>
           <div class="field" id="f_responsibleEmail">
             <label for="in_responsibleEmail">Alert Email Address</label>
-            <input class="input" type="email" id="in_responsibleEmail" placeholder="e.g. anita@renewaltrack.com" />
+            <input class="input" type="email" id="in_responsibleEmail" placeholder="e.g. elakkiyaohai@gmail.com" />
             <span class="cell-sub" style="font-size:11px;margin-top:2px;">Receives automated email reminders</span>
           </div>
         </div>

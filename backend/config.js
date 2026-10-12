@@ -39,7 +39,7 @@ const config = {
   CRON_SCHEDULE: process.env.CRON_SCHEDULE || "0 8 * * *",
 
   // Fallback recipient when renewal has no assigned user or invalid email
-  ALERT_FALLBACK_EMAIL: process.env.ALERT_FALLBACK_EMAIL || "demo@renewaltrack.com",
+  ALERT_FALLBACK_EMAIL: process.env.ALERT_FALLBACK_EMAIL || "elakkiyaohai@gmail.com",
 };
 
 module.exports = config;
