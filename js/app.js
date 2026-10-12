@@ -1418,7 +1418,6 @@
       const teamHtml = `
         <div class="sidebar-section-label" data-role="Admin">Team Management</div>
         <a href="team.html" class="nav-link" data-role="Admin"><i data-lucide="users" class="icon"></i>Team Members</a>
-        <a href="team.html#invite" class="nav-link" data-role="Admin"><i data-lucide="user-plus" class="icon"></i>Invite Members</a>
         <a href="audit.html" class="nav-link" data-role="Admin"><i data-lucide="clipboard-list" class="icon"></i>Audit Logs</a>
       `;
       if (accLabel) {
@@ -1427,6 +1426,10 @@
         nav.insertAdjacentHTML("beforeend", teamHtml);
       }
     }
+
+    // Always remove Invite Members from sidebar navigation
+    const existingInvite = nav.querySelector("a[href='team.html#invite'], a[href='#invite']");
+    if (existingInvite) existingInvite.remove();
 
     // 5. Remove any duplicate nav links
     const seenHrefs = new Set();
