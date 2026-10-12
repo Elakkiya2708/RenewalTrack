@@ -208,11 +208,17 @@
         </table>
       </div>
     </div>
+  </div>
+</div>
+
 <!-- Mark as Renewed Modal -->
 <div class="modal-overlay" id="renewModal">
   <div class="modal modal-sm">
     <div class="modal-header">
-      <h3>Mark as Renewed</h3>
+      <h3 style="display:flex;align-items:center;gap:6px;">
+        <span>Mark as Renewed</span>
+        <span id="renewRecordTitle" style="font-size:13px;color:var(--accent);font-weight:600;margin-left:4px;"></span>
+      </h3>
       <button class="modal-close" data-close-modal="renewModal"><i data-lucide="x" class="icon"></i></button>
     </div>
     <form id="renewForm" novalidate>

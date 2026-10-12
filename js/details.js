@@ -243,9 +243,9 @@
           document.getElementById("rf_newExpiry").classList.add("has-error");
           valid = false;
         } else if (curRecord && curRecord.expiryDate) {
-          const oldTime = new Date(curRecord.expiryDate).getTime();
-          const newTime = new Date(newExpiry).getTime();
-          if (!isNaN(oldTime) && !isNaN(newTime) && newTime <= oldTime) {
+          const oldStr = String(curRecord.expiryDate).slice(0, 10);
+          const newStr = String(newExpiry).slice(0, 10);
+          if (oldStr && newStr && newStr <= oldStr) {
             document.getElementById("rf_newExpiry").classList.add("has-error");
             RTS.toast("New expiry date must be after current expiry date (" + RTS.formatDate(curRecord.expiryDate) + ").", "warning");
             valid = false;

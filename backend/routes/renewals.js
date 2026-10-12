@@ -157,12 +157,13 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ ok: false, error: "Renewal record not found." });
     }
 
-    // RBAC: Employees can only manage their assigned renewals
+    // RBAC: Employees can manage renewals assigned to them, created by them, or unassigned records
     if (actor.role === "Employee") {
       const respEmail = (existing.responsibleEmail || existing.responsible_email || "").toLowerCase();
       const respName = (existing.responsiblePerson || existing.responsible_person || "").toLowerCase();
       const createdBy = (existing.createdBy || "").toLowerCase();
       const isAssigned =
+        (!respEmail && !respName) ||
         respEmail === actor.email.toLowerCase() ||
         respName === actor.fullName.toLowerCase() ||
         createdBy === actor.email.toLowerCase();
@@ -299,7 +300,12 @@ router.post("/:id/mark-renewed", async (req, res) => {
     if (actor.role === "Employee") {
       const respEmail = (record.responsibleEmail || record.responsible_email || "").toLowerCase();
       const respName = (record.responsiblePerson || record.responsible_person || "").toLowerCase();
-      const isAssigned = respEmail === actor.email.toLowerCase() || respName === actor.fullName.toLowerCase();
+      const createdBy = (record.createdBy || "").toLowerCase();
+      const isAssigned =
+        (!respEmail && !respName) ||
+        respEmail === actor.email.toLowerCase() ||
+        respName === actor.fullName.toLowerCase() ||
+        createdBy === actor.email.toLowerCase();
       if (!isAssigned) {
         return res.status(403).json({
           ok: false,
