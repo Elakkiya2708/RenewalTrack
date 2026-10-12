@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" type="image/png" href="assets/favicon.png" data-img-indigo="assets/favicon.png" data-img-gold="assets/favicon-gold.png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My Profile — Renewal Tracking System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/responsive.css" />
+<script src="js/app.js"></script>
+<script>RTS.auth.requireAuth();</script>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img class="brand-mark" src="assets/logo.png" data-img-indigo="assets/logo.png" data-img-gold="assets/logo-gold.png" alt="RenewalTrack logo" />
+      <span>RenewalTrack</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Main</div>
+      <a href="dashboard.html" class="nav-link"><i data-lucide="layout-dashboard" class="icon"></i>Dashboard</a>
+      <a href="records.html" class="nav-link"><i data-lucide="file-text" class="icon"></i>Renewal Records</a>
+      <a href="calendar.html" class="nav-link"><i data-lucide="calendar" class="icon"></i>Calendar</a>
+      <a href="reminders.html" class="nav-link"><i data-lucide="bell" class="icon"></i>Reminders</a>
+      <a href="history.html" class="nav-link"><i data-lucide="history" class="icon"></i>Renewal History</a>
+      <a href="documents.html" class="nav-link"><i data-lucide="folder" class="icon"></i>Documents</a>
+      <a href="reports.html" class="nav-link"><i data-lucide="bar-chart-2" class="icon"></i>Reports</a>
+
+      <div class="sidebar-section-label" data-role="Admin">Team Management</div>
+      <a href="team.html" class="nav-link" data-role="Admin"><i data-lucide="users" class="icon"></i>Team Members</a>
+      <a href="team.html#invite" class="nav-link" data-role="Admin"><i data-lucide="user-plus" class="icon"></i>Invite Members</a>
+      <a href="audit.html" class="nav-link" data-role="Admin"><i data-lucide="clipboard-list" class="icon"></i>Audit Logs</a>
+
+      <div class="sidebar-section-label">Account</div>
+      <a href="profile.html" class="nav-link active"><i data-lucide="user" class="icon"></i>My Profile</a>
+      <a href="settings.html" class="nav-link"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </nav>
+    <div class="sidebar-footer">© 2026 RenewalTrack Inc.</div>
+  </aside>
+  <div class="sidebar-overlay"></div>
+
+  <div class="main-area">
+    <header class="topbar">
+      <button class="sidebar-toggle" aria-label="Toggle menu"><i data-lucide="menu" class="icon"></i></button>
+      <div class="topbar-actions">
+        <div class="dropdown-wrap">
+          <button class="icon-btn" data-dropdown-trigger="notifPanel" aria-label="Notifications">
+            <i data-lucide="bell" class="icon"></i>
+            <span class="dot" id="notifDot" style="display:none;"></span>
+          </button>
+          <div class="dropdown-panel" id="notifPanel">
+            <div class="dropdown-header"><strong>Notifications</strong> <span id="notifCount">0</span> urgent renewal(s)</div>
+            <div class="notif-list" id="notifList"></div>
+          </div>
+        </div>
+        <div class="dropdown-wrap">
+          <div class="user-menu-trigger" data-dropdown-trigger="userPanel">
+            <div class="avatar" data-user-initials>—</div>
+            <span class="uname" data-user-name>User</span>
+            <i data-lucide="chevron-down" class="icon" style="width:14px;height:14px;"></i>
+          </div>
+          <div class="dropdown-panel" id="userPanel">
+            <div class="dropdown-header"><strong data-user-name>User</strong><span data-user-email>—</span></div>
+            <a href="profile.html" class="dropdown-item"><i data-lucide="user" class="icon"></i>My Profile</a>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="settings" class="icon"></i>App Settings</a>
+            <div class="dropdown-item" data-logout><i data-lucide="log-out" class="icon"></i>Logout</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="page-header">
+        <div>
+          <h1>My Profile</h1>
+          <p>View your role credentials, permissions, assigned renewal items, and account security settings.</p>
+        </div>
+      </div>
+
+      <div class="dashboard-grid" style="grid-template-columns: 1fr 1.6fr; gap: 20px; align-items: start;">
+
+        <!-- Left: User Identity Card -->
+        <div class="card">
+          <div style="text-align:center;padding:24px 16px 16px;border-bottom:1px solid var(--border-color);">
+            <div class="avatar" id="profileAvatarLarge" style="width:72px;height:72px;font-size:24px;margin:0 auto 12px;box-shadow:var(--shadow-md);">
+              U
+            </div>
+            <h2 id="profileNameDisplay" style="font-size:18px;margin:0 0 4px;color:var(--text);">User Name</h2>
+            <p id="profileEmailDisplay" style="font-size:13px;color:var(--text-muted);margin:0 0 12px;">user@example.com</p>
+            <div style="display:flex;justify-content:center;gap:8px;align-items:center;">
+              <span id="profileRoleBadge" class="role-pill-badge role-admin">Admin</span>
+              <span class="status-pill status-active">Active Account</span>
+            </div>
+          </div>
+
+          <div style="padding:16px;">
+            <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-dim);font-size:13px;">
+              <span style="color:var(--text-muted);">Assigned Renewals</span>
+              <strong id="profileAssignedCount" style="color:var(--text);">0 records</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-dim);font-size:13px;">
+              <span style="color:var(--text-muted);">Mobile Contact</span>
+              <strong id="profileMobileDisplay" style="color:var(--text);">—</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;">
+              <span style="color:var(--text-muted);">Access Level</span>
+              <strong id="profileAccessLevel" style="color:var(--text);">Full Administrator</strong>
+            </div>
+          </div>
+
+          <!-- Role Permissions Box -->
+          <div style="margin:16px;padding:14px;background:var(--bg-surface-2);border-radius:8px;font-size:12px;line-height:1.5;color:var(--text-mid);">
+            <div style="font-weight:700;color:var(--text);margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+              <i data-lucide="shield-check" class="icon" style="width:14px;height:14px;color:var(--accent);"></i>
+              Role Permissions Overview
+            </div>
+            <div id="rolePermissionsSummary">
+              <!-- Dynamically populated based on role -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Profile Settings & Password Change -->
+        <div style="display:flex;flex-direction:column;gap:20px;">
+          
+          <!-- Personal Information -->
+          <div class="card">
+            <div class="card-header">
+              <h3>Personal Details</h3>
+            </div>
+            <form id="profileForm" style="padding:20px;" novalidate>
+              <div class="field" style="margin-bottom:14px;">
+                <label for="profNameInput">Full Name <span class="req">*</span></label>
+                <input type="text" id="profNameInput" class="input" required />
+              </div>
+              <div class="field-row" style="margin-bottom:14px;">
+                <div class="field">
+                  <label for="profEmailInput">Email Address</label>
+                  <input type="email" id="profEmailInput" class="input" disabled style="opacity:0.7;cursor:not-allowed;" />
+                  <span style="font-size:11px;color:var(--text-muted);margin-top:3px;">Email address cannot be changed directly.</span>
+                </div>
+                <div class="field">
+                  <label for="profMobileInput">Mobile Number</label>
+                  <input type="tel" id="profMobileInput" class="input" placeholder="+1 555 0102" />
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary" id="saveProfileBtn">
+                <i data-lucide="check" class="icon"></i>Save Changes
+              </button>
+            </form>
+          </div>
+
+          <!-- Password & Security -->
+          <div class="card">
+            <div class="card-header">
+              <h3>Change Password</h3>
+            </div>
+            <form id="changePasswordForm" style="padding:20px;" novalidate>
+              <div class="field" style="margin-bottom:14px;">
+                <label for="currentPasswordInput">Current Password <span class="req">*</span></label>
+                <div class="password-field">
+                  <input type="password" id="currentPasswordInput" class="input" placeholder="Enter current password" required />
+                  <button type="button" class="toggle-visibility" data-target="currentPasswordInput" aria-label="Show password">
+                    <i data-lucide="eye" class="icon"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="field-row" style="margin-bottom:14px;">
+                <div class="field">
+                  <label for="newPasswordInput">New Password <span class="req">*</span></label>
+                  <div class="password-field">
+                    <input type="password" id="newPasswordInput" class="input" placeholder="Min. 8 characters" required />
+                    <button type="button" class="toggle-visibility" data-target="newPasswordInput" aria-label="Show password">
+                      <i data-lucide="eye" class="icon"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="confirmNewPasswordInput">Confirm New Password <span class="req">*</span></label>
+                  <div class="password-field">
+                    <input type="password" id="confirmNewPasswordInput" class="input" placeholder="Repeat new password" required />
+                    <button type="button" class="toggle-visibility" data-target="confirmNewPasswordInput" aria-label="Show password">
+                      <i data-lucide="eye" class="icon"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary" id="updatePasswordBtn">
+                <i data-lucide="lock" class="icon"></i>Update Password
+              </button>
+            </form>
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+(function() {
+  function renderProfile() {
+    const user = RTS.auth.getCurrentUser();
+    const role = user.role || "Admin";
+
+    // Set Header & Displays
+    document.getElementById("profileNameDisplay").textContent = user.fullName || "User";
+    document.getElementById("profileEmailDisplay").textContent = user.email || "";
+    document.getElementById("profileMobileDisplay").textContent = user.mobile || "None provided";
+    
+    // Large avatar
+    const initials = (user.fullName || "U").split(" ").map(p => p[0]).slice(0, 2).join("").toUpperCase();
+    document.getElementById("profileAvatarLarge").textContent = initials;
+
+    // Role badge & permissions
+    const badge = document.getElementById("profileRoleBadge");
+    badge.textContent = role;
+    badge.className = `role-pill-badge role-${role.toLowerCase()}`;
+
+    const levelEl = document.getElementById("profileAccessLevel");
+    const permsEl = document.getElementById("rolePermissionsSummary");
+
+    if (role === "Admin") {
+      levelEl.textContent = "Full Administrator";
+      permsEl.innerHTML = `
+        <ul style="padding-left:16px;margin:4px 0 0;">
+          <li>Full read &amp; write access to all renewals across the organization</li>
+          <li>Access to <strong>Team Management</strong> (Manage members, change roles, deactivate accounts)</li>
+          <li>Send member email invitations with custom token expiry</li>
+          <li>Inspect complete <strong>Audit Logs</strong> and system event records</li>
+        </ul>
+      `;
+    } else if (role === "Employee") {
+      levelEl.textContent = "Employee (Self-Management)";
+      permsEl.innerHTML = `
+        <ul style="padding-left:16px;margin:4px 0 0;">
+          <li>View organization renewal records, calendar, and reminders</li>
+          <li>Create and manage renewals assigned to your name or email</li>
+          <li>Cannot access Team Management or modify other members' roles</li>
+        </ul>
+      `;
+    } else {
+      levelEl.textContent = "Viewer (Read-Only)";
+      permsEl.innerHTML = `
+        <ul style="padding-left:16px;margin:4px 0 0;">
+          <li>Read-only access to view renewal records, history, documents, and reports</li>
+          <li>Create, edit, delete, and assignment operations are disabled</li>
+          <li>Admin and Team Management sections are hidden</li>
+        </ul>
+      `;
+    }
+
+    // Compute assigned renewals count
+    const renewals = RTS.renewals.getRenewals();
+    const assigned = renewals.filter(r => {
+      const respEmail = (r.responsibleEmail || r.responsible_email || "").toLowerCase();
+      const respName = (r.responsiblePerson || r.responsible_person || "").toLowerCase();
+      return respEmail === user.email.toLowerCase() || respName === (user.fullName || "").toLowerCase();
+    });
+    document.getElementById("profileAssignedCount").textContent = `${assigned.length} ${assigned.length === 1 ? 'record' : 'records'}`;
+
+    // Fill form
+    document.getElementById("profNameInput").value = user.fullName || "";
+    document.getElementById("profEmailInput").value = user.email || "";
+    document.getElementById("profMobileInput").value = user.mobile || "";
+
+    RTS.refreshIcons();
+  }
+
+  function wirePasswordVisibility() {
+    document.querySelectorAll(".toggle-visibility").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetId = btn.getAttribute("data-target");
+        const input = document.getElementById(targetId);
+        if (!input) return;
+        const isPassword = input.type === "password";
+        input.type = isPassword ? "text" : "password";
+        btn.innerHTML = isPassword
+          ? '<i data-lucide="eye-off" class="icon"></i>'
+          : '<i data-lucide="eye" class="icon"></i>';
+        RTS.refreshIcons();
+      });
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    RTS.initLayout();
+    renderProfile();
+    wirePasswordVisibility();
+
+    // Profile Save
+    document.getElementById("profileForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const fullName = document.getElementById("profNameInput").value.trim();
+      const mobile = document.getElementById("profMobileInput").value.trim();
+      if (!fullName) {
+        RTS.toast("Please enter your full name.", "error");
+        return;
+      }
+      RTS.auth.setCurrentUser({ fullName, mobile });
+      RTS.toast("Profile details updated successfully.", "success");
+      renderProfile();
+    });
+
+    // Password Change
+    document.getElementById("changePasswordForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const current = document.getElementById("currentPasswordInput").value;
+      const next = document.getElementById("newPasswordInput").value;
+      const confirm = document.getElementById("confirmNewPasswordInput").value;
+
+      if (!current || !next || !confirm) {
+        RTS.toast("All password fields are required.", "error");
+        return;
+      }
+      if (next.length < 8) {
+        RTS.toast("New password must be at least 8 characters long.", "error");
+        return;
+      }
+      if (next !== confirm) {
+        RTS.toast("New passwords do not match.", "error");
+        return;
+      }
+
+      const res = RTS.auth.changePassword(current, next);
+      if (!res.ok) {
+        RTS.toast(res.error || "Failed to update password.", "error");
+        return;
+      }
+
+      RTS.toast("Password updated successfully!", "success");
+      document.getElementById("changePasswordForm").reset();
+    });
+  });
+})();
+</script>
+</body>
+</html>

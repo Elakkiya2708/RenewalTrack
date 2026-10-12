@@ -18,6 +18,8 @@ const authRoutes = require("./backend/routes/auth");
 const renewalsRoutes = require("./backend/routes/renewals");
 const remindersRoutes = require("./backend/routes/reminders");
 const settingsRoutes = require("./backend/routes/settings");
+const teamRoutes = require("./backend/routes/team");
+const auditRoutes = require("./backend/routes/audit");
 
 const app = express();
 const PORT = config.PORT;
@@ -46,6 +48,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/renewals", renewalsRoutes);
 app.use("/api/reminders", remindersRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/team", teamRoutes);
+app.use("/api/audit", auditRoutes);
 
 // Serve static frontend files (HTML, CSS, JS, assets)
 app.use(express.static(ROOT));

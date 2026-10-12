@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" type="image/png" href="assets/favicon.png" data-img-indigo="assets/favicon.png" data-img-gold="assets/favicon-gold.png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Team Management — Renewal Tracking System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/responsive.css" />
+<script src="js/app.js"></script>
+<script>RTS.auth.requireAdmin();</script>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img class="brand-mark" src="assets/logo.png" data-img-indigo="assets/logo.png" data-img-gold="assets/logo-gold.png" alt="RenewalTrack logo" />
+      <span>RenewalTrack</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Main</div>
+      <a href="dashboard.html" class="nav-link"><i data-lucide="layout-dashboard" class="icon"></i>Dashboard</a>
+      <a href="records.html" class="nav-link"><i data-lucide="file-text" class="icon"></i>Renewal Records</a>
+      <a href="calendar.html" class="nav-link"><i data-lucide="calendar" class="icon"></i>Calendar</a>
+      <a href="reminders.html" class="nav-link"><i data-lucide="bell" class="icon"></i>Reminders</a>
+      <a href="history.html" class="nav-link"><i data-lucide="history" class="icon"></i>Renewal History</a>
+      <a href="documents.html" class="nav-link"><i data-lucide="folder" class="icon"></i>Documents</a>
+      <a href="reports.html" class="nav-link"><i data-lucide="bar-chart-2" class="icon"></i>Reports</a>
+
+      <div class="sidebar-section-label" data-role="Admin">Team Management</div>
+      <a href="team.html" class="nav-link active" data-role="Admin"><i data-lucide="users" class="icon"></i>Team Members</a>
+      <a href="team.html#invite" class="nav-link" data-role="Admin" id="sidebarInviteLink"><i data-lucide="user-plus" class="icon"></i>Invite Members</a>
+      <a href="audit.html" class="nav-link" data-role="Admin"><i data-lucide="clipboard-list" class="icon"></i>Audit Logs</a>
+
+      <div class="sidebar-section-label">Account</div>
+      <a href="profile.html" class="nav-link"><i data-lucide="user" class="icon"></i>My Profile</a>
+      <a href="settings.html" class="nav-link"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </nav>
+    <div class="sidebar-footer">© 2026 RenewalTrack Inc.</div>
+  </aside>
+  <div class="sidebar-overlay"></div>
+
+  <div class="main-area">
+    <header class="topbar">
+      <button class="sidebar-toggle" aria-label="Toggle menu"><i data-lucide="menu" class="icon"></i></button>
+      <div class="topbar-actions">
+        <div class="dropdown-wrap">
+          <button class="icon-btn" data-dropdown-trigger="notifPanel" aria-label="Notifications">
+            <i data-lucide="bell" class="icon"></i>
+            <span class="dot" id="notifDot" style="display:none;"></span>
+          </button>
+          <div class="dropdown-panel" id="notifPanel">
+            <div class="dropdown-header"><strong>Notifications</strong> <span id="notifCount">0</span> urgent renewal(s)</div>
+            <div class="notif-list" id="notifList"></div>
+          </div>
+        </div>
+        <div class="dropdown-wrap">
+          <div class="user-menu-trigger" data-dropdown-trigger="userPanel">
+            <div class="avatar" data-user-initials>—</div>
+            <span class="uname" data-user-name>User</span>
+            <i data-lucide="chevron-down" class="icon" style="width:14px;height:14px;"></i>
+          </div>
+          <div class="dropdown-panel" id="userPanel">
+            <div class="dropdown-header"><strong data-user-name>User</strong><span data-user-email>—</span></div>
+            <a href="profile.html" class="dropdown-item"><i data-lucide="user" class="icon"></i>My Profile</a>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="settings" class="icon"></i>App Settings</a>
+            <div class="dropdown-item" data-logout><i data-lucide="log-out" class="icon"></i>Logout</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="page-header">
+        <div>
+          <h1>Team Management</h1>
+          <p>Control user roles, permissions, account activations, and pending team invitations.</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary" id="refreshTeamBtn">
+            <i data-lucide="refresh-cw" class="icon"></i>Refresh
+          </button>
+          <button class="btn btn-primary" id="openInviteModalBtn">
+            <i data-lucide="user-plus" class="icon"></i>Invite Member
+          </button>
+        </div>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="stat-grid" style="margin-bottom:20px;">
+        <div class="stat-card" style="--stat-color:var(--accent);--stat-bg:var(--accent-dim);">
+          <div class="stat-top"><div class="stat-icon"><i data-lucide="users" class="icon"></i></div></div>
+          <div class="stat-value" id="statTotalUsers">0</div>
+          <div class="stat-label">Total Registered Users</div>
+        </div>
+        <div class="stat-card" style="--stat-color:#8b5cf6;--stat-bg:rgba(139,92,246,0.12);">
+          <div class="stat-top"><div class="stat-icon"><i data-lucide="shield" class="icon"></i></div></div>
+          <div class="stat-value" id="statAdmins">0</div>
+          <div class="stat-label">Administrators</div>
+        </div>
+        <div class="stat-card" style="--stat-color:var(--blue);--stat-bg:var(--blue-dim);">
+          <div class="stat-top"><div class="stat-icon"><i data-lucide="user-check" class="icon"></i></div></div>
+          <div class="stat-value" id="statEmployees">0</div>
+          <div class="stat-label">Employees (Assigned Only)</div>
+        </div>
+        <div class="stat-card" style="--stat-color:var(--text-mid);--stat-bg:var(--bg-surface-2);">
+          <div class="stat-top"><div class="stat-icon"><i data-lucide="eye" class="icon"></i></div></div>
+          <div class="stat-value" id="statViewers">0</div>
+          <div class="stat-label">Viewers (Read-Only)</div>
+        </div>
+        <div class="stat-card" style="--stat-color:var(--warning);--stat-bg:var(--warning-dim);">
+          <div class="stat-top"><div class="stat-icon"><i data-lucide="mail" class="icon"></i></div></div>
+          <div class="stat-value" id="statPendingInvites">0</div>
+          <div class="stat-label">Pending Invitations</div>
+        </div>
+      </div>
+
+      <!-- Main Members Card -->
+      <div class="card" style="margin-bottom:24px;">
+        <div class="card-header" style="flex-wrap:wrap;gap:12px;">
+          <div>
+            <h3>Active Team Members</h3>
+            <p style="margin:2px 0 0;font-size:12px;color:var(--text-muted);">
+              Manage member roles and toggle active status. Initial Administrator is permanently protected.
+            </p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <div class="search-input-wrap" style="width:220px;">
+              <input type="text" id="memberSearch" class="input" placeholder="Search members…" style="height:34px;font-size:13px;padding-left:30px;" />
+              <i data-lucide="search" class="icon" style="position:absolute;left:9px;top:9px;width:14px;height:14px;color:var(--text-muted);pointer-events:none;"></i>
+            </div>
+            <select id="roleFilter" class="input" style="height:34px;font-size:13px;width:130px;padding:4px 8px;">
+              <option value="">All Roles</option>
+              <option value="Admin">Admin</option>
+              <option value="Employee">Employee</option>
+              <option value="Viewer">Viewer</option>
+            </select>
+            <select id="statusFilter" class="input" style="height:34px;font-size:13px;width:130px;padding:4px 8px;">
+              <option value="">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="deactivated">Deactivated</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table" id="membersTable">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Assigned Renewals</th>
+                <th>Last Active</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="membersTableBody">
+              <tr>
+                <td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted);">
+                  <div class="loading-spinner" style="margin:0 auto 8px;"></div>
+                  Loading team members…
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Invitations Section -->
+      <div class="card" id="inviteSection">
+        <div class="card-header">
+          <div>
+            <h3>Pending &amp; Recent Invitations</h3>
+            <p style="margin:2px 0 0;font-size:12px;color:var(--text-muted);">
+              Invitations expire in 48 hours. When accepted, members will automatically join with their assigned role.
+            </p>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="refreshInvitesBtn">
+            <i data-lucide="refresh-cw" class="icon"></i>Refresh Invites
+          </button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table" id="invitesTable">
+            <thead>
+              <tr>
+                <th>Recipient Email</th>
+                <th>Assigned Role</th>
+                <th>Invited By</th>
+                <th>Expires</th>
+                <th>Status</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="invitesTableBody">
+              <tr>
+                <td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted);">
+                  No pending invitations found. Click "Invite Member" above to send one.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Modal: Invite Member -->
+<div class="modal-backdrop" id="inviteModal" style="display:none;">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      <h3 style="display:flex;align-items:center;gap:8px;">
+        <i data-lucide="user-plus" class="icon" style="color:var(--accent);"></i>
+        Invite New Team Member
+      </h3>
+      <button class="modal-close" data-modal-close>&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-mid);margin-bottom:16px;">
+        Send an invitation email with a secure registration link. The recipient will be granted the designated role upon registration.
+      </p>
+
+      <form id="inviteForm" novalidate>
+        <div class="field" style="margin-bottom:14px;">
+          <label for="inviteEmail">Recipient Work Email <span class="req">*</span></label>
+          <input type="email" id="inviteEmail" class="input" placeholder="colleague@company.com" required />
+          <span class="error-msg" id="inviteEmailError" style="display:none;color:var(--danger);font-size:12px;margin-top:4px;"></span>
+        </div>
+
+        <div class="field" style="margin-bottom:14px;">
+          <label for="inviteName">Full Name (Optional)</label>
+          <input type="text" id="inviteName" class="input" placeholder="e.g. Rachel Adams" />
+        </div>
+
+        <div class="field" style="margin-bottom:14px;">
+          <label for="inviteRole">Assigned Role <span class="req">*</span></label>
+          <select id="inviteRole" class="input">
+            <option value="Employee" selected>Employee — Can view &amp; manage assigned renewals</option>
+            <option value="Viewer">Viewer — Read-only access to permitted records</option>
+          </select>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+            Note: Public registrations cannot choose Admin. Admin privileges can only be configured by existing administrators.
+          </p>
+        </div>
+
+        <div class="form-banner info" style="margin-bottom:16px;padding:10px 12px;border-radius:8px;background:var(--accent-dim);border:1px solid rgba(139,92,246,0.25);font-size:12px;color:var(--text);">
+          <i data-lucide="clock" class="icon" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i>
+          Invitation tokens automatically expire after <strong>48 hours</strong>.
+        </div>
+
+        <div id="inviteResultBox" style="display:none;margin-bottom:16px;"></div>
+
+        <div class="modal-footer" style="padding:0;margin-top:20px;border-top:none;display:flex;justify-content:flex-end;gap:8px;">
+          <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+          <button type="submit" class="btn btn-primary" id="sendInviteBtn">
+            <i data-lucide="send" class="icon"></i>Send Invitation
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Change Role -->
+<div class="modal-backdrop" id="roleModal" style="display:none;">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h3 style="display:flex;align-items:center;gap:8px;">
+        <i data-lucide="shield" class="icon" style="color:var(--accent);"></i>
+        Modify Member Role
+      </h3>
+      <button class="modal-close" data-modal-close>&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-mid);margin-bottom:14px;">
+        Update access permissions for <strong id="roleModalUserName">—</strong> (<span id="roleModalUserEmail" style="color:var(--text-muted);">—</span>).
+      </p>
+
+      <div class="field" style="margin-bottom:16px;">
+        <label for="newRoleSelect">Assign New Role <span class="req">*</span></label>
+        <select id="newRoleSelect" class="input">
+          <option value="Employee">Employee — Manage assigned renewals</option>
+          <option value="Viewer">Viewer — Read-only access</option>
+          <option value="Admin">Admin — Full workspace management</option>
+        </select>
+      </div>
+
+      <div class="form-banner warning" id="roleChangeNotice" style="display:none;padding:8px 12px;border-radius:6px;background:var(--warning-dim);border:1px solid rgba(245,158,11,0.3);font-size:12px;color:var(--text);margin-bottom:16px;">
+        ⚠️ Granting Administrator role gives full team and renewal management privileges.
+      </div>
+
+      <div class="modal-footer" style="padding:0;margin-top:20px;border-top:none;display:flex;justify-content:flex-end;gap:8px;">
+        <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+        <button type="button" class="btn btn-primary" id="saveRoleBtn">
+          Save Role
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Toggle Status (Deactivate / Reactivate) -->
+<div class="modal-backdrop" id="statusModal" style="display:none;">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h3 id="statusModalTitle" style="display:flex;align-items:center;gap:8px;">
+        <i data-lucide="alert-triangle" class="icon" style="color:var(--danger);"></i>
+        Confirm Account Status Change
+      </h3>
+      <button class="modal-close" data-modal-close>&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="statusModalDesc" style="font-size:13px;color:var(--text-mid);margin-bottom:16px;">
+        Are you sure you want to deactivate this account? The user will immediately be barred from signing in.
+      </p>
+      <div class="modal-footer" style="padding:0;margin-top:20px;border-top:none;display:flex;justify-content:flex-end;gap:8px;">
+        <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmStatusBtn">
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+(function() {
+  let allMembers = [];
+  let allInvites = [];
+  let selectedUser = null;
+  let targetStatusAction = null;
+
+  async function loadTeam() {
+    try {
+      const res = await RTS.team.getMembers();
+      if (res.ok && Array.isArray(res.members)) {
+        allMembers = res.members;
+        renderMembers();
+        updateStats();
+      } else {
+        // Fallback to local accounts
+        const localAccounts = RTS.auth.getAccounts();
+        allMembers = localAccounts.map(a => ({
+          id: a.id || "usr-" + a.email,
+          fullName: a.fullName,
+          email: a.email,
+          mobile: a.mobile,
+          role: a.role || "Employee",
+          status: a.status || "active",
+          assignedRenewalCount: 0,
+          isPrimaryAdmin: a.email === "demo@renewaltrack.com"
+        }));
+        renderMembers();
+        updateStats();
+      }
+    } catch (err) {
+      console.warn("Failed to load members via API, using local store:", err);
+      const localAccounts = RTS.auth.getAccounts();
+      allMembers = localAccounts.map(a => ({
+        id: a.id || "usr-" + a.email,
+        fullName: a.fullName,
+        email: a.email,
+        mobile: a.mobile,
+        role: a.role || "Employee",
+        status: a.status || "active",
+        assignedRenewalCount: 0,
+        isPrimaryAdmin: a.email === "demo@renewaltrack.com"
+      }));
+      renderMembers();
+      updateStats();
+    }
+  }
+
+  async function loadInvites() {
+    try {
+      const res = await RTS.team.getInvites();
+      if (res.ok && Array.isArray(res.invitations)) {
+        allInvites = res.invitations;
+        renderInvites();
+        updateStats();
+      }
+    } catch (err) {
+      console.warn("Failed to load invitations:", err);
+    }
+  }
+
+  function updateStats() {
+    document.getElementById("statTotalUsers").textContent = allMembers.length;
+    document.getElementById("statAdmins").textContent = allMembers.filter(m => m.role === "Admin").length;
+    document.getElementById("statEmployees").textContent = allMembers.filter(m => m.role === "Employee").length;
+    document.getElementById("statViewers").textContent = allMembers.filter(m => m.role === "Viewer").length;
+    const pendingCount = allInvites.filter(i => i.status === "pending" && new Date(i.expires_at || i.expiresAt) > new Date()).length;
+    document.getElementById("statPendingInvites").textContent = pendingCount;
+  }
+
+  function renderMembers() {
+    const tbody = document.getElementById("membersTableBody");
+    const search = document.getElementById("memberSearch").value.trim().toLowerCase();
+    const roleFilter = document.getElementById("roleFilter").value;
+    const statusFilter = document.getElementById("statusFilter").value;
+
+    const filtered = allMembers.filter(m => {
+      if (roleFilter && m.role !== roleFilter) return false;
+      if (statusFilter && m.status !== statusFilter) return false;
+      if (search) {
+        const text = `${m.fullName} ${m.email} ${m.role}`.toLowerCase();
+        if (!text.includes(search)) return false;
+      }
+      return true;
+    });
+
+    if (!filtered.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted);">
+            No team members matched your search criteria.
+          </td>
+        </tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(m => {
+      const isPrimary = m.isPrimaryAdmin || m.id === "usr-1" || m.email.toLowerCase() === "demo@renewaltrack.com";
+      const roleBadge = `<span class="role-pill-badge role-${(m.role || 'employee').toLowerCase()}">${m.role || 'Employee'}</span>`;
+      const statusBadge = `<span class="status-pill status-${m.status === 'deactivated' ? 'deactivated' : 'active'}">${m.status === 'deactivated' ? 'Deactivated' : 'Active'}</span>`;
+      const assignedCount = m.assignedRenewalCount !== undefined ? m.assignedRenewalCount : 0;
+      const initials = (m.fullName || "User").split(" ").map(p => p[0]).slice(0, 2).join("").toUpperCase();
+
+      let actionsHtml = "";
+      if (isPrimary) {
+        actionsHtml = `
+          <span style="font-size:11px;color:var(--text-muted);display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:4px;background:var(--bg-surface-2);">
+            <i data-lucide="lock" class="icon" style="width:12px;height:12px;"></i> Primary Admin
+          </span>`;
+      } else {
+        const toggleLabel = m.status === "deactivated" ? "Reactivate" : "Deactivate";
+        const toggleClass = m.status === "deactivated" ? "btn-secondary" : "btn-danger";
+        actionsHtml = `
+          <div style="display:flex;gap:6px;justify-content:flex-end;">
+            <button class="btn btn-secondary btn-sm change-role-btn" data-id="${m.id}">
+              <i data-lucide="user-cog" class="icon"></i>Change Role
+            </button>
+            <button class="btn ${toggleClass} btn-sm toggle-status-btn" data-id="${m.id}" data-action="${m.status === 'deactivated' ? 'activate' : 'deactivate'}">
+              ${toggleLabel}
+            </button>
+          </div>`;
+      }
+
+      return `
+        <tr>
+          <td>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="avatar" style="width:34px;height:34px;font-size:12px;">${initials}</div>
+              <div>
+                <strong style="display:block;font-size:13px;color:var(--text);">${escapeHtml(m.fullName)}</strong>
+                <span style="font-size:12px;color:var(--text-muted);">${escapeHtml(m.email)}</span>
+              </div>
+            </div>
+          </td>
+          <td>${roleBadge}</td>
+          <td>${statusBadge}</td>
+          <td>
+            <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;background:var(--bg-surface-2);color:var(--text-mid);font-weight:600;">
+              ${assignedCount} ${assignedCount === 1 ? 'renewal' : 'renewals'}
+            </span>
+          </td>
+          <td style="font-size:12px;color:var(--text-muted);">
+            ${m.lastLogin ? formatDate(m.lastLogin) : 'Active'}
+          </td>
+          <td style="text-align:right;">${actionsHtml}</td>
+        </tr>`;
+    }).join("");
+
+    RTS.refreshIcons();
+    wireMemberActions();
+  }
+
+  function renderInvites() {
+    const tbody = document.getElementById("invitesTableBody");
+    if (!allInvites.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted);">
+            No pending invitations found. Click "Invite Member" above to create one.
+          </td>
+        </tr>`;
+      return;
+    }
+
+    tbody.innerHTML = allInvites.map(inv => {
+      const expiresAt = new Date(inv.expires_at || inv.expiresAt);
+      const isExpired = expiresAt < new Date();
+      let statusBadge = `<span class="status-pill status-pending">Pending</span>`;
+      if (inv.status === "accepted") {
+        statusBadge = `<span class="status-pill status-active">Accepted</span>`;
+      } else if (inv.status === "revoked") {
+        statusBadge = `<span class="status-pill status-deactivated">Revoked</span>`;
+      } else if (isExpired) {
+        statusBadge = `<span class="status-pill status-deactivated">Expired</span>`;
+      }
+
+      const inviteUrl = `${window.location.origin}/register.html?invite=${encodeURIComponent(inv.token)}`;
+
+      return `
+        <tr>
+          <td>
+            <strong style="color:var(--text);font-size:13px;">${escapeHtml(inv.email)}</strong>
+            ${inv.fullName ? `<span style="display:block;font-size:11px;color:var(--text-muted);">${escapeHtml(inv.fullName)}</span>` : ''}
+          </td>
+          <td><span class="role-pill-badge role-${(inv.role || 'employee').toLowerCase()}">${inv.role || 'Employee'}</span></td>
+          <td style="font-size:12px;color:var(--text-muted);">${escapeHtml(inv.invited_by_name || 'Admin')}</td>
+          <td style="font-size:12px;color:${isExpired ? 'var(--danger)' : 'var(--text-muted)'};">
+            ${isExpired ? 'Expired' : formatDate(expiresAt)}
+          </td>
+          <td>${statusBadge}</td>
+          <td style="text-align:right;">
+            <div style="display:flex;gap:6px;justify-content:flex-end;">
+              ${inv.status === 'pending' && !isExpired ? `
+                <button class="btn btn-secondary btn-sm copy-invite-btn" data-url="${escapeHtml(inviteUrl)}">
+                  <i data-lucide="copy" class="icon"></i>Copy Link
+                </button>
+                <button class="btn btn-danger btn-sm revoke-invite-btn" data-id="${inv.id}">
+                  <i data-lucide="x" class="icon"></i>Revoke
+                </button>
+              ` : `
+                <span style="font-size:12px;color:var(--text-muted);">—</span>
+              `}
+            </div>
+          </td>
+        </tr>`;
+    }).join("");
+
+    RTS.refreshIcons();
+    wireInviteActions();
+  }
+
+  function wireMemberActions() {
+    document.querySelectorAll(".change-role-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-id");
+        selectedUser = allMembers.find(m => m.id === id);
+        if (!selectedUser) return;
+
+        document.getElementById("roleModalUserName").textContent = selectedUser.fullName;
+        document.getElementById("roleModalUserEmail").textContent = selectedUser.email;
+        document.getElementById("newRoleSelect").value = selectedUser.role || "Employee";
+
+        const notice = document.getElementById("roleChangeNotice");
+        notice.style.display = selectedUser.role === "Admin" ? "block" : "none";
+
+        RTS.modal.open("roleModal");
+      });
+    });
+
+    document.querySelectorAll(".toggle-status-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-id");
+        targetStatusAction = btn.getAttribute("data-action");
+        selectedUser = allMembers.find(m => m.id === id);
+        if (!selectedUser) return;
+
+        const isDeactivate = targetStatusAction === "deactivate";
+        document.getElementById("statusModalTitle").innerHTML = `
+          <i data-lucide="${isDeactivate ? 'alert-triangle' : 'check-circle'}" class="icon" style="color:var(--${isDeactivate ? 'danger' : 'success'});"></i>
+          ${isDeactivate ? 'Deactivate Account' : 'Reactivate Account'}
+        `;
+        document.getElementById("statusModalDesc").textContent = isDeactivate
+          ? `Are you sure you want to deactivate ${selectedUser.fullName}'s account (${selectedUser.email})? They will immediately be denied login access.`
+          : `Reactivate ${selectedUser.fullName}'s account (${selectedUser.email})? They will be allowed to log in and access their assigned renewals.`;
+
+        const confirmBtn = document.getElementById("confirmStatusBtn");
+        confirmBtn.className = isDeactivate ? "btn btn-danger" : "btn btn-primary";
+        confirmBtn.textContent = isDeactivate ? "Yes, Deactivate" : "Yes, Reactivate";
+
+        RTS.refreshIcons();
+        RTS.modal.open("statusModal");
+      });
+    });
+  }
+
+  function wireInviteActions() {
+    document.querySelectorAll(".copy-invite-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const url = btn.getAttribute("data-url");
+        try {
+          await navigator.clipboard.writeText(url);
+          RTS.toast("Invitation link copied to clipboard!", "success");
+        } catch (e) {
+          prompt("Copy invitation link:", url);
+        }
+      });
+    });
+
+    document.querySelectorAll(".revoke-invite-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-id");
+        if (!confirm("Are you sure you want to revoke this invitation?")) return;
+        try {
+          const res = await RTS.team.revokeInvite(id);
+          if (res.ok) {
+            RTS.toast("Invitation revoked.", "info");
+            loadInvites();
+          } else {
+            RTS.toast(res.error || "Failed to revoke invitation.", "error");
+          }
+        } catch (err) {
+          RTS.toast("Failed to revoke invitation.", "error");
+        }
+      });
+    });
+  }
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return String(str).replace(/[&<>"']/g, m => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[m]));
+  }
+
+  function formatDate(d) {
+    try {
+      return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch (e) {
+      return String(d);
+    }
+  }
+
+  // Event Listeners
+  document.addEventListener("DOMContentLoaded", () => {
+    RTS.initLayout();
+    loadTeam();
+    loadInvites();
+
+    document.getElementById("memberSearch").addEventListener("input", renderMembers);
+    document.getElementById("roleFilter").addEventListener("change", renderMembers);
+    document.getElementById("statusFilter").addEventListener("change", renderMembers);
+
+    document.getElementById("refreshTeamBtn").addEventListener("click", () => {
+      loadTeam();
+      RTS.toast("Team members refreshed.", "info");
+    });
+
+    document.getElementById("refreshInvitesBtn").addEventListener("click", () => {
+      loadInvites();
+      RTS.toast("Invitations refreshed.", "info");
+    });
+
+    document.getElementById("openInviteModalBtn").addEventListener("click", () => {
+      document.getElementById("inviteResultBox").style.display = "none";
+      document.getElementById("inviteEmailError").style.display = "none";
+      document.getElementById("inviteForm").reset();
+      RTS.modal.open("inviteModal");
+    });
+
+    // Check if URL has #invite hash
+    if (window.location.hash === "#invite") {
+      setTimeout(() => {
+        RTS.modal.open("inviteModal");
+      }, 300);
+    }
+
+    document.getElementById("newRoleSelect").addEventListener("change", (e) => {
+      const notice = document.getElementById("roleChangeNotice");
+      notice.style.display = e.target.value === "Admin" ? "block" : "none";
+    });
+
+    // Save Role
+    document.getElementById("saveRoleBtn").addEventListener("click", async () => {
+      if (!selectedUser) return;
+      const newRole = document.getElementById("newRoleSelect").value;
+      try {
+        const res = await RTS.team.updateRole(selectedUser.id, newRole);
+        if (res.ok) {
+          RTS.toast(`Role updated to ${newRole} for ${selectedUser.fullName}.`, "success");
+          RTS.modal.close("roleModal");
+          loadTeam();
+        } else {
+          RTS.toast(res.error || "Failed to update role.", "error");
+        }
+      } catch (e) {
+        RTS.toast("Error saving role.", "error");
+      }
+    });
+
+    // Confirm Status (Deactivate / Reactivate)
+    document.getElementById("confirmStatusBtn").addEventListener("click", async () => {
+      if (!selectedUser || !targetStatusAction) return;
+      const newStatus = targetStatusAction === "deactivate" ? "deactivated" : "active";
+      try {
+        const res = await RTS.team.updateStatus(selectedUser.id, newStatus);
+        if (res.ok) {
+          RTS.toast(`Account ${newStatus === "deactivated" ? "deactivated" : "reactivated"} for ${selectedUser.fullName}.`, "success");
+          RTS.modal.close("statusModal");
+          loadTeam();
+        } else {
+          RTS.toast(res.error || "Failed to update status.", "error");
+        }
+      } catch (e) {
+        RTS.toast("Error updating account status.", "error");
+      }
+    });
+
+    // Send Invite Form
+    document.getElementById("inviteForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("inviteEmail").value.trim();
+      const fullName = document.getElementById("inviteName").value.trim();
+      const role = document.getElementById("inviteRole").value;
+      const errEl = document.getElementById("inviteEmailError");
+      const btn = document.getElementById("sendInviteBtn");
+
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errEl.textContent = "Please enter a valid email address.";
+        errEl.style.display = "block";
+        return;
+      }
+      errEl.style.display = "none";
+
+      btn.disabled = true;
+      btn.innerHTML = `<span class="loading-spinner" style="width:14px;height:14px;"></span> Sending…`;
+
+      try {
+        const res = await RTS.team.sendInvite({ email, fullName, role });
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="send" class="icon"></i>Send Invitation`;
+        RTS.refreshIcons();
+
+        if (res.ok) {
+          const inviteUrl = res.inviteUrl || `${window.location.origin}/register.html?invite=${encodeURIComponent(res.invitation ? res.invitation.token : '')}`;
+          const resultBox = document.getElementById("inviteResultBox");
+          resultBox.style.display = "block";
+          resultBox.innerHTML = `
+            <div class="copy-link-box">
+              <strong style="display:block;font-size:12px;margin-bottom:4px;color:var(--text);">
+                ✅ Invitation Created! Secure Registration Link:
+              </strong>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <input type="text" class="input" readonly value="${escapeHtml(inviteUrl)}" id="generatedInviteInput" style="height:32px;font-size:12px;" />
+                <button type="button" class="btn btn-secondary btn-sm" id="copyGeneratedInviteBtn" style="white-space:nowrap;">
+                  Copy Link
+                </button>
+              </div>
+              <p style="font-size:11px;color:var(--text-muted);margin:4px 0 0;">
+                ${res.emailSent ? "Email notification dispatched to recipient." : "Email delivery simulated. You can also share the direct link above."}
+              </p>
+            </div>
+          `;
+          document.getElementById("copyGeneratedInviteBtn").addEventListener("click", async () => {
+            await navigator.clipboard.writeText(inviteUrl);
+            RTS.toast("Link copied to clipboard!", "success");
+          });
+
+          RTS.toast("Invitation generated successfully!", "success");
+          loadInvites();
+        } else {
+          errEl.textContent = res.error || "Failed to create invitation.";
+          errEl.style.display = "block";
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="send" class="icon"></i>Send Invitation`;
+        RTS.refreshIcons();
+        errEl.textContent = "Server error while sending invitation.";
+        errEl.style.display = "block";
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

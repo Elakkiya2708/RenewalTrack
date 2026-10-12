@@ -5,8 +5,10 @@
 
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const { supabase, isConfigured } = require("./supabaseClient");
 const config = require("./config");
+const emailService = require("./emailService");
 
 const DATA_DIR = path.join(__dirname, "..", "data");
 const LOCAL_STORE_FILE = path.join(DATA_DIR, "store.json");
@@ -35,7 +37,55 @@ function getLocalStore() {
     }
     if (fs.existsSync(LOCAL_STORE_FILE)) {
       const raw = fs.readFileSync(LOCAL_STORE_FILE, "utf-8");
-      return JSON.parse(raw);
+      const store = JSON.parse(raw);
+      let changed = false;
+
+      if (!store.invitations) {
+        store.invitations = [];
+        changed = true;
+      }
+      if (!store.audit_logs || store.audit_logs.length === 0) {
+        store.audit_logs = [
+          {
+            id: "log-seed-1",
+            actorId: "system",
+            actorName: "System",
+            actorEmail: "system@renewaltrack.com",
+            actorRole: "System",
+            action: "SYSTEM_INITIALIZED",
+            targetType: "system",
+            targetId: "system",
+            details: "RenewGuard initialized with Role-Based Access Control (Admin, Employee, Viewer).",
+            channel: "System",
+            createdAt: new Date().toISOString(),
+          },
+        ];
+        changed = true;
+      }
+      if (!store.users || store.users.length === 0) {
+        store.users = [
+          { id: "usr-1", fullName: "Anita Sharma", email: "demo@renewaltrack.com", role: "Admin", status: "active", mobile: "+1 555 0102", password: "Demo@1234" },
+          { id: "usr-2", fullName: "David Kim", email: "david.kim@renewaltrack.com", role: "Employee", status: "active", mobile: "+1 555 0103", password: "Demo@1234" },
+          { id: "usr-3", fullName: "Priya Nair", email: "priya.nair@renewaltrack.com", role: "Viewer", status: "active", mobile: "+1 555 0104", password: "Demo@1234" },
+        ];
+        changed = true;
+      } else {
+        store.users.forEach((u) => {
+          if (u.role === "Editor") {
+            u.role = "Employee";
+            changed = true;
+          }
+          if (!u.status) {
+            u.status = "active";
+            changed = true;
+          }
+        });
+      }
+
+      if (changed) {
+        saveLocalStore(store);
+      }
+      return store;
     }
   } catch (err) {
     console.error(`[Local Store Read Error] ${err.message}`);
@@ -45,6 +95,22 @@ function getLocalStore() {
   const initial = {
     renewals: getInitialSeedRenewals(),
     reminder_logs: [],
+    invitations: [],
+    audit_logs: [
+      {
+        id: "log-seed-1",
+        actorId: "system",
+        actorName: "System",
+        actorEmail: "system@renewaltrack.com",
+        actorRole: "System",
+        action: "SYSTEM_INITIALIZED",
+        targetType: "system",
+        targetId: "system",
+        details: "RenewGuard initialized with Role-Based Access Control (Admin, Employee, Viewer).",
+        channel: "System",
+        createdAt: new Date().toISOString(),
+      },
+    ],
     settings: {
       emailNotificationsEnabled: true,
       reminderDays: [30, 15, 7, 0],
@@ -55,11 +121,9 @@ function getLocalStore() {
       updatedAt: new Date().toISOString(),
     },
     users: [
-      { id: "usr-1", fullName: "Anita Sharma", email: "demo@renewaltrack.com", role: "Admin" },
-      { id: "usr-2", fullName: "David Kim", email: "david.kim@renewaltrack.com", role: "Editor" },
-      { id: "usr-3", fullName: "Priya Nair", email: "priya.nair@renewaltrack.com", role: "Viewer" },
-      { id: "usr-4", fullName: "Wei Zhang", email: "wei.zhang@renewaltrack.com", role: "Editor" },
-      { id: "usr-5", fullName: "Marcus Chen", email: "demo@renewaltrack.com", role: "Editor" },
+      { id: "usr-1", fullName: "Anita Sharma", email: "demo@renewaltrack.com", role: "Admin", status: "active", mobile: "+1 555 0102", password: "Demo@1234" },
+      { id: "usr-2", fullName: "David Kim", email: "david.kim@renewaltrack.com", role: "Employee", status: "active", mobile: "+1 555 0103", password: "Demo@1234" },
+      { id: "usr-3", fullName: "Priya Nair", email: "priya.nair@renewaltrack.com", role: "Viewer", status: "active", mobile: "+1 555 0104", password: "Demo@1234" },
     ],
   };
 
@@ -395,6 +459,401 @@ const db = {
     // 4. Fallback to configured alert recipient
     const settings = await this.getNotificationSettings();
     return settings.defaultRecipientEmail || config.ALERT_FALLBACK_EMAIL || "demo@renewaltrack.com";
+  },
+
+  // 11. Get all users (enriches with assigned renewals count)
+  async getUsers() {
+    let usersList = [];
+    if (isConfigured()) {
+      try {
+        const { data, error } = await supabase.from("app_users").select("*").order("created_at", { ascending: true });
+        if (!error && data && data.length > 0) {
+          usersList = data.map(toCamelCase);
+        }
+      } catch (e) {
+        console.error(`[Supabase getUsers error] ${e.message}`);
+      }
+    }
+    if (!usersList.length) {
+      const store = getLocalStore();
+      usersList = store.users || [];
+    }
+
+    // Tally renewal counts per user
+    const counts = await this.getAssignedRenewalCounts();
+    return usersList.map((u) => {
+      const email = (u.email || "").toLowerCase();
+      const name = (u.fullName || "").toLowerCase();
+      const count = (counts[email] || 0) + (counts[name] || 0);
+      return {
+        ...u,
+        assignedRenewalsCount: count,
+      };
+    });
+  },
+
+  // 12. Get user by ID
+  async getUserById(id) {
+    const users = await this.getUsers();
+    return users.find((u) => u.id === id) || null;
+  },
+
+  // 13. Get user by email
+  async getUserByEmail(email) {
+    if (!email) return null;
+    const users = await this.getUsers();
+    return users.find((u) => (u.email || "").toLowerCase() === email.trim().toLowerCase()) || null;
+  },
+
+  // 14. Save or upsert user
+  async saveUser(userData) {
+    const id = userData.id || `usr-${Date.now()}`;
+    const record = {
+      ...userData,
+      id,
+      role: userData.role || "Employee",
+      status: userData.status || "active",
+      updatedAt: new Date().toISOString(),
+    };
+    if (isConfigured()) {
+      try {
+        await supabase.from("app_users").upsert(toSnakeCase(record), { onConflict: "id" });
+      } catch (e) {
+        console.error(`[Supabase saveUser error] ${e.message}`);
+      }
+    }
+    const store = getLocalStore();
+    const idx = (store.users || []).findIndex((u) => u.id === id || (u.email && u.email.toLowerCase() === (record.email || "").toLowerCase()));
+    if (idx >= 0) {
+      store.users[idx] = { ...store.users[idx], ...record };
+    } else {
+      store.users.push(record);
+    }
+    saveLocalStore(store);
+    return record;
+  },
+
+  // 15. Update user role (Protects initial Admin)
+  async updateUserRole(id, newRole, actor = {}) {
+    const validRoles = ["Admin", "Employee", "Viewer"];
+    if (!validRoles.includes(newRole)) {
+      throw new Error(`Invalid role "${newRole}". Must be Admin, Employee, or Viewer.`);
+    }
+
+    const user = await this.getUserById(id);
+    if (!user) throw new Error("User not found.");
+
+    // Primary Admin Protection: Cannot demote usr-1 or demo@renewaltrack.com
+    if ((user.id === "usr-1" || (user.email && user.email.toLowerCase() === "demo@renewaltrack.com")) && newRole !== "Admin") {
+      throw new Error("The initial Admin account is protected and cannot be demoted.");
+    }
+
+    const oldRole = user.role;
+    user.role = newRole;
+    await this.saveUser(user);
+
+    await this.logAudit({
+      actorId: actor.id || "admin",
+      actorName: actor.fullName || actor.name || "Administrator",
+      actorEmail: actor.email || "demo@renewaltrack.com",
+      actorRole: actor.role || "Admin",
+      action: "ROLE_CHANGED",
+      targetType: "user",
+      targetId: user.id,
+      details: `Changed ${user.fullName || user.email}'s role from ${oldRole} to ${newRole}.`,
+    });
+
+    return user;
+  },
+
+  // 16. Update user status (active / deactivated) (Protects initial Admin)
+  async setUserStatus(id, newStatus, actor = {}) {
+    if (!["active", "deactivated"].includes(newStatus)) {
+      throw new Error(`Invalid status "${newStatus}". Must be active or deactivated.`);
+    }
+
+    const user = await this.getUserById(id);
+    if (!user) throw new Error("User not found.");
+
+    // Primary Admin Protection: Cannot deactivate usr-1 or demo@renewaltrack.com
+    if ((user.id === "usr-1" || (user.email && user.email.toLowerCase() === "demo@renewaltrack.com")) && newStatus === "deactivated") {
+      throw new Error("The initial Admin account is protected and cannot be deactivated.");
+    }
+
+    user.status = newStatus;
+    await this.saveUser(user);
+
+    await this.logAudit({
+      actorId: actor.id || "admin",
+      actorName: actor.fullName || actor.name || "Administrator",
+      actorEmail: actor.email || "demo@renewaltrack.com",
+      actorRole: actor.role || "Admin",
+      action: newStatus === "deactivated" ? "ACCOUNT_DEACTIVATED" : "ACCOUNT_ACTIVATED",
+      targetType: "user",
+      targetId: user.id,
+      details: `${newStatus === "deactivated" ? "Deactivated" : "Activated"} user account for ${user.fullName || user.email}.`,
+    });
+
+    return user;
+  },
+
+  // 17. Calculate assigned renewals count for all users
+  async getAssignedRenewalCounts() {
+    const renewals = await this.getRenewals();
+    const counts = {};
+    renewals.forEach((r) => {
+      const email = (r.responsibleEmail || r.responsible_email || "").trim().toLowerCase();
+      const person = (r.responsiblePerson || r.responsible_person || "").trim().toLowerCase();
+      if (email) counts[email] = (counts[email] || 0) + 1;
+      if (person) counts[person] = (counts[person] || 0) + 1;
+    });
+    return counts;
+  },
+
+  // 18. Create invitation with secure token, expiry, and email dispatch
+  async createInvitation({ email, fullName, role }, actor = {}) {
+    if (!email || !email.includes("@")) {
+      throw new Error("A valid email address is required.");
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanRole = ["Employee", "Viewer"].includes(role) ? role : "Employee";
+
+    // Check if user is already registered
+    const existingUser = await this.getUserByEmail(cleanEmail);
+    if (existingUser) {
+      throw new Error(`A user with email "${cleanEmail}" is already registered.`);
+    }
+
+    const token = `inv-${crypto.randomBytes(16).toString("hex")}`;
+    const expiresAt = new Date(Date.now() + 48 * 3600 * 1000).toISOString(); // 48 hours
+
+    const invite = {
+      id: `inv-${Date.now()}`,
+      email: cleanEmail,
+      fullName: (fullName || "").trim(),
+      role: cleanRole,
+      invitedBy: actor.email || "demo@renewaltrack.com",
+      invitedByName: actor.fullName || "Administrator",
+      token,
+      status: "pending",
+      expiresAt,
+      createdAt: new Date().toISOString(),
+    };
+
+    if (isConfigured()) {
+      try {
+        await supabase.from("invitations").insert([toSnakeCase(invite)]);
+      } catch (e) {
+        console.error(`[Supabase createInvitation error] ${e.message}`);
+      }
+    }
+
+    const store = getLocalStore();
+    store.invitations = [invite, ...(store.invitations || [])];
+    saveLocalStore(store);
+
+    const appUrl = config.APP_URL || `http://localhost:${config.PORT}`;
+    const inviteUrl = `${appUrl}/register.html?invite=${token}`;
+
+    const emailResult = await emailService.sendInvitationEmail({
+      to: cleanEmail,
+      fullName: invite.fullName,
+      role: invite.role,
+      inviteUrl,
+      invitedBy: invite.invitedByName,
+    });
+
+    await this.logAudit({
+      actorId: actor.id || "admin",
+      actorName: actor.fullName || "Administrator",
+      actorEmail: actor.email || "demo@renewaltrack.com",
+      actorRole: actor.role || "Admin",
+      action: "MEMBER_INVITED",
+      targetType: "invitation",
+      targetId: invite.id,
+      details: `Sent invitation to ${cleanEmail} for role ${cleanRole} (Expires: 48h).`,
+    });
+
+    return {
+      ...invite,
+      inviteUrl,
+      emailSent: emailResult.success,
+      emailSimulated: emailResult.simulated,
+    };
+  },
+
+  // 19. Get all invitations
+  async getInvitations() {
+    if (isConfigured()) {
+      try {
+        const { data, error } = await supabase.from("invitations").select("*").order("created_at", { ascending: false });
+        if (!error && data && data.length > 0) return data.map(toCamelCase);
+      } catch (e) {
+        console.error(`[Supabase getInvitations error] ${e.message}`);
+      }
+    }
+    const store = getLocalStore();
+    return store.invitations || [];
+  },
+
+  // 20. Get invitation by token
+  async getInvitationByToken(token) {
+    const invites = await this.getInvitations();
+    const invite = invites.find((i) => i.token === token);
+    if (!invite) return null;
+
+    if (new Date(invite.expiresAt) < new Date() && invite.status === "pending") {
+      invite.status = "expired";
+      const store = getLocalStore();
+      const idx = (store.invitations || []).findIndex((i) => i.token === token);
+      if (idx >= 0) store.invitations[idx].status = "expired";
+      saveLocalStore(store);
+    }
+    return invite;
+  },
+
+  // 21. Accept invitation
+  async acceptInvitation(token, registrationData) {
+    const invite = await this.getInvitationByToken(token);
+    if (!invite) throw new Error("Invalid invitation token.");
+    if (invite.status !== "pending") throw new Error(`Invitation is no longer pending (current status: ${invite.status}).`);
+    if (new Date(invite.expiresAt) < new Date()) throw new Error("Invitation has expired. Please ask an Admin to resend an invite.");
+
+    const newUser = {
+      id: `usr-${Date.now()}`,
+      fullName: (registrationData.fullName || invite.fullName || "").trim(),
+      email: invite.email,
+      mobile: registrationData.mobile || "",
+      password: registrationData.password,
+      role: invite.role, // strictly assigned by Admin
+      status: "active",
+      createdAt: new Date().toISOString(),
+    };
+
+    await this.saveUser(newUser);
+
+    invite.status = "accepted";
+    invite.acceptedAt = new Date().toISOString();
+
+    if (isConfigured()) {
+      try {
+        await supabase.from("invitations").update({ status: "accepted", accepted_at: invite.acceptedAt }).eq("token", token);
+      } catch (e) {
+        console.error(`[Supabase acceptInvitation error] ${e.message}`);
+      }
+    }
+
+    const store = getLocalStore();
+    const idx = (store.invitations || []).findIndex((i) => i.token === token);
+    if (idx >= 0) {
+      store.invitations[idx] = invite;
+      saveLocalStore(store);
+    }
+
+    await this.logAudit({
+      actorId: newUser.id,
+      actorName: newUser.fullName,
+      actorEmail: newUser.email,
+      actorRole: newUser.role,
+      action: "INVITE_ACCEPTED",
+      targetType: "user",
+      targetId: newUser.id,
+      details: `Accepted team invitation and registered account with role ${newUser.role}.`,
+    });
+
+    return newUser;
+  },
+
+  // 22. Revoke invitation
+  async revokeInvitation(id, actor = {}) {
+    const store = getLocalStore();
+    const invite = (store.invitations || []).find((i) => i.id === id);
+    if (!invite) throw new Error("Invitation not found.");
+
+    invite.status = "revoked";
+    saveLocalStore(store);
+
+    if (isConfigured()) {
+      try {
+        await supabase.from("invitations").update({ status: "revoked" }).eq("id", id);
+      } catch (e) {}
+    }
+
+    await this.logAudit({
+      actorId: actor.id || "admin",
+      actorName: actor.fullName || "Administrator",
+      actorEmail: actor.email || "demo@renewaltrack.com",
+      actorRole: actor.role || "Admin",
+      action: "INVITE_REVOKED",
+      targetType: "invitation",
+      targetId: id,
+      details: `Revoked pending invitation for ${invite.email}.`,
+    });
+
+    return invite;
+  },
+
+  // 23. Log audit activity
+  async logAudit(entry) {
+    const record = {
+      id: entry.id || `aud-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      actorId: entry.actorId || "usr-anon",
+      actorName: entry.actorName || "System",
+      actorEmail: entry.actorEmail || "system@renewaltrack.com",
+      actorRole: entry.actorRole || "System",
+      action: entry.action || "GENERAL_ACTIVITY",
+      targetType: entry.targetType || "system",
+      targetId: entry.targetId || null,
+      details: entry.details || "",
+      channel: entry.channel || "Web Dashboard",
+      ipAddress: entry.ipAddress || "127.0.0.1",
+      createdAt: entry.createdAt || new Date().toISOString(),
+    };
+
+    if (isConfigured()) {
+      try {
+        await supabase.from("audit_logs").insert([toSnakeCase(record)]);
+      } catch (e) {
+        console.error(`[Supabase logAudit error] ${e.message}`);
+      }
+    }
+
+    const store = getLocalStore();
+    store.audit_logs = [record, ...(store.audit_logs || [])].slice(0, 500);
+    saveLocalStore(store);
+    return record;
+  },
+
+  // 24. Get audit logs with filter & pagination
+  async getAuditLogs({ limit = 100, action, search } = {}) {
+    if (isConfigured()) {
+      try {
+        let query = supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(limit);
+        if (action && action !== "ALL") query = query.eq("action", action);
+        const { data, error } = await query;
+        if (!error && data && data.length > 0) {
+          let list = data.map(toCamelCase);
+          if (search) {
+            const q = search.toLowerCase();
+            list = list.filter((l) => (l.details || "").toLowerCase().includes(q) || (l.actorName || "").toLowerCase().includes(q) || (l.actorEmail || "").toLowerCase().includes(q));
+          }
+          return list;
+        }
+      } catch (e) {
+        console.error(`[Supabase getAuditLogs error] ${e.message}`);
+      }
+    }
+
+    const store = getLocalStore();
+    let logs = store.audit_logs || [];
+    if (action && action !== "ALL") {
+      logs = logs.filter((l) => l.action === action);
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      logs = logs.filter((l) => (l.details || "").toLowerCase().includes(q) || (l.actorName || "").toLowerCase().includes(q) || (l.actorEmail || "").toLowerCase().includes(q));
+    }
+    return logs.slice(0, limit);
   },
 };
 

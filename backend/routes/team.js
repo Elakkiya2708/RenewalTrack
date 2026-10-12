@@ -1,0 +1,106 @@
+/* ==========================================================================
+   backend/routes/team.js — Team Management API Endpoints (Admin Only)
+   Supports member listing, role changes, deactivation, and invitations.
+   ========================================================================== */
+
+const express = require("express");
+const db = require("../db");
+const { authenticateToken, requireRole } = require("./auth");
+
+const router = express.Router();
+
+// Enforce authentication & Admin role across all team management endpoints
+router.use(authenticateToken);
+router.use(requireRole("Admin"));
+
+// GET /api/team/members — List all team members with renewal counts & status
+router.get("/members", async (req, res) => {
+  try {
+    const members = await db.getUsers();
+    // Remove password hashes from response
+    const sanitized = members.map((m) => {
+      const { password, passwordHash, ...rest } = m;
+      return rest;
+    });
+    res.json({ ok: true, data: sanitized });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// PUT /api/team/members/:id/role — Change member role (Employee <-> Viewer)
+router.put("/members/:id/role", async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!role) {
+      return res.status(400).json({ ok: false, error: "New role is required." });
+    }
+
+    const updated = await db.updateUserRole(req.params.id, role, req.user);
+    const { password, passwordHash, ...safeUser } = updated;
+    res.json({ ok: true, data: safeUser, message: `Role updated to ${role} successfully.` });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+// PUT /api/team/members/:id/status — Toggle member status (active / deactivated)
+router.put("/members/:id/status", async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!status || !["active", "deactivated"].includes(status)) {
+      return res.status(400).json({ ok: false, error: "Valid status ('active' or 'deactivated') is required." });
+    }
+
+    const updated = await db.setUserStatus(req.params.id, status, req.user);
+    const { password, passwordHash, ...safeUser } = updated;
+    res.json({
+      ok: true,
+      data: safeUser,
+      message: `Account ${status === "deactivated" ? "deactivated" : "activated"} successfully.`,
+    });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/team/invites — Invite a new member by email
+router.post("/invites", async (req, res) => {
+  try {
+    const { email, fullName, role } = req.body;
+    if (!email) {
+      return res.status(400).json({ ok: false, error: "Recipient email is required." });
+    }
+
+    const invite = await db.createInvitation({ email, fullName, role }, req.user);
+    res.status(201).json({
+      ok: true,
+      data: invite,
+      message: `Invitation successfully dispatched to ${email}.`,
+    });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+// GET /api/team/invites — List pending/recent invitations
+router.get("/invites", async (req, res) => {
+  try {
+    const invites = await db.getInvitations();
+    res.json({ ok: true, data: invites });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// DELETE /api/team/invites/:id — Revoke a pending invitation
+router.delete("/invites/:id", async (req, res) => {
+  try {
+    const revoked = await db.revokeInvitation(req.params.id, req.user);
+    res.json({ ok: true, data: revoked, message: "Invitation revoked successfully." });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+module.exports = router;

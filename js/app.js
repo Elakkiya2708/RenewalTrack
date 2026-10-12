@@ -679,17 +679,62 @@
     syncRenewalToBackend('DELETE', '/api/renewals');
   }
 
+  const DEFAULT_ACCOUNTS = [
+    {
+      id: "usr-1",
+      fullName: "Anita Sharma",
+      email: "demo@renewaltrack.com",
+      mobile: "+1 555 0102",
+      password: "Demo@1234",
+      role: "Admin",
+      status: "active",
+    },
+    {
+      id: "usr-2",
+      fullName: "David Kim",
+      email: "david.kim@renewaltrack.com",
+      mobile: "+1 555 0103",
+      password: "Demo@1234",
+      role: "Employee",
+      status: "active",
+    },
+    {
+      id: "usr-3",
+      fullName: "Priya Nair",
+      email: "priya.nair@renewaltrack.com",
+      mobile: "+1 555 0104",
+      password: "Demo@1234",
+      role: "Viewer",
+      status: "active",
+    },
+  ];
+
   function seedAccount() {
-    if (!localStorage.getItem(STORAGE_KEYS.ACCOUNTS)) {
-      writeJSON(STORAGE_KEYS.ACCOUNTS, [
-        {
-          fullName: "Anita Sharma",
-          email: "demo@renewaltrack.com",
-          mobile: "+1 555 0102",
-          password: "Demo@1234",
-        },
-      ]);
+    let accounts = readJSON(STORAGE_KEYS.ACCOUNTS, null);
+    if (!accounts || !accounts.length) {
+      writeJSON(STORAGE_KEYS.ACCOUNTS, DEFAULT_ACCOUNTS);
+    } else {
+      // Ensure all 3 default role accounts exist in storage
+      let changed = false;
+      DEFAULT_ACCOUNTS.forEach((def) => {
+        const found = accounts.find((a) => a.email.toLowerCase() === def.email.toLowerCase());
+        if (!found) {
+          accounts.push(def);
+          changed = true;
+        } else {
+          if (!found.role || found.role === "Editor") {
+            found.role = def.role;
+            changed = true;
+          }
+          if (!found.status) {
+            found.status = "active";
+            changed = true;
+          }
+        }
+      });
+      if (changed) writeJSON(STORAGE_KEYS.ACCOUNTS, accounts);
     }
+
     if (!localStorage.getItem(STORAGE_KEYS.SETTINGS)) {
       writeJSON(STORAGE_KEYS.SETTINGS, {
         theme: "indigo",
@@ -702,41 +747,135 @@
   }
 
   /* ------------------------------------------------------------------ */
-  /* Auth                                                                 */
+  /* Auth & Role-Based Access Control                                   */
   /* ------------------------------------------------------------------ */
 
   function getAccounts() {
-    return readJSON(STORAGE_KEYS.ACCOUNTS, []);
+    const accs = readJSON(STORAGE_KEYS.ACCOUNTS, []);
+    if (!accs.length) return DEFAULT_ACCOUNTS;
+    return accs;
   }
 
-  function registerAccount({ fullName, email, mobile, password }) {
-    const accounts = getAccounts();
-    if (accounts.some((a) => a.email.toLowerCase() === email.toLowerCase())) {
-      return { ok: false, error: "An account with this email already exists." };
+  async function registerAccount({ fullName, email, mobile, password, inviteToken }) {
+    const cleanEmail = (email || "").trim().toLowerCase();
+
+    try {
+      const res = await fetch(apiUrl("/api/auth/register"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fullName, email: cleanEmail, mobile, password, inviteToken }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        return { ok: false, error: data.error || "Registration failed." };
+      }
+
+      const newAcc = {
+        id: (data.user && data.user.id) || uid("usr"),
+        fullName: (data.user && data.user.fullName) || fullName.trim(),
+        email: cleanEmail,
+        mobile: mobile || "",
+        password,
+        role: (data.user && data.user.role) || "Employee",
+        status: "active",
+      };
+      const accounts = getAccounts();
+      const existingIdx = accounts.findIndex((a) => a.email.toLowerCase() === cleanEmail);
+      if (existingIdx >= 0) {
+        accounts[existingIdx] = newAcc;
+      } else {
+        accounts.push(newAcc);
+      }
+      writeJSON(STORAGE_KEYS.ACCOUNTS, accounts);
+      return { ok: true, user: newAcc };
+    } catch (err) {
+      const accounts = getAccounts();
+      if (accounts.some((a) => a.email.toLowerCase() === cleanEmail)) {
+        return { ok: false, error: "An account with this email already exists." };
+      }
+
+      const newAcc = {
+        id: uid("usr"),
+        fullName: fullName.trim(),
+        email: cleanEmail,
+        mobile: mobile || "",
+        password,
+        role: "Employee",
+        status: "active",
+      };
+
+      accounts.push(newAcc);
+      writeJSON(STORAGE_KEYS.ACCOUNTS, accounts);
+      return { ok: true, user: newAcc };
     }
-    accounts.push({ fullName, email, mobile, password });
-    writeJSON(STORAGE_KEYS.ACCOUNTS, accounts);
-    return { ok: true };
   }
 
-  function login(email, password, remember) {
-    const accounts = getAccounts();
-    const account = accounts.find(
-      (a) => a.email.toLowerCase() === email.toLowerCase() && a.password === password
-    );
-    if (!account) return { ok: false, error: "Invalid email or password." };
-    writeJSON(STORAGE_KEYS.USER, {
-      fullName: account.fullName,
-      email: account.email,
-      mobile: account.mobile,
-    });
-    localStorage.setItem(STORAGE_KEYS.AUTH, uid("tok"));
-    if (remember) {
-      localStorage.setItem(STORAGE_KEYS.REMEMBER, email);
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.REMEMBER);
+  async function login(email, password, remember) {
+    const cleanEmail = (email || "").trim().toLowerCase();
+
+    try {
+      const res = await fetch(apiUrl("/api/auth/login"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: cleanEmail, password }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        return { ok: false, error: data.error || "Invalid email or password." };
+      }
+
+      const userData = data.user;
+      writeJSON(STORAGE_KEYS.USER, userData);
+      localStorage.setItem(STORAGE_KEYS.AUTH, data.token);
+      localStorage.setItem("rts_jwt_token", data.token);
+
+      const accounts = getAccounts();
+      const idx = accounts.findIndex((a) => a.email.toLowerCase() === cleanEmail);
+      if (idx >= 0) {
+        accounts[idx] = Object.assign({}, accounts[idx], userData, { password });
+      } else {
+        accounts.push(Object.assign({}, userData, { password }));
+      }
+      writeJSON(STORAGE_KEYS.ACCOUNTS, accounts);
+
+      if (remember) {
+        localStorage.setItem(STORAGE_KEYS.REMEMBER, cleanEmail);
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.REMEMBER);
+      }
+      return { ok: true, user: userData };
+    } catch (err) {
+      const accounts = getAccounts();
+      const account = accounts.find(
+        (a) => a.email.toLowerCase() === cleanEmail && a.password === password
+      );
+      if (!account) return { ok: false, error: "Invalid email or password." };
+
+      if (account.status === "deactivated") {
+        return { ok: false, error: "Your account has been deactivated. Please contact an administrator." };
+      }
+
+      const userData = {
+        id: account.id || "usr-user",
+        fullName: account.fullName,
+        email: account.email,
+        mobile: account.mobile || "",
+        role: account.role || "Admin",
+        status: account.status || "active",
+      };
+
+      writeJSON(STORAGE_KEYS.USER, userData);
+      const mockToken = uid("tok");
+      localStorage.setItem(STORAGE_KEYS.AUTH, mockToken);
+      localStorage.setItem("rts_jwt_token", mockToken);
+
+      if (remember) {
+        localStorage.setItem(STORAGE_KEYS.REMEMBER, cleanEmail);
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.REMEMBER);
+      }
+      return { ok: true, user: userData };
     }
-    return { ok: true };
   }
 
   function changePassword(currentPassword, newPassword) {
@@ -749,11 +888,21 @@
     }
     accounts[idx].password = newPassword;
     writeJSON(STORAGE_KEYS.ACCOUNTS, accounts);
+
+    try {
+      fetch(apiUrl("/api/auth/change-password"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email, currentPassword, newPassword }),
+      }).catch(() => {});
+    } catch (e) {}
+
     return { ok: true };
   }
 
   function logout() {
     localStorage.removeItem(STORAGE_KEYS.AUTH);
+    localStorage.removeItem("rts_jwt_token");
     global.location.href = "login.html";
   }
 
@@ -763,20 +912,69 @@
 
   function getCurrentUser() {
     return readJSON(STORAGE_KEYS.USER, {
-      fullName: "Guest User",
-      email: "guest@renewaltrack.com",
-      mobile: "",
+      fullName: "Anita Sharma",
+      email: "demo@renewaltrack.com",
+      mobile: "+1 555 0102",
+      role: "Admin",
+      status: "active",
     });
   }
 
   function setCurrentUser(data) {
     const current = getCurrentUser();
-    writeJSON(STORAGE_KEYS.USER, Object.assign({}, current, data));
+    const next = Object.assign({}, current, data);
+    writeJSON(STORAGE_KEYS.USER, next);
+
+    // Also update accounts list
+    const accs = getAccounts();
+    const idx = accs.findIndex((a) => a.email.toLowerCase() === (next.email || "").toLowerCase());
+    if (idx >= 0) {
+      accs[idx] = Object.assign({}, accs[idx], next);
+      writeJSON(STORAGE_KEYS.ACCOUNTS, accs);
+    }
+  }
+
+  function isAdmin() {
+    return (getCurrentUser().role || "Admin") === "Admin";
+  }
+
+  function isEmployee() {
+    return getCurrentUser().role === "Employee";
+  }
+
+  function isViewer() {
+    return getCurrentUser().role === "Viewer";
+  }
+
+  function canEditRenewal(r) {
+    if (!r) return false;
+    if (isAdmin()) return true;
+    if (isViewer()) return false;
+    const user = getCurrentUser();
+    const respEmail = (r.responsibleEmail || r.responsible_email || "").toLowerCase();
+    const respName = (r.responsiblePerson || r.responsible_person || "").toLowerCase();
+    const createdBy = (r.createdBy || "").toLowerCase();
+    return (
+      respEmail === user.email.toLowerCase() ||
+      respName === user.fullName.toLowerCase() ||
+      createdBy === user.email.toLowerCase()
+    );
   }
 
   function requireAuth() {
     if (!isLoggedIn()) {
       global.location.href = "login.html";
+    }
+  }
+
+  function requireAdmin() {
+    requireAuth();
+    const user = getCurrentUser();
+    if (user.role !== "Admin") {
+      showToast("Access Denied: Administrator role required.", "error");
+      setTimeout(() => {
+        global.location.href = "dashboard.html";
+      }, 400);
     }
   }
 
@@ -910,10 +1108,98 @@
     const page = currentPageName();
     document.querySelectorAll(".nav-link").forEach((link) => {
       const href = link.getAttribute("href");
-      if (href === page) {
+      if (href === page || (page === "" && href === "dashboard.html")) {
         link.classList.add("active");
+      } else {
+        link.classList.remove("active");
       }
     });
+  }
+
+  function applyViewerRestrictions() {
+    const hideSelectors = [
+      ".page-header-actions a[href*='add']",
+      ".page-header-actions button",
+      "#btnAddRenewal",
+      "#btnImportCsv",
+      "#bulkActionBar",
+      ".row-actions button[aria-label='Edit']",
+      ".row-actions button[aria-label='Delete']",
+      "#btnMarkRenewed",
+      "#btnDeleteRenewal",
+      "#btnEditRenewal",
+      "#btnUploadDocTrigger"
+    ];
+    document.querySelectorAll(hideSelectors.join(", ")).forEach((btn) => {
+      btn.style.display = "none";
+    });
+
+    const topbarActions = document.querySelector(".topbar-actions");
+    if (topbarActions && !document.getElementById("viewerModePill")) {
+      const pill = document.createElement("div");
+      pill.id = "viewerModePill";
+      pill.className = "viewer-mode-pill";
+      pill.innerHTML = `<i data-lucide="eye" class="icon" style="width:12px;height:12px;"></i> <span>Viewer (Read-Only)</span>`;
+      topbarActions.insertBefore(pill, topbarActions.firstChild);
+    }
+  }
+
+  function renderRoleSidebar() {
+    const nav = document.querySelector(".sidebar-nav");
+    if (!nav) return;
+
+    const user = getCurrentUser();
+    const role = user.role || "Admin";
+
+    // 1. Ensure TEAM MANAGEMENT section exists for Admin
+    let teamLabel = nav.querySelector(".sidebar-team-label");
+    if (!teamLabel) {
+      const accountLabel = Array.from(nav.querySelectorAll(".sidebar-section-label")).find(
+        (el) => el.textContent.trim().toLowerCase() === "account"
+      );
+
+      const teamHtml = `
+        <div class="sidebar-section-label sidebar-team-label" data-role="Admin">Team Management</div>
+        <a href="team.html" class="nav-link sidebar-team-link" data-role="Admin"><i data-lucide="users" class="icon"></i>Team Members</a>
+        <a href="team.html#invite" class="nav-link sidebar-team-link" data-role="Admin"><i data-lucide="user-plus" class="icon"></i>Invite Members</a>
+        <a href="audit.html" class="nav-link sidebar-team-link" data-role="Admin"><i data-lucide="clipboard-list" class="icon"></i>Audit Logs</a>
+      `;
+
+      if (accountLabel) {
+        accountLabel.insertAdjacentHTML("beforebegin", teamHtml);
+      } else {
+        nav.insertAdjacentHTML("beforeend", teamHtml);
+      }
+    }
+
+    // 2. Ensure "My Profile" exists under Account section
+    let profileLink = nav.querySelector("a[href='profile.html']");
+    if (!profileLink) {
+      const settingsLink = nav.querySelector("a[href='settings.html']");
+      const profileHtml = `<a href="profile.html" class="nav-link"><i data-lucide="user" class="icon"></i>My Profile</a>`;
+      if (settingsLink) {
+        settingsLink.insertAdjacentHTML("beforebegin", profileHtml);
+      } else {
+        nav.insertAdjacentHTML("beforeend", profileHtml);
+      }
+    }
+
+    // 3. Control visibility based on role
+    const teamItems = nav.querySelectorAll("[data-role='Admin'], .sidebar-team-label, .sidebar-team-link");
+    teamItems.forEach((el) => {
+      if (role === "Admin") {
+        el.style.display = "";
+      } else {
+        el.style.display = "none";
+      }
+    });
+
+    initSidebarActive();
+
+    // 4. Apply read-only protections if Viewer
+    if (role === "Viewer") {
+      applyViewerRestrictions();
+    }
   }
 
   function initMobileSidebar() {
@@ -961,9 +1247,34 @@
 
   function renderTopbarUser() {
     const user = getCurrentUser();
+    const role = user.role || "Admin";
     document.querySelectorAll("[data-user-name]").forEach((el) => (el.textContent = user.fullName));
     document.querySelectorAll("[data-user-email]").forEach((el) => (el.textContent = user.email));
     document.querySelectorAll("[data-user-initials]").forEach((el) => (el.textContent = initials(user.fullName)));
+
+    // Role pill badge
+    document.querySelectorAll(".user-menu-trigger .uname").forEach((el) => {
+      let badge = el.parentElement.querySelector(".role-pill-badge");
+      if (!badge) {
+        badge = document.createElement("span");
+        el.insertAdjacentElement("afterend", badge);
+      }
+      badge.textContent = role;
+      badge.className = `role-pill-badge role-${role.toLowerCase()}`;
+    });
+
+    // Ensure Profile link in dropdown panel
+    const userPanel = document.getElementById("userPanel");
+    if (userPanel && !userPanel.querySelector("a[href='profile.html']")) {
+      const firstItem = userPanel.querySelector(".dropdown-item");
+      const profileLink = document.createElement("a");
+      profileLink.href = "profile.html";
+      profileLink.className = "dropdown-item";
+      profileLink.innerHTML = `<i data-lucide="user" class="icon"></i>My Profile`;
+      if (firstItem) {
+        userPanel.insertBefore(profileLink, firstItem);
+      }
+    }
   }
 
   function buildNotifications() {
@@ -1631,7 +1942,7 @@
   function initLayout() {
     ensureSeed();
     applyTheme(getSettings().theme);
-    initSidebarActive();
+    renderRoleSidebar();
     initMobileSidebar();
     initDropdowns();
     initModalDismiss();
@@ -1703,10 +2014,107 @@
       getCurrentUser,
       setCurrentUser,
       requireAuth,
+      requireAdmin,
+      isAdmin,
+      isEmployee,
+      isViewer,
+      canEditRenewal,
       redirectIfAuthed,
       registerAccount,
       getAccounts,
       changePassword,
+    },
+    team: {
+      async getMembers() {
+        const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH);
+        const res = await fetch(apiUrl("/api/team/members"), {
+          headers: {
+            Authorization: "Bearer " + token,
+            "x-user-role": getCurrentUser().role,
+            "x-user-email": getCurrentUser().email,
+          },
+        });
+        return res.json();
+      },
+      async updateRole(userId, role) {
+        const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH);
+        const res = await fetch(apiUrl("/api/team/members/" + encodeURIComponent(userId) + "/role"), {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+            "x-user-role": getCurrentUser().role,
+            "x-user-email": getCurrentUser().email,
+          },
+          body: JSON.stringify({ role }),
+        });
+        return res.json();
+      },
+      async updateStatus(userId, status) {
+        const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH);
+        const res = await fetch(apiUrl("/api/team/members/" + encodeURIComponent(userId) + "/status"), {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+            "x-user-role": getCurrentUser().role,
+            "x-user-email": getCurrentUser().email,
+          },
+          body: JSON.stringify({ status }),
+        });
+        return res.json();
+      },
+      async sendInvite({ email, fullName, role }) {
+        const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH);
+        const res = await fetch(apiUrl("/api/team/invites"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+            "x-user-role": getCurrentUser().role,
+            "x-user-email": getCurrentUser().email,
+          },
+          body: JSON.stringify({ email, fullName, role }),
+        });
+        return res.json();
+      },
+      async getInvites() {
+        const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH);
+        const res = await fetch(apiUrl("/api/team/invites"), {
+          headers: {
+            Authorization: "Bearer " + token,
+            "x-user-role": getCurrentUser().role,
+            "x-user-email": getCurrentUser().email,
+          },
+        });
+        return res.json();
+      },
+      async revokeInvite(id) {
+        const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH);
+        const res = await fetch(apiUrl("/api/team/invites/" + encodeURIComponent(id)), {
+          method: "DELETE",
+          headers: {
+            Authorization: "Bearer " + token,
+            "x-user-role": getCurrentUser().role,
+            "x-user-email": getCurrentUser().email,
+          },
+        });
+        return res.json();
+      },
+    },
+    audit: {
+      async getLogs(params = {}) {
+        const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH);
+        const qs = new URLSearchParams(params).toString();
+        const res = await fetch(apiUrl("/api/audit/logs" + (qs ? "?" + qs : "")), {
+          headers: {
+            Authorization: "Bearer " + token,
+            "x-user-role": getCurrentUser().role,
+            "x-user-email": getCurrentUser().email,
+          },
+        });
+        return res.json();
+      },
     },
     settings: {
       getSettings,
@@ -1744,6 +2152,7 @@
     modal: { open: openModal, close: closeModal },
     initLayout,
     ensureSeed,
+    renderRoleSidebar,
     exportCSV,
     exportICS,
     parseCSVText,

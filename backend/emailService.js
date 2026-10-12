@@ -15,6 +15,16 @@ function isValidEmail(email) {
   return EMAIL_REGEX.test(email.trim());
 }
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 // Format priority badge in HTML
 function getPriorityColor(priority) {
   switch ((priority || "").toLowerCase()) {
@@ -404,6 +414,110 @@ const emailService = {
       daysRemaining: 15,
       interval: "15_days",
     });
+  },
+
+  // Send an invitation email to a new team member
+  async sendInvitationEmail({ to, fullName, role, inviteUrl, invitedBy }) {
+    if (!isValidEmail(to)) {
+      return { success: false, error: `Invalid recipient email address: "${to}"` };
+    }
+
+    const recipientName = fullName || to.split("@")[0];
+    const subject = `You're invited to join RenewGuard as ${role}`;
+    const inviterText = invitedBy ? `${invitedBy} has invited you` : "You have been invited";
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invitation to Join RenewGuard</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;line-height:1.5;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width:600px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07);border:1px solid #e2e8f0;">
+          <tr>
+            <td style="background-color:#0f172a;padding:24px 32px;border-bottom:3px solid #6366f1;">
+              <div style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
+                <span style="color:#818cf8;">Renew</span>Guard
+              </div>
+              <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
+                Renewal &amp; Compliance Management
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 32px 24px;">
+              <h2 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#0f172a;">
+                Welcome to the Team, ${escapeHtml(recipientName)}!
+              </h2>
+              <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">
+                ${escapeHtml(inviterText)} to join our organization workspace on RenewGuard with the role of <strong>${escapeHtml(role)}</strong>.
+              </p>
+              <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:18px;margin-bottom:24px;">
+                <table role="presentation" width="100%">
+                  <tr>
+                    <td style="padding:4px 0;font-size:13px;color:#64748b;">Assigned Role:</td>
+                    <td style="padding:4px 0;font-size:13px;font-weight:600;color:#4f46e5;">${escapeHtml(role)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:4px 0;font-size:13px;color:#64748b;">Email Address:</td>
+                    <td style="padding:4px 0;font-size:13px;font-weight:600;color:#0f172a;">${escapeHtml(to)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:4px 0;font-size:13px;color:#64748b;">Link Validity:</td>
+                    <td style="padding:4px 0;font-size:13px;font-weight:600;color:#0f172a;">48 Hours</td>
+                  </tr>
+                </table>
+              </div>
+              <div style="text-align:center;margin:28px 0;">
+                <a href="${inviteUrl}" style="background-color:#4f46e5;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 28px;border-radius:6px;display:inline-block;box-shadow:0 2px 4px rgba(79,70,229,0.3);">
+                  Accept Invitation &rarr;
+                </a>
+              </div>
+              <p style="margin:24px 0 0;font-size:12px;color:#94a3b8;line-height:1.5;">
+                If the button above does not work, copy and paste this URL into your browser:<br>
+                <a href="${inviteUrl}" style="color:#6366f1;word-break:break-all;">${inviteUrl}</a>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center;">
+              &copy; 2026 RenewGuard Inc. &bull; Secure Invitation Token
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    const text = `Welcome to RenewGuard!\n\n${inviterText} to join as ${role}.\n\nPlease accept your invitation here:\n${inviteUrl}\n\nThis invitation link expires in 48 hours.`;
+
+    if (!config.EMAIL_SEND_ENABLED) {
+      console.log(`[Email Simulation] Invitation to ${to} (${role}): ${inviteUrl}`);
+      return {
+        success: true,
+        simulated: true,
+        provider: "simulated",
+        inviteUrl,
+      };
+    }
+
+    try {
+      const from = config.EMAIL_FROM;
+      if (config.EMAIL_PROVIDER.toLowerCase() === "resend") {
+        return await this._sendViaResend({ from, to, subject, html, text, renewal: { name: "Team Invitation" } });
+      } else {
+        return await this._sendViaNodemailer({ from, to, subject, html, text, renewal: { name: "Team Invitation" } });
+      }
+    } catch (err) {
+      console.error(`[Invitation Email Error] ${err.message}`);
+      return { success: false, error: err.message, inviteUrl };
+    }
   },
 };
 

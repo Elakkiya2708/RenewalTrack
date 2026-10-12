@@ -95,14 +95,28 @@
           <span class="error-msg">Password is required.</span>
         </div>
 
-        <div class="form-row-between" style="margin-bottom:14px;">
+        <div class="form-row-between" style="margin-bottom:12px;">
           <label class="checkbox-row">
             <input type="checkbox" id="rememberMe" />
             <span>Remember me</span>
           </label>
-          <button type="button" id="fillDemoBtn" class="demo-chip-btn" title="Auto-fill demo credentials">
-            <i data-lucide="sparkles" class="icon" style="width:12px;height:12px;"></i> Quick Demo Fill
-          </button>
+        </div>
+
+        <div style="margin: 0 0 16px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;margin-bottom:6px;">
+            1-Click Demo Credentials:
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:6px;">
+            <button type="button" class="demo-chip-btn demo-role-chip" data-email="demo@renewaltrack.com" data-pass="Demo@1234" title="Sign in as Administrator" style="justify-content:center;padding:6px 4px;">
+              <span class="role-pill-badge role-admin" style="font-size:10px;padding:2px 6px;">Admin</span>
+            </button>
+            <button type="button" class="demo-chip-btn demo-role-chip" data-email="david.kim@renewaltrack.com" data-pass="Demo@1234" title="Sign in as Employee" style="justify-content:center;padding:6px 4px;">
+              <span class="role-pill-badge role-employee" style="font-size:10px;padding:2px 6px;">Employee</span>
+            </button>
+            <button type="button" class="demo-chip-btn demo-role-chip" data-email="priya.nair@renewaltrack.com" data-pass="Demo@1234" title="Sign in as Viewer" style="justify-content:center;padding:6px 4px;">
+              <span class="role-pill-badge role-viewer" style="font-size:10px;padding:2px 6px;">Viewer</span>
+            </button>
+          </div>
         </div>
 
         <button type="submit" class="btn btn-primary btn-block">Sign In</button>

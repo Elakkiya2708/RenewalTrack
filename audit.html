@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" type="image/png" href="assets/favicon.png" data-img-indigo="assets/favicon.png" data-img-gold="assets/favicon-gold.png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Audit Logs — Renewal Tracking System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/responsive.css" />
+<script src="js/app.js"></script>
+<script>RTS.auth.requireAdmin();</script>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img class="brand-mark" src="assets/logo.png" data-img-indigo="assets/logo.png" data-img-gold="assets/logo-gold.png" alt="RenewalTrack logo" />
+      <span>RenewalTrack</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Main</div>
+      <a href="dashboard.html" class="nav-link"><i data-lucide="layout-dashboard" class="icon"></i>Dashboard</a>
+      <a href="records.html" class="nav-link"><i data-lucide="file-text" class="icon"></i>Renewal Records</a>
+      <a href="calendar.html" class="nav-link"><i data-lucide="calendar" class="icon"></i>Calendar</a>
+      <a href="reminders.html" class="nav-link"><i data-lucide="bell" class="icon"></i>Reminders</a>
+      <a href="history.html" class="nav-link"><i data-lucide="history" class="icon"></i>Renewal History</a>
+      <a href="documents.html" class="nav-link"><i data-lucide="folder" class="icon"></i>Documents</a>
+      <a href="reports.html" class="nav-link"><i data-lucide="bar-chart-2" class="icon"></i>Reports</a>
+
+      <div class="sidebar-section-label" data-role="Admin">Team Management</div>
+      <a href="team.html" class="nav-link" data-role="Admin"><i data-lucide="users" class="icon"></i>Team Members</a>
+      <a href="team.html#invite" class="nav-link" data-role="Admin"><i data-lucide="user-plus" class="icon"></i>Invite Members</a>
+      <a href="audit.html" class="nav-link active" data-role="Admin"><i data-lucide="clipboard-list" class="icon"></i>Audit Logs</a>
+
+      <div class="sidebar-section-label">Account</div>
+      <a href="profile.html" class="nav-link"><i data-lucide="user" class="icon"></i>My Profile</a>
+      <a href="settings.html" class="nav-link"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </nav>
+    <div class="sidebar-footer">© 2026 RenewalTrack Inc.</div>
+  </aside>
+  <div class="sidebar-overlay"></div>
+
+  <div class="main-area">
+    <header class="topbar">
+      <button class="sidebar-toggle" aria-label="Toggle menu"><i data-lucide="menu" class="icon"></i></button>
+      <div class="topbar-actions">
+        <div class="dropdown-wrap">
+          <button class="icon-btn" data-dropdown-trigger="notifPanel" aria-label="Notifications">
+            <i data-lucide="bell" class="icon"></i>
+            <span class="dot" id="notifDot" style="display:none;"></span>
+          </button>
+          <div class="dropdown-panel" id="notifPanel">
+            <div class="dropdown-header"><strong>Notifications</strong> <span id="notifCount">0</span> urgent renewal(s)</div>
+            <div class="notif-list" id="notifList"></div>
+          </div>
+        </div>
+        <div class="dropdown-wrap">
+          <div class="user-menu-trigger" data-dropdown-trigger="userPanel">
+            <div class="avatar" data-user-initials>—</div>
+            <span class="uname" data-user-name>User</span>
+            <i data-lucide="chevron-down" class="icon" style="width:14px;height:14px;"></i>
+          </div>
+          <div class="dropdown-panel" id="userPanel">
+            <div class="dropdown-header"><strong data-user-name>User</strong><span data-user-email>—</span></div>
+            <a href="profile.html" class="dropdown-item"><i data-lucide="user" class="icon"></i>My Profile</a>
+            <a href="settings.html" class="dropdown-item"><i data-lucide="settings" class="icon"></i>App Settings</a>
+            <div class="dropdown-item" data-logout><i data-lucide="log-out" class="icon"></i>Logout</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="page-header">
+        <div>
+          <h1>Audit Logs</h1>
+          <p>Complete historical trail of renewal operations, assignments, role changes, and member invites.</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary" id="exportAuditBtn">
+            <i data-lucide="download" class="icon"></i>Export CSV
+          </button>
+          <button class="btn btn-primary" id="refreshAuditBtn">
+            <i data-lucide="refresh-cw" class="icon"></i>Refresh Logs
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Summary Pills -->
+      <div class="dashboard-grid" style="grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px;margin-bottom:20px;">
+        <div class="stat-card" style="padding:14px 18px;--stat-color:var(--accent);--stat-bg:var(--accent-dim);">
+          <div class="stat-value" id="statLogCount" style="font-size:22px;">0</div>
+          <div class="stat-label">Total Logged Activities</div>
+        </div>
+        <div class="stat-card" style="padding:14px 18px;--stat-color:var(--success);--stat-bg:var(--success-dim);">
+          <div class="stat-value" id="statRenewalEvents" style="font-size:22px;">0</div>
+          <div class="stat-label">Renewal Changes</div>
+        </div>
+        <div class="stat-card" style="padding:14px 18px;--stat-color:#8b5cf6;--stat-bg:rgba(139,92,246,0.12);">
+          <div class="stat-value" id="statRoleEvents" style="font-size:22px;">0</div>
+          <div class="stat-label">Role &amp; Team Changes</div>
+        </div>
+        <div class="stat-card" style="padding:14px 18px;--stat-color:var(--blue);--stat-bg:var(--blue-dim);">
+          <div class="stat-value" id="statInviteEvents" style="font-size:22px;">0</div>
+          <div class="stat-label">Invitations &amp; Logins</div>
+        </div>
+      </div>
+
+      <!-- Audit Log Table Card -->
+      <div class="card">
+        <div class="card-header" style="flex-wrap:wrap;gap:12px;">
+          <div>
+            <h3>Activity Trail</h3>
+            <p style="margin:2px 0 0;font-size:12px;color:var(--text-muted);">
+              Immutable log records stamped with actor details, action category, and full operation specifics.
+            </p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <div class="search-input-wrap" style="width:230px;">
+              <input type="text" id="auditSearch" class="input" placeholder="Search actor, details…" style="height:34px;font-size:13px;padding-left:30px;" />
+              <i data-lucide="search" class="icon" style="position:absolute;left:9px;top:9px;width:14px;height:14px;color:var(--text-muted);pointer-events:none;"></i>
+            </div>
+            <select id="actionFilter" class="input" style="height:34px;font-size:13px;width:180px;padding:4px 8px;">
+              <option value="">All Actions</option>
+              <option value="RENEWAL_">Renewal Operations</option>
+              <option value="ROLE_">Role Changes</option>
+              <option value="USER_">User &amp; Status</option>
+              <option value="INVITATION_">Member Invitations</option>
+              <option value="LOGIN">Logins &amp; Auth</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table" id="auditTable">
+            <thead>
+              <tr>
+                <th style="width:160px;">Timestamp</th>
+                <th style="width:240px;">Actor</th>
+                <th style="width:170px;">Action</th>
+                <th>Details</th>
+                <th style="width:110px;">Target Type</th>
+              </tr>
+            </thead>
+            <tbody id="auditTableBody">
+              <tr>
+                <td colspan="5" style="text-align:center;padding:36px;color:var(--text-muted);">
+                  <div class="loading-spinner" style="margin:0 auto 8px;"></div>
+                  Loading audit logs…
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+(function() {
+  let allLogs = [];
+
+  async function loadLogs() {
+    try {
+      const res = await RTS.audit.getLogs({ limit: 150 });
+      if (res.ok && Array.isArray(res.logs)) {
+        allLogs = res.logs;
+      } else {
+        allLogs = [];
+      }
+      renderLogs();
+      updateStats();
+    } catch (err) {
+      console.warn("Failed to load audit logs:", err);
+      allLogs = [];
+      renderLogs();
+      updateStats();
+    }
+  }
+
+  function updateStats() {
+    document.getElementById("statLogCount").textContent = allLogs.length;
+    document.getElementById("statRenewalEvents").textContent = allLogs.filter(l => (l.action || "").includes("RENEWAL")).length;
+    document.getElementById("statRoleEvents").textContent = allLogs.filter(l => (l.action || "").includes("ROLE") || (l.action || "").includes("DEACTIVATED")).length;
+    document.getElementById("statInviteEvents").textContent = allLogs.filter(l => (l.action || "").includes("INVIT") || (l.action || "").includes("LOGIN")).length;
+  }
+
+  function renderLogs() {
+    const tbody = document.getElementById("auditTableBody");
+    const search = document.getElementById("auditSearch").value.trim().toLowerCase();
+    const actionFilter = document.getElementById("actionFilter").value;
+
+    const filtered = allLogs.filter(l => {
+      if (actionFilter && !(l.action || "").includes(actionFilter)) return false;
+      if (search) {
+        const text = `${l.actor_name} ${l.actor_email} ${l.action} ${l.details}`.toLowerCase();
+        if (!text.includes(search)) return false;
+      }
+      return true;
+    });
+
+    if (!filtered.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" style="text-align:center;padding:36px;color:var(--text-muted);">
+            No audit log entries found matching criteria.
+          </td>
+        </tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(l => {
+      const created = new Date(l.created_at || l.createdAt);
+      const timeStr = created.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) +
+        " " + created.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+      const actorInitials = ((l.actor_name || "System")[0] || "S").toUpperCase();
+      const actorRole = l.actor_role || "User";
+      const actionPill = getActionPill(l.action);
+
+      return `
+        <tr>
+          <td style="font-size:12px;color:var(--text-muted);white-space:nowrap;">
+            ${timeStr}
+          </td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="avatar" style="width:28px;height:28px;font-size:11px;">${actorInitials}</div>
+              <div>
+                <strong style="display:block;font-size:13px;color:var(--text);">${escapeHtml(l.actor_name || 'System')}</strong>
+                <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(l.actor_email || 'system')} &middot; <span class="role-pill-badge role-${actorRole.toLowerCase()}" style="font-size:10px;padding:1px 6px;">${actorRole}</span></span>
+              </div>
+            </div>
+          </td>
+          <td>${actionPill}</td>
+          <td style="font-size:12px;color:var(--text-mid);line-height:1.4;">
+            ${escapeHtml(l.details || '')}
+          </td>
+          <td>
+            <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--bg-surface-2);color:var(--text-muted);text-transform:uppercase;font-weight:600;">
+              ${escapeHtml(l.target_type || 'system')}
+            </span>
+          </td>
+        </tr>`;
+    }).join("");
+
+    RTS.refreshIcons();
+  }
+
+  function getActionPill(action) {
+    if (!action) return `<span class="status-pill">EVENT</span>`;
+    const act = action.toUpperCase();
+    if (act.includes("CREATE") || act.includes("ACCEPTED")) {
+      return `<span class="status-pill status-active">${action}</span>`;
+    }
+    if (act.includes("DELETE") || act.includes("DEACTIVATE") || act.includes("REVOKE") || act.includes("REJECTED")) {
+      return `<span class="status-pill status-deactivated">${action}</span>`;
+    }
+    if (act.includes("ROLE") || act.includes("UPDATE") || act.includes("INVITE")) {
+      return `<span class="status-pill status-pending">${action}</span>`;
+    }
+    return `<span class="status-pill">${action}</span>`;
+  }
+
+  function exportAuditCSV() {
+    if (!allLogs.length) {
+      RTS.toast("No audit logs to export.", "info");
+      return;
+    }
+    const headers = ["ID", "Timestamp", "Actor Name", "Actor Email", "Actor Role", "Action", "Target Type", "Target ID", "Details"];
+    const rows = allLogs.map(l => [
+      l.id,
+      new Date(l.created_at || l.createdAt).toISOString(),
+      l.actor_name || "",
+      l.actor_email || "",
+      l.actor_role || "",
+      l.action || "",
+      l.target_type || "",
+      l.target_id || "",
+      (l.details || "").replace(/"/g, '""')
+    ]);
+
+    const csvContent = [headers.join(","), ...rows.map(r => r.map(c => `"${c}"`).join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `renewguard_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    RTS.toast("Audit logs exported to CSV.", "success");
+  }
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return String(str).replace(/[&<>"']/g, m => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[m]));
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    RTS.initLayout();
+    loadLogs();
+
+    document.getElementById("auditSearch").addEventListener("input", renderLogs);
+    document.getElementById("actionFilter").addEventListener("change", renderLogs);
+    document.getElementById("refreshAuditBtn").addEventListener("click", () => {
+      loadLogs();
+      RTS.toast("Audit logs refreshed.", "info");
+    });
+    document.getElementById("exportAuditBtn").addEventListener("click", exportAuditCSV);
+  });
+})();
+</script>
+</body>
+</html>
