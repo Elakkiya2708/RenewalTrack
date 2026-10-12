@@ -1397,13 +1397,13 @@
     // 2. Remove "My Profile" and "Logout" from sidebar across all roles and dashboards
     nav.querySelectorAll("a[href*='profile.html'], [data-logout], a[href*='logout']").forEach((el) => el.remove());
 
-    // 3. Ensure Employee "Assigned to Me" link exists
+    // 3. Ensure "Assigned to Me" link exists (for Employee and Admin)
     let empLink = nav.querySelector("a[href='assigned.html'], a[href='records.html?assigned=me']");
     if (!empLink) {
       const reportsLink = nav.querySelector("a[href='reports.html']");
       const empHtml = `
-        <div class="sidebar-section-label" data-role="Employee">My Work</div>
-        <a href="assigned.html" class="nav-link" data-role="Employee"><i data-lucide="user-check" class="icon"></i>Assigned to Me</a>
+        <div class="sidebar-section-label" data-role="Employee,Admin">My Work</div>
+        <a href="assigned.html" class="nav-link" data-role="Employee,Admin"><i data-lucide="user-check" class="icon"></i>Assigned to Me</a>
       `;
       if (reportsLink) {
         reportsLink.insertAdjacentHTML("afterend", empHtml);
@@ -1419,6 +1419,11 @@
       }
     } else {
       empLink.setAttribute("href", "assigned.html");
+      empLink.setAttribute("data-role", "Employee,Admin");
+      const prev = empLink.previousElementSibling;
+      if (prev && (prev.classList.contains("sidebar-section-label") || prev.classList.contains("nav-section-title"))) {
+        prev.setAttribute("data-role", "Employee,Admin");
+      }
     }
 
     // 4. Ensure Team Management links exist for Admin
@@ -1467,18 +1472,18 @@
 
     // 7. Enforce role-based sidebar visibility
     const adminItems = nav.querySelectorAll("[data-role='Admin']");
-    const empItems = nav.querySelectorAll("[data-role='Employee']");
+    const assignedItems = nav.querySelectorAll("[data-role='Employee'], [data-role='Employee,Admin']");
 
     if (role === "Admin") {
       adminItems.forEach((el) => (el.style.display = ""));
-      empItems.forEach((el) => (el.style.display = "none"));
+      assignedItems.forEach((el) => (el.style.display = ""));
     } else if (role === "Employee") {
       adminItems.forEach((el) => (el.style.display = "none"));
-      empItems.forEach((el) => (el.style.display = ""));
+      assignedItems.forEach((el) => (el.style.display = ""));
     } else {
-      // Viewer (read-only): hide both Admin team management and Employee assigned items
+      // Viewer (read-only): hide both Admin team management and Assigned items
       adminItems.forEach((el) => (el.style.display = "none"));
-      empItems.forEach((el) => (el.style.display = "none"));
+      assignedItems.forEach((el) => (el.style.display = "none"));
     }
 
     // 8. Active navigation link state

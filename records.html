@@ -30,8 +30,8 @@
       <a href="documents.html" class="nav-link"><i data-lucide="folder" class="icon"></i>Documents</a>
       <a href="reports.html" class="nav-link"><i data-lucide="bar-chart-2" class="icon"></i>Reports</a>
 
-      <div class="sidebar-section-label" data-role="Employee">My Work</div>
-      <a href="assigned.html" class="nav-link" data-role="Employee"><i data-lucide="user-check" class="icon"></i>Assigned to Me</a>
+      <div class="sidebar-section-label" data-role="Employee,Admin">My Work</div>
+      <a href="assigned.html" class="nav-link" data-role="Employee,Admin"><i data-lucide="user-check" class="icon"></i>Assigned to Me</a>
 
       <div class="sidebar-section-label" data-role="Admin">Team Management</div>
       <a href="team.html" class="nav-link" data-role="Admin"><i data-lucide="users" class="icon"></i>Team Members</a>
@@ -214,18 +214,18 @@
         <div class="field-row">
           <div class="field" id="f_assignedTo">
             <div style="display:flex;justify-content:space-between;align-items:center;">
-              <label for="in_assignedTo">Assigned To (Employee) <span style="font-size:11px;font-weight:normal;color:var(--text-low);">(Optional)</span></label>
+              <label for="in_assignedTo">Assigned To <span style="font-size:11px;font-weight:normal;color:var(--text-low);">(Employee / Admin)</span></label>
               <span id="assignedToBadge" style="font-size:11px;color:var(--accent-text);"></span>
             </div>
             <select class="input" id="in_assignedTo">
               <option value="">— Unassigned —</option>
             </select>
-            <span class="cell-sub" id="assignedToHelp" style="font-size:11px;margin-top:2px;">Employee responsible for managing this renewal</span>
-            <span class="error-msg">Please select an assigned employee or leave Unassigned.</span>
+            <span class="cell-sub" id="assignedToHelp" style="font-size:11px;margin-top:2px;">User (Employee or Admin) responsible for managing this renewal</span>
+            <span class="error-msg">Please select an assigned employee/admin or leave Unassigned.</span>
           </div>
           <div class="field" id="f_responsibleEmail">
             <label for="in_responsibleEmail">Alert / Notification Email</label>
-            <input class="input" type="email" id="in_responsibleEmail" placeholder="Auto-filled from assigned employee" />
+            <input class="input" type="email" id="in_responsibleEmail" placeholder="Auto-filled from assigned employee/admin" />
             <span class="cell-sub" style="font-size:11px;margin-top:2px;">Receives assignment alerts &amp; reminders</span>
           </div>
         </div>

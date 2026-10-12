@@ -422,7 +422,7 @@
         sel.value = "";
       }
       if (help) {
-        help.textContent = "Select an active employee, or leave as Unassigned.";
+        help.textContent = "Select an active employee or administrator, or leave as Unassigned.";
       }
       if (respInput) respInput.value = "";
       if (emailInput) emailInput.value = "";
