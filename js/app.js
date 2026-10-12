@@ -1198,16 +1198,10 @@
       }
     }
 
-    // 2. Ensure "My Profile" exists under Account section
-    let profileLink = nav.querySelector("a[href='profile.html']");
-    if (!profileLink) {
-      const settingsLink = nav.querySelector("a[href='settings.html']");
-      const profileHtml = `<a href="profile.html" class="nav-link"><i data-lucide="user" class="icon"></i>My Profile</a>`;
-      if (settingsLink) {
-        settingsLink.insertAdjacentHTML("beforebegin", profileHtml);
-      } else {
-        nav.insertAdjacentHTML("beforeend", profileHtml);
-      }
+    // 2. Remove "My Profile" from sidebar across all dashboards (profile is managed in Settings)
+    const profileLink = nav.querySelector("a[href='profile.html']");
+    if (profileLink) {
+      profileLink.remove();
     }
 
     // 3. Control visibility based on role
@@ -1323,16 +1317,22 @@
       badge.className = `role-pill-badge role-${role.toLowerCase()}`;
     });
 
-    // Ensure Profile link in dropdown panel
+    // Ensure Settings link in dropdown panel and remove redundant profile link
     const userPanel = document.getElementById("userPanel");
-    if (userPanel && !userPanel.querySelector("a[href='profile.html']")) {
-      const firstItem = userPanel.querySelector(".dropdown-item");
-      const profileLink = document.createElement("a");
-      profileLink.href = "profile.html";
-      profileLink.className = "dropdown-item";
-      profileLink.innerHTML = `<i data-lucide="user" class="icon"></i>My Profile`;
-      if (firstItem) {
-        userPanel.insertBefore(profileLink, firstItem);
+    if (userPanel) {
+      const oldProf = userPanel.querySelector("a[href='profile.html']");
+      if (oldProf) oldProf.remove();
+      if (!userPanel.querySelector("a[href='settings.html']")) {
+        const firstItem = userPanel.querySelector(".dropdown-item");
+        const settingsLink = document.createElement("a");
+        settingsLink.href = "settings.html";
+        settingsLink.className = "dropdown-item";
+        settingsLink.innerHTML = `<i data-lucide="settings" class="icon"></i>Settings`;
+        if (firstItem) {
+          userPanel.insertBefore(settingsLink, firstItem);
+        } else {
+          userPanel.appendChild(settingsLink);
+        }
       }
     }
   }
