@@ -73,10 +73,20 @@
       : '<p class="text-mid" style="font-size:13px;">No documents attached to this record yet.</p>';
 
     const events = [];
-    (record.history || [])
+    let hist = record.history;
+    if (typeof hist === "string") {
+      try {
+        hist = JSON.parse(hist);
+      } catch (e) {
+        hist = [];
+      }
+    }
+    if (!Array.isArray(hist)) hist = [];
+    hist
       .slice()
-      .sort((a, b) => (a.renewalDate < b.renewalDate ? 1 : -1))
+      .sort((a, b) => new Date(b.renewalDate || 0) - new Date(a.renewalDate || 0))
       .forEach((h) => {
+        if (!h) return;
         events.push({
           date: h.renewalDate,
           title: "Renewed — new expiry " + RTS.formatDate(h.newExpiry),
@@ -86,7 +96,7 @@
     events.push({
       date: (record.createdAt || "").slice(0, 10),
       title: "Record added to tracking",
-      detail: `Issued ${RTS.formatDate(record.issueDate)}, initial expiry ${RTS.formatDate(record.history && record.history.length ? record.history[record.history.length - 1].previousExpiry : record.expiryDate)}`,
+      detail: `Issued ${RTS.formatDate(record.issueDate)}, initial expiry ${RTS.formatDate(hist && hist.length ? hist[hist.length - 1].previousExpiry : record.expiryDate)}`,
     });
     document.getElementById("timelineList").innerHTML = events
       .map(
@@ -177,7 +187,7 @@
           document.getElementById("renew_newExpiry").value = autoNewExpiry;
           document.getElementById("renew_currency").value = curRecord.currency || "USD";
           document.getElementById("renew_cost").value = curRecord.cost != null ? curRecord.cost : "";
-          document.getElementById("renew_renewedBy").value = RTS.auth.getCurrentUser().fullName;
+          document.getElementById("renew_renewedBy").value = (RTS.auth && RTS.auth.getCurrentUser() && RTS.auth.getCurrentUser().fullName) || "System User";
 
           const notice = document.getElementById("renewCycleNotice");
           if (notice) notice.textContent = `Auto-calculated (${RTS.cycleLabel(cycle)})`;
@@ -226,10 +236,22 @@
         const renewedBy = document.getElementById("renew_renewedBy").value.trim();
         const nextCycle = cycleSelect ? cycleSelect.value : curRecord.recurringCycle || "Yearly";
         let valid = true;
-        if (!newExpiry || newExpiry <= curRecord.expiryDate) {
+
+        document.querySelectorAll("#renewForm .field").forEach((f) => f.classList.remove("has-error"));
+
+        if (!newExpiry) {
           document.getElementById("rf_newExpiry").classList.add("has-error");
           valid = false;
+        } else if (curRecord && curRecord.expiryDate) {
+          const oldTime = new Date(curRecord.expiryDate).getTime();
+          const newTime = new Date(newExpiry).getTime();
+          if (!isNaN(oldTime) && !isNaN(newTime) && newTime <= oldTime) {
+            document.getElementById("rf_newExpiry").classList.add("has-error");
+            RTS.toast("New expiry date must be after current expiry date (" + RTS.formatDate(curRecord.expiryDate) + ").", "warning");
+            valid = false;
+          }
         }
+
         if (!renewedBy) {
           document.getElementById("rf_renewedBy").classList.add("has-error");
           valid = false;
@@ -244,7 +266,7 @@
           renewedBy,
           notes: document.getElementById("renew_notes").value.trim(),
         });
-        RTS.toast("Record successfully marked as renewed!", "success");
+        RTS.toast("Record successfully marked as renewed! History updated.", "success");
         RTS.modal.close("renewModal");
         render();
       });

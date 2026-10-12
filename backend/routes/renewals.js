@@ -44,6 +44,35 @@ router.get("/", async (req, res) => {
   }
 });
 
+// GET /api/renewals/history — Get aggregated renewal history
+router.get("/history", async (req, res) => {
+  try {
+    const list = await db.getRenewals();
+    const rows = [];
+    list.forEach((r) => {
+      let hist = r.history;
+      if (typeof hist === "string") {
+        try { hist = JSON.parse(hist); } catch (e) { hist = []; }
+      }
+      if (!Array.isArray(hist)) hist = [];
+      hist.forEach((h) => {
+        if (!h || typeof h !== "object") return;
+        rows.push({
+          ...h,
+          renewalId: r.id,
+          renewalName: r.name || r.recordName || "Unnamed Record",
+          category: r.category || "General",
+          recordCode: r.code || r.referenceNumber || "—",
+        });
+      });
+    });
+    rows.sort((a, b) => new Date(b.renewalDate || 0) - new Date(a.renewalDate || 0));
+    res.json({ ok: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // GET /api/renewals/:id — Get renewal by ID
 router.get("/:id", async (req, res) => {
   try {
@@ -279,21 +308,31 @@ router.post("/:id/mark-renewed", async (req, res) => {
       }
     }
 
-    const { renewalDate, newExpiryDate, cost, currency, notes, recurringCycle } = req.body;
+    const { renewalDate, newExpiryDate, cost, currency, notes, recurringCycle, renewedBy } = req.body;
     const historyEntry = {
       id: `hist-${Date.now()}`,
       previousExpiry: record.expiryDate,
       newExpiry: newExpiryDate,
       renewalDate: renewalDate || new Date().toISOString().slice(0, 10),
-      cost: cost !== undefined ? Number(cost) : record.cost,
-      currency: currency || record.currency,
-      renewedBy: actor.fullName || "System User",
+      cost: cost !== undefined && cost !== "" && cost !== null ? Number(cost) : record.cost,
+      currency: currency || record.currency || "USD",
+      renewedBy: renewedBy || actor.fullName || "System User",
       notes: notes || "",
     };
 
+    let existingHistory = record.history;
+    if (typeof existingHistory === "string") {
+      try {
+        existingHistory = JSON.parse(existingHistory);
+      } catch (e) {
+        existingHistory = [];
+      }
+    }
+    if (!Array.isArray(existingHistory)) existingHistory = [];
+
     const updatedRecord = {
       ...record,
-      history: [historyEntry, ...(record.history || [])],
+      history: [historyEntry, ...existingHistory],
       issueDate: historyEntry.renewalDate,
       expiryDate: newExpiryDate,
       lastRenewedAt: historyEntry.renewalDate,

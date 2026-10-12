@@ -329,9 +329,24 @@
     return toISODate(d);
   }
 
+  function parseSafeDate(val) {
+    if (!val && val !== 0) return null;
+    if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+    const s = String(val).trim();
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const d = new Date(s + "T00:00:00");
+      return isNaN(d.getTime()) ? null : d;
+    }
+    const cleanISO = s.includes("T") ? s : s.replace(" ", "T");
+    const d = new Date(cleanISO);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
   function daysBetween(fromISO, toISOStr) {
-    const a = new Date(fromISO + "T00:00:00");
-    const b = new Date(toISOStr + "T00:00:00");
+    const a = parseSafeDate(fromISO);
+    const b = parseSafeDate(toISOStr);
+    if (!a || !b) return 0;
     return Math.round((b - a) / 86400000);
   }
 
@@ -340,9 +355,9 @@
   }
 
   function formatDate(iso, opts) {
-    if (!iso) return "—";
-    const d = new Date(iso + "T00:00:00");
-    if (isNaN(d.getTime())) return "—";
+    if (!iso && iso !== 0) return "—";
+    const d = parseSafeDate(iso);
+    if (!d) return String(iso);
     return d.toLocaleDateString(
       "en-US",
       opts || { month: "short", day: "numeric", year: "numeric" }
@@ -350,7 +365,9 @@
   }
 
   function formatMonthYear(iso) {
-    const d = new Date(iso + "T00:00:00");
+    if (!iso) return "—";
+    const d = parseSafeDate(iso);
+    if (!d) return String(iso);
     return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
   }
 
@@ -473,9 +490,12 @@
 
   function syncRenewalToBackend(method, url, body) {
     try {
+      const token = (global.RTS && global.RTS.auth && typeof global.RTS.auth.getToken === "function" && global.RTS.auth.getToken()) || localStorage.getItem("rts_auth_token");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = "Bearer " + token;
       fetch(apiUrl(url), {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: body ? JSON.stringify(body) : undefined,
       }).catch(() => {});
     } catch (e) {}
@@ -507,8 +527,42 @@
     const list = getRenewals();
     const idx = list.findIndex((r) => r.id === id);
     if (idx === -1) return null;
+    const oldRecord = list[idx];
+
+    // If expiryDate is advancing forward to a new date, automatically record history!
+    if (data.expiryDate && oldRecord.expiryDate && data.expiryDate !== oldRecord.expiryDate) {
+      const oldD = new Date(oldRecord.expiryDate).getTime();
+      const newD = new Date(data.expiryDate).getTime();
+      if (!isNaN(oldD) && !isNaN(newD) && newD > oldD && !data.history) {
+        const currentUser = (global.RTS && global.RTS.auth && typeof global.RTS.auth.getCurrentUser === "function" && global.RTS.auth.getCurrentUser()) || null;
+        const historyEntry = {
+          id: uid("hist"),
+          previousExpiry: oldRecord.expiryDate,
+          newExpiry: data.expiryDate,
+          renewalDate: todayISO(),
+          cost: data.cost !== undefined && data.cost !== "" && data.cost !== null ? Number(data.cost) : oldRecord.cost,
+          currency: data.currency || oldRecord.currency || "USD",
+          renewedBy: (currentUser && currentUser.fullName) || "System User",
+          notes: data.notes || "Renewed via record update",
+        };
+        let hist = oldRecord.history;
+        if (typeof hist === "string") {
+          try { hist = JSON.parse(hist); } catch (e) { hist = []; }
+        }
+        if (!Array.isArray(hist)) hist = [];
+        data.history = [historyEntry, ...hist];
+        data.lastRenewedAt = todayISO();
+        data.reminderCompleted = false;
+      }
+    }
+
     list[idx] = Object.assign({}, list[idx], data);
     saveRenewals(list);
+
+    try {
+      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { id, record: list[idx] } }));
+    } catch (e) {}
+
     syncRenewalToBackend("PUT", "/api/renewals/" + encodeURIComponent(id), list[idx]);
     return list[idx];
   }
@@ -526,20 +580,31 @@
     const record = list[idx];
     const cycle = payload.recurringCycle || record.recurringCycle || "Yearly";
     const newExpiry = payload.newExpiryDate || calculateNextExpiry(record.expiryDate, cycle);
+    const currentUser = (global.RTS && global.RTS.auth && typeof global.RTS.auth.getCurrentUser === "function" && global.RTS.auth.getCurrentUser()) || null;
+    const renewedBy = payload.renewedBy || (currentUser && currentUser.fullName) || "System User";
+    const renewalDate = payload.renewalDate || todayISO();
+
     const historyEntry = {
       id: uid("hist"),
       previousExpiry: record.expiryDate,
       newExpiry: newExpiry,
-      renewalDate: payload.renewalDate || todayISO(),
-      cost: payload.cost !== undefined && payload.cost !== "" ? Number(payload.cost) : record.cost,
-      currency: payload.currency || record.currency,
-      renewedBy: payload.renewedBy || "System User",
+      renewalDate: renewalDate,
+      cost: payload.cost !== undefined && payload.cost !== "" && payload.cost !== null ? Number(payload.cost) : record.cost,
+      currency: payload.currency || record.currency || "USD",
+      renewedBy: renewedBy,
       notes: payload.notes || "",
     };
-    record.history = [historyEntry, ...(record.history || [])];
-    record.issueDate = historyEntry.renewalDate;
+
+    let existingHistory = record.history;
+    if (typeof existingHistory === "string") {
+      try { existingHistory = JSON.parse(existingHistory); } catch (e) { existingHistory = []; }
+    }
+    if (!Array.isArray(existingHistory)) existingHistory = [];
+
+    record.history = [historyEntry, ...existingHistory];
+    record.issueDate = renewalDate;
     record.expiryDate = newExpiry;
-    record.lastRenewedAt = historyEntry.renewalDate;
+    record.lastRenewedAt = renewalDate;
     record.reminderCompleted = false;
     record.recurringCycle = cycle;
     if (payload.reminderDate) {
@@ -549,7 +614,20 @@
     }
     list[idx] = record;
     saveRenewals(list);
-    syncRenewalToBackend("POST", "/api/renewals/" + encodeURIComponent(id) + "/mark-renewed", payload);
+
+    try {
+      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { id, record, historyEntry } }));
+    } catch (e) {}
+
+    syncRenewalToBackend("POST", "/api/renewals/" + encodeURIComponent(id) + "/mark-renewed", {
+      ...payload,
+      renewalDate,
+      newExpiryDate: newExpiry,
+      renewedBy,
+      cost: historyEntry.cost,
+      currency: historyEntry.currency,
+      recurringCycle: cycle,
+    });
     return record;
   }
 
@@ -568,6 +646,9 @@
     if (!ids || !ids.length) return 0;
     const list = getRenewals();
     let count = 0;
+    const currentUser = (global.RTS && global.RTS.auth && typeof global.RTS.auth.getCurrentUser === "function" && global.RTS.auth.getCurrentUser()) || null;
+    const actorName = (currentUser && currentUser.fullName) || "Bulk Action";
+
     ids.forEach((id) => {
       const idx = list.findIndex((r) => r.id === id);
       if (idx !== -1) {
@@ -580,11 +661,16 @@
           newExpiry: newExpiry,
           renewalDate: todayISO(),
           cost: record.cost,
-          currency: record.currency,
-          renewedBy: "Bulk Action",
+          currency: record.currency || "USD",
+          renewedBy: actorName,
           notes: "Auto-renewed via Bulk Action (" + cycle + ")",
         };
-        record.history = [historyEntry, ...(record.history || [])];
+        let hist = record.history;
+        if (typeof hist === "string") {
+          try { hist = JSON.parse(hist); } catch (e) { hist = []; }
+        }
+        if (!Array.isArray(hist)) hist = [];
+        record.history = [historyEntry, ...hist];
         record.issueDate = historyEntry.renewalDate;
         record.expiryDate = newExpiry;
         record.lastRenewedAt = historyEntry.renewalDate;
@@ -592,9 +678,21 @@
         record.reminderDate = addDays(newExpiry, -14);
         list[idx] = record;
         count++;
+
+        syncRenewalToBackend("POST", "/api/renewals/" + encodeURIComponent(id) + "/mark-renewed", {
+          newExpiryDate: newExpiry,
+          cost: record.cost,
+          currency: record.currency,
+          recurringCycle: cycle,
+          renewedBy: actorName,
+          notes: historyEntry.notes,
+        });
       }
     });
     saveRenewals(list);
+    try {
+      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { count } }));
+    } catch (e) {}
     return count;
   }
 
@@ -630,7 +728,12 @@
     return updateRenewal(recordId, { documents: docs });
   }
 
-  function toggleReminderCompleted(id, completed) {
+  function toggleReminderCompleted(id, completed, options) {
+    if (completed && options && options.renew) {
+      return markAsRenewed(id, {
+        notes: options.notes || "Completed & renewed via Reminders",
+      });
+    }
     return updateRenewal(id, { reminderCompleted: completed });
   }
 
@@ -649,18 +752,32 @@
     const renewals = getRenewals();
     const rows = [];
     renewals.forEach((r) => {
-      (r.history || []).forEach((h) => {
+      let hist = r.history;
+      if (typeof hist === "string") {
+        try {
+          hist = JSON.parse(hist);
+        } catch (e) {
+          hist = [];
+        }
+      }
+      if (!Array.isArray(hist)) hist = [];
+      hist.forEach((h) => {
+        if (!h || typeof h !== "object") return;
         rows.push(
           Object.assign({}, h, {
             renewalId: r.id,
-            renewalName: r.name,
-            category: r.category,
-            recordCode: r.code,
+            renewalName: r.name || r.recordName || "Unnamed Record",
+            category: r.category || "General",
+            recordCode: r.code || r.referenceNumber || "—",
           })
         );
       });
     });
-    return rows.sort((a, b) => (a.renewalDate < b.renewalDate ? 1 : -1));
+    return rows.sort((a, b) => {
+      const da = new Date(a.renewalDate || a.createdAt || 0).getTime();
+      const db = new Date(b.renewalDate || b.createdAt || 0).getTime();
+      return db - da;
+    });
   }
 
   /* ------------------------------------------------------------------ */
@@ -2160,6 +2277,15 @@
     });
     const combined = [...newRecords, ...currentList];
     saveRenewals(combined);
+
+    newRecords.forEach((r) => {
+      syncRenewalToBackend("POST", "/api/renewals", r);
+    });
+
+    try {
+      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { count: newRecords.length } }));
+    } catch (e) {}
+
     return newRecords.length;
   }
 

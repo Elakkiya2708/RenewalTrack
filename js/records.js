@@ -167,6 +167,7 @@
             <td>
               <div class="row-actions">
                 <a class="icon-btn" href="details.html?id=${r.id}" aria-label="View details" title="View details"><i data-lucide="eye" class="icon"></i></a>
+                ${canEdit ? `<button class="icon-btn" aria-label="Renew" title="Mark as Renewed" onclick="RecordsPage.openRenew('${r.id}')"><i data-lucide="refresh-cw" class="icon"></i></button>` : ""}
                 ${canEdit ? `<button class="icon-btn" aria-label="Edit" title="Edit" onclick="RecordsPage.openEdit('${r.id}')"><i data-lucide="edit-3" class="icon"></i></button>` : ""}
                 ${canDelete ? `<button class="icon-btn" aria-label="Delete" title="Delete" onclick="RecordsPage.openDelete('${r.id}')"><i data-lucide="trash-2" class="icon"></i></button>` : ""}
               </div>
@@ -806,6 +807,132 @@
     }
   }
 
+  /* ---------------------------- Modal: Mark as Renewed --------------------------- */
+
+  function openRenew(id) {
+    const curRecord = RTS.data.getRenewalById(id);
+    if (!curRecord) return;
+    const targetInput = document.getElementById("renewTargetId");
+    if (targetInput) targetInput.value = id;
+
+    const renewForm = document.getElementById("renewForm");
+    if (renewForm) renewForm.reset();
+
+    const cycleSelect = document.getElementById("renew_recurringCycle");
+    if (cycleSelect) {
+      cycleSelect.innerHTML = "";
+      RTS.RECURRING_CYCLES.forEach((c) => {
+        cycleSelect.insertAdjacentHTML("beforeend", `<option value="${c}">${RTS.cycleLabel(c)}</option>`);
+      });
+      cycleSelect.value = curRecord.recurringCycle || "Yearly";
+    }
+
+    const currencySelect = document.getElementById("renew_currency");
+    if (currencySelect) {
+      currencySelect.innerHTML = "";
+      RTS.CURRENCIES.forEach((c) => currencySelect.insertAdjacentHTML("beforeend", `<option value="${c}">${c}</option>`));
+      currencySelect.value = curRecord.currency || "USD";
+    }
+
+    const cycle = curRecord.recurringCycle || "Yearly";
+    const autoNewExpiry = RTS.calculateNextExpiry(curRecord.expiryDate, cycle);
+    const expInput = document.getElementById("renew_newExpiry");
+    if (expInput) expInput.value = autoNewExpiry;
+
+    const costInput = document.getElementById("renew_cost");
+    if (costInput) costInput.value = curRecord.cost != null ? curRecord.cost : "";
+
+    const user = RTS.auth && RTS.auth.getCurrentUser ? RTS.auth.getCurrentUser() : null;
+    const byInput = document.getElementById("renew_renewedBy");
+    if (byInput) byInput.value = (user && user.fullName) || "System User";
+
+    const notice = document.getElementById("renewCycleNotice");
+    if (notice) notice.textContent = `Auto-calculated (${RTS.cycleLabel(cycle)})`;
+
+    document.querySelectorAll("#renewForm .field").forEach((f) => f.classList.remove("has-error"));
+    RTS.modal.open("renewModal");
+  }
+
+  function wireRenewModal() {
+    const presetGroup = document.getElementById("cyclePresetGroup");
+    const cycleSelect = document.getElementById("renew_recurringCycle");
+    if (presetGroup) {
+      presetGroup.querySelectorAll("button").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = document.getElementById("renewTargetId") ? document.getElementById("renewTargetId").value : null;
+          const curRecord = id ? RTS.data.getRenewalById(id) : null;
+          if (!curRecord) return;
+          presetGroup.querySelectorAll("button").forEach((b) => b.classList.replace("btn-secondary", "btn-ghost"));
+          btn.classList.replace("btn-ghost", "btn-secondary");
+
+          let nextExpiry = "";
+          let cycleName = "Yearly";
+          if (btn.hasAttribute("data-add-months")) {
+            const m = parseInt(btn.getAttribute("data-add-months"), 10);
+            cycleName = m === 1 ? "Monthly" : "Quarterly";
+            nextExpiry = RTS.calculateNextExpiry(curRecord.expiryDate, cycleName);
+          } else if (btn.hasAttribute("data-add-years")) {
+            const y = parseInt(btn.getAttribute("data-add-years"), 10);
+            cycleName = y === 1 ? "Yearly" : y === 2 ? "2-Year" : "3-Year";
+            nextExpiry = RTS.calculateNextExpiry(curRecord.expiryDate, cycleName);
+          }
+          const expInput = document.getElementById("renew_newExpiry");
+          if (expInput) expInput.value = nextExpiry;
+          if (cycleSelect) cycleSelect.value = cycleName;
+          const notice = document.getElementById("renewCycleNotice");
+          if (notice) notice.textContent = `Preset applied (${RTS.cycleLabel(cycleName)})`;
+        });
+      });
+    }
+
+    const renewForm = document.getElementById("renewForm");
+    if (renewForm) {
+      renewForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const id = document.getElementById("renewTargetId") ? document.getElementById("renewTargetId").value : null;
+        if (!id) return;
+        const curRecord = RTS.data.getRenewalById(id);
+        const newExpiry = document.getElementById("renew_newExpiry").value;
+        const renewedBy = document.getElementById("renew_renewedBy").value.trim();
+        const nextCycle = cycleSelect ? cycleSelect.value : (curRecord && curRecord.recurringCycle) || "Yearly";
+        let valid = true;
+
+        document.querySelectorAll("#renewForm .field").forEach((f) => f.classList.remove("has-error"));
+
+        if (!newExpiry) {
+          document.getElementById("rf_newExpiry").classList.add("has-error");
+          valid = false;
+        } else if (curRecord && curRecord.expiryDate) {
+          const oldTime = new Date(curRecord.expiryDate).getTime();
+          const newTime = new Date(newExpiry).getTime();
+          if (!isNaN(oldTime) && !isNaN(newTime) && newTime <= oldTime) {
+            document.getElementById("rf_newExpiry").classList.add("has-error");
+            RTS.toast("New expiry date must be after current expiry date (" + RTS.formatDate(curRecord.expiryDate) + ").", "warning");
+            valid = false;
+          }
+        }
+
+        if (!renewedBy) {
+          document.getElementById("rf_renewedBy").classList.add("has-error");
+          valid = false;
+        }
+        if (!valid) return;
+
+        RTS.data.markAsRenewed(id, {
+          newExpiryDate: newExpiry,
+          cost: document.getElementById("renew_cost").value ? Number(document.getElementById("renew_cost").value) : (curRecord ? curRecord.cost : null),
+          currency: document.getElementById("renew_currency").value,
+          recurringCycle: nextCycle,
+          renewedBy,
+          notes: document.getElementById("renew_notes").value.trim(),
+        });
+        RTS.toast("Record marked as renewed! Renewal history updated.", "success");
+        RTS.modal.close("renewModal");
+        renderTable();
+      });
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     RTS.initLayout();
     populateSelects();
@@ -813,6 +940,7 @@
     wireUpload();
     wireBulkActions();
     wireImport();
+    wireRenewModal();
     applyUrlParams();
     renderTable();
 
@@ -834,12 +962,17 @@
       populateSelects();
       renderTable();
     });
+
+    window.addEventListener("rts-renewal-updated", () => {
+      renderTable();
+    });
   });
 
   // Exposed for inline onclick handlers & cross-script calls
   window.RecordsPage = {
     openAdd,
     openEdit,
+    openRenew,
     openDelete,
     removeDoc,
     render: renderTable,
