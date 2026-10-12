@@ -496,28 +496,61 @@
 
   function wireImport() {
     const openBtn = document.getElementById("openImportBtn");
+    const previewSec = document.getElementById("importPreviewSection");
+    const confirmBtn = document.getElementById("confirmImportBtn");
+    const fileInfo = document.getElementById("importFileInfo");
+    const errAlert = document.getElementById("importErrorAlert");
+    const dropzone = document.getElementById("importDropzone");
+    const fileInput = document.getElementById("csvFileInput");
+    const clearBtn = document.getElementById("importClearFileBtn");
+
+    function resetModalState() {
+      stagedImportRecords = [];
+      if (previewSec) previewSec.style.display = "none";
+      if (confirmBtn) {
+        confirmBtn.disabled = true;
+        const confirmText = document.getElementById("confirmImportText");
+        if (confirmText) confirmText.textContent = "Import Records";
+      }
+      if (fileInfo) fileInfo.style.display = "none";
+      if (errAlert) {
+        errAlert.style.display = "none";
+        errAlert.textContent = "";
+      }
+      if (fileInput) fileInput.value = "";
+    }
+
     if (openBtn) {
       openBtn.addEventListener("click", () => {
-        stagedImportRecords = [];
-        const previewSec = document.getElementById("importPreviewSection");
-        const confirmBtn = document.getElementById("confirmImportBtn");
-        if (previewSec) previewSec.style.display = "none";
-        if (confirmBtn) confirmBtn.disabled = true;
+        resetModalState();
         RTS.modal.open("importModal");
       });
     }
 
     const tplBtn = document.getElementById("downloadTemplateBtn");
     if (tplBtn) {
-      tplBtn.addEventListener("click", () => {
+      tplBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         RTS.downloadCSVTemplate();
         RTS.toast("Downloaded sample CSV template.", "info");
       });
     }
 
-    const dropzone = document.getElementById("importDropzone");
-    const fileInput = document.getElementById("csvFileInput");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        resetModalState();
+        if (fileInput) fileInput.click();
+      });
+    }
+
     if (!dropzone || !fileInput) return;
+
+    // Make entire dropzone box clickable
+    dropzone.addEventListener("click", (e) => {
+      if (e.target.closest("#downloadTemplateBtn") || e.target.closest("button") || e.target.closest("a")) return;
+      fileInput.click();
+    });
 
     dropzone.addEventListener("dragover", (e) => {
       e.preventDefault();
@@ -529,46 +562,138 @@
     dropzone.addEventListener("drop", (e) => {
       e.preventDefault();
       dropzone.classList.remove("drag-over");
-      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-        processCSVFile(e.dataTransfer.files[0]);
+      if (e.dataTransfer.files && e.dataTransfer.files.length) {
+        processSpreadsheetFile(e.dataTransfer.files[0]);
       }
     });
 
     fileInput.addEventListener("change", (e) => {
-      if (e.target.files && e.target.files[0]) {
-        processCSVFile(e.target.files[0]);
+      if (e.target.files && e.target.files.length) {
+        processSpreadsheetFile(e.target.files[0]);
       }
     });
 
-    const confirmBtn = document.getElementById("confirmImportBtn");
     if (confirmBtn) {
       confirmBtn.addEventListener("click", () => {
         if (!stagedImportRecords.length) return;
         const count = RTS.importRecords(stagedImportRecords);
         RTS.toast(`Successfully imported ${count} renewal record(s)!`, "success");
         stagedImportRecords = [];
+        resetModalState();
         RTS.modal.close("importModal");
         renderTable();
       });
     }
   }
 
-  function processCSVFile(file) {
-    if (!file.name.endsWith(".csv") && file.type !== "text/csv") {
-      RTS.toast("Please upload a .csv file.", "warning");
-      return;
+  function formatBytes(bytes) {
+    if (!bytes || bytes <= 0) return "0 B";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function showImportError(msg) {
+    const errAlert = document.getElementById("importErrorAlert");
+    const previewSec = document.getElementById("importPreviewSection");
+    const confirmBtn = document.getElementById("confirmImportBtn");
+    if (previewSec) previewSec.style.display = "none";
+    if (confirmBtn) confirmBtn.disabled = true;
+    if (errAlert) {
+      errAlert.innerHTML = `<strong>Import Warning:</strong> ${RTS.escapeHtml(msg)}<br><small style="display:block;margin-top:4px;color:var(--text-mid);">Tip: Click 'Download Sample CSV' in the box above to see the recommended header format.</small>`;
+      errAlert.style.display = "block";
     }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target.result;
-      const parsed = RTS.parseCSVText(text);
-      if (!parsed.length) {
-        RTS.toast("Could not find valid renewal rows in this file. Please check column headers.", "error");
+    RTS.toast(msg, "error");
+  }
+
+  function processSpreadsheetFile(file) {
+    const errAlert = document.getElementById("importErrorAlert");
+    if (errAlert) errAlert.style.display = "none";
+
+    const name = file.name || "uploaded_file";
+    const ext = name.split(".").pop().toLowerCase();
+    const isExcel = ["xlsx", "xls", "xlsm", "xlsb"].includes(ext);
+
+    // Update File Info display
+    const fileInfo = document.getElementById("importFileInfo");
+    const fileNameEl = document.getElementById("importFileName");
+    const fileSizeEl = document.getElementById("importFileSize");
+    if (fileNameEl) fileNameEl.textContent = name;
+    if (fileSizeEl) fileSizeEl.textContent = `(${formatBytes(file.size)})`;
+    if (fileInfo) fileInfo.style.display = "flex";
+
+    // Handle Excel files with SheetJS if available
+    if (isExcel) {
+      if (typeof window.XLSX !== "undefined") {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = window.XLSX.read(data, { type: "array", cellDates: true });
+            const sheetName = workbook.SheetNames[0];
+            if (!sheetName) {
+              showImportError("The Excel workbook does not contain any sheets.");
+              return;
+            }
+            const sheet = workbook.Sheets[sheetName];
+            const rawRows = window.XLSX.utils.sheet_to_json(sheet, { defval: "" });
+            if (!rawRows.length) {
+              showImportError("The selected Excel sheet appears to be empty.");
+              return;
+            }
+            const parsed = RTS.parseSheetRows ? RTS.parseSheetRows(rawRows) : [];
+            if (!parsed.length) {
+              showImportError("Could not detect renewal records in this sheet. Please make sure the first row contains column headers like Record Name, Expiry Date, etc.");
+              return;
+            }
+            stagedImportRecords = parsed;
+            renderImportPreview(parsed);
+          } catch (err) {
+            console.error("Excel parse error:", err);
+            showImportError("Failed to parse Excel file: " + (err.message || "Unknown error"));
+          }
+        };
+        reader.onerror = () => showImportError("Could not read file from disk.");
+        reader.readAsArrayBuffer(file);
+        return;
+      } else {
+        showImportError("Excel parser is unavailable or loading. Please convert to .csv or retry in a moment.");
         return;
       }
-      stagedImportRecords = parsed;
-      renderImportPreview(parsed);
+    }
+
+    // Handle CSV / TSV / Text files
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        let parsed = [];
+        if (typeof window.XLSX !== "undefined") {
+          try {
+            const workbook = window.XLSX.read(text, { type: "string" });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rawRows = window.XLSX.utils.sheet_to_json(sheet, { defval: "" });
+            if (rawRows.length && RTS.parseSheetRows) {
+              parsed = RTS.parseSheetRows(rawRows);
+            }
+          } catch (e2) {}
+        }
+        if (!parsed.length) {
+          parsed = RTS.parseCSVText(text);
+        }
+
+        if (!parsed.length) {
+          showImportError("Could not find valid renewal rows in this file. Please verify column headers (e.g. Record Name, Expiry Date).");
+          return;
+        }
+        stagedImportRecords = parsed;
+        renderImportPreview(parsed);
+      } catch (err) {
+        console.error("CSV parse error:", err);
+        showImportError("Error processing CSV: " + (err.message || "Invalid structure"));
+      }
     };
+    reader.onerror = () => showImportError("Could not read file from disk.");
     reader.readAsText(file);
   }
 
@@ -579,7 +704,9 @@
     const tbody = document.getElementById("importPreviewBody");
     const confirmBtn = document.getElementById("confirmImportBtn");
     const confirmText = document.getElementById("confirmImportText");
+    const errAlert = document.getElementById("importErrorAlert");
 
+    if (errAlert) errAlert.style.display = "none";
     if (previewSec) previewSec.style.display = "block";
     if (countEl) countEl.textContent = records.length;
     if (validEl) validEl.textContent = `${records.length} valid`;
@@ -588,7 +715,7 @@
 
     if (tbody) {
       tbody.innerHTML = records
-        .slice(0, 15)
+        .slice(0, 20)
         .map(
           (r, idx) => `
         <tr>

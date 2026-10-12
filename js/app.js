@@ -1848,11 +1848,243 @@
   /* CSV Import & Template Helpers                                       */
   /* ------------------------------------------------------------------ */
 
+  function normalizeDate(val) {
+    if (!val && val !== 0) return "";
+    if (val instanceof Date && !isNaN(val.getTime())) {
+      try {
+        return val.toISOString().slice(0, 10);
+      } catch (e) {
+        return "";
+      }
+    }
+    // Handle Excel serial date numbers (e.g. 45678)
+    if (typeof val === "number" || (!isNaN(val) && Number(val) > 20000 && Number(val) < 70000)) {
+      const n = Number(val);
+      const d = new Date(Math.round((n - 25569) * 86400 * 1000));
+      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    }
+    let s = String(val).trim();
+    if (!s) return "";
+
+    // ISO format: YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+    // YYYY/MM/DD or YYYY.MM.DD
+    if (/^\d{4}[\/\.]\d{1,2}[\/\.]\d{1,2}$/.test(s)) {
+      const p = s.split(/[\/\.]/);
+      return `${p[0]}-${p[1].padStart(2, "0")}-${p[2].padStart(2, "0")}`;
+    }
+
+    // DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+    const dmy = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+    if (dmy) {
+      const p1 = parseInt(dmy[1], 10);
+      const p2 = parseInt(dmy[2], 10);
+      const y = dmy[3];
+      if (p1 > 12) {
+        return `${y}-${String(p2).padStart(2, "0")}-${String(p1).padStart(2, "0")}`;
+      }
+      if (p2 > 12) {
+        return `${y}-${String(p1).padStart(2, "0")}-${String(p2).padStart(2, "0")}`;
+      }
+      return `${y}-${String(p2).padStart(2, "0")}-${String(p1).padStart(2, "0")}`;
+    }
+
+    // Standard date parsing
+    const parsed = new Date(s);
+    if (!isNaN(parsed.getTime())) {
+      try {
+        const yr = parsed.getFullYear();
+        if (yr >= 1990 && yr <= 2100) {
+          const m = String(parsed.getMonth() + 1).padStart(2, "0");
+          const d = String(parsed.getDate()).padStart(2, "0");
+          return `${yr}-${m}-${d}`;
+        }
+      } catch (e) {}
+    }
+
+    return "";
+  }
+
+  function mapRowToRecord(vals, headers) {
+    if (!vals || !headers) return null;
+    const obj = {};
+    let foundDate = "";
+    let firstNonEmptyText = "";
+
+    headers.forEach((h, idx) => {
+      const rawVal = vals[idx] !== undefined && vals[idx] !== null ? String(vals[idx]).trim() : "";
+      if (!firstNonEmptyText && rawVal && isNaN(rawVal) && rawVal.length > 1) {
+        firstNonEmptyText = rawVal;
+      }
+      // Check if value itself looks like a date
+      if (!foundDate && rawVal && (/\d{4}[\-\/\.]\d{1,2}[\-\/\.]\d{1,2}/.test(rawVal) || /\d{1,2}[\-\/\.]\d{1,2}[\-\/\.]\d{4}/.test(rawVal))) {
+        foundDate = normalizeDate(rawVal);
+      }
+
+      // 1. Record Name / Title / Item
+      if (
+        h.includes("name") ||
+        h.includes("title") ||
+        h.includes("record") ||
+        h.includes("service") ||
+        h.includes("item") ||
+        h.includes("software") ||
+        h.includes("contract") ||
+        h.includes("license") ||
+        h.includes("certificate") ||
+        h.includes("subscription") ||
+        h.includes("domain") ||
+        h.includes("asset") ||
+        h.includes("product") ||
+        h.includes("description") ||
+        h === "desc"
+      ) {
+        if (!obj.name && rawVal) obj.name = rawVal;
+      }
+      // 2. Expiry / Due / Renewal Date
+      else if (
+        h.includes("exp") ||
+        h.includes("due") ||
+        h.includes("renew") ||
+        h.includes("end") ||
+        h.includes("valid") ||
+        h.includes("deadline") ||
+        h.includes("finish") ||
+        h.includes("until") ||
+        h.includes("maturity") ||
+        h === "date"
+      ) {
+        if (!obj.expiryDate) obj.expiryDate = normalizeDate(rawVal);
+      }
+      // 3. Category / Type
+      else if (h.includes("cat") || h.includes("type") || h.includes("kind") || h.includes("group") || h.includes("class") || h.includes("dept") || h.includes("sector")) {
+        if (!obj.category && rawVal) obj.category = rawVal;
+      }
+      // 4. Provider / Organization / Vendor
+      else if (
+        h.includes("org") ||
+        h.includes("prov") ||
+        h.includes("vendor") ||
+        h.includes("company") ||
+        h.includes("issuer") ||
+        h.includes("supplier") ||
+        h.includes("partner") ||
+        h.includes("source") ||
+        h.includes("client") ||
+        h.includes("account") ||
+        h.includes("brand")
+      ) {
+        if (!obj.organization && rawVal) obj.organization = rawVal;
+      }
+      // 5. Cost / Amount
+      else if (
+        h.includes("cost") ||
+        h.includes("price") ||
+        h.includes("amount") ||
+        h.includes("fee") ||
+        h.includes("charge") ||
+        h.includes("rate") ||
+        h.includes("val") ||
+        h.includes("sum") ||
+        h.includes("total") ||
+        h.includes("bill")
+      ) {
+        const cleaned = rawVal.replace(/[^\d.]/g, "");
+        obj.cost = parseFloat(cleaned) || 0;
+        if (rawVal.includes("₹")) obj.currency = "INR";
+        else if (rawVal.includes("€")) obj.currency = "EUR";
+        else if (rawVal.includes("£")) obj.currency = "GBP";
+      }
+      // 6. Currency
+      else if (h.includes("curr")) {
+        if (rawVal) obj.currency = rawVal.toUpperCase();
+      }
+      // 7. Priority
+      else if (h.includes("prior") || h.includes("urg") || h.includes("level") || h.includes("prio")) {
+        if (rawVal) obj.priority = rawVal;
+      }
+      // 8. Responsible Person
+      else if (h.includes("resp") || h.includes("owner") || h.includes("person") || h.includes("assign") || h.includes("user") || h.includes("manager") || h.includes("lead")) {
+        if (rawVal) obj.responsiblePerson = rawVal;
+      }
+      // 9. Recurring Cycle
+      else if (h.includes("cycle") || h.includes("recur") || h.includes("freq") || h.includes("period") || h.includes("interval")) {
+        if (rawVal) obj.recurringCycle = rawVal;
+      }
+      // 10. Issue / Start Date
+      else if (h.includes("issue") || h.includes("start") || h.includes("begin") || h.includes("create") || h.includes("from")) {
+        if (!obj.issueDate) obj.issueDate = normalizeDate(rawVal);
+      }
+      // 11. Reminder Date
+      else if (h.includes("remind") || h.includes("alert") || h.includes("notify")) {
+        if (!obj.reminderDate) obj.reminderDate = normalizeDate(rawVal);
+      }
+      // 12. Reference Number
+      else if (h.includes("ref") || h.includes("serial") || h.includes("code") || h.includes("policy") || h.includes("invoice") || h.includes("id")) {
+        if (!obj.referenceNumber && rawVal) obj.referenceNumber = rawVal;
+      }
+      // 13. Notes
+      else if (h.includes("note") || h.includes("comment") || h.includes("remark") || h.includes("info")) {
+        if (!obj.notes && rawVal) obj.notes = rawVal;
+      }
+    });
+
+    // Fallbacks
+    if (!obj.name) {
+      obj.name = firstNonEmptyText || (vals[0] ? String(vals[0]).trim() : "");
+    }
+    if (!obj.name || obj.name.trim() === "") return null;
+
+    if (!obj.expiryDate) {
+      obj.expiryDate = foundDate || addDays(todayISO(), 365);
+    }
+
+    // Category mapping
+    const catMatch = CATEGORIES.find((c) => c.toLowerCase() === (obj.category || "").toLowerCase());
+    obj.category = catMatch || (obj.category && obj.category.trim() ? obj.category.trim() : "Contract");
+
+    // Priority mapping
+    const prioLower = (obj.priority || "").toLowerCase();
+    if (prioLower.includes("high") || prioLower.includes("crit")) obj.priority = "High";
+    else if (prioLower.includes("low")) obj.priority = "Low";
+    else obj.priority = "Medium";
+
+    // Cycle mapping
+    const cycleLower = (obj.recurringCycle || "").toLowerCase();
+    if (cycleLower.includes("month")) obj.recurringCycle = "Monthly";
+    else if (cycleLower.includes("quart")) obj.recurringCycle = "Quarterly";
+    else if (cycleLower.includes("one") || cycleLower.includes("none")) obj.recurringCycle = "One-time";
+    else obj.recurringCycle = "Yearly";
+
+    if (!obj.currency || !CURRENCIES.includes(obj.currency)) obj.currency = "USD";
+    if (obj.cost === undefined) obj.cost = 0;
+    if (!obj.issueDate) obj.issueDate = todayISO();
+    if (!obj.reminderDate) obj.reminderDate = addDays(obj.expiryDate, -14);
+
+    return obj;
+  }
+
   function parseCSVText(csvText) {
+    if (!csvText || typeof csvText !== "string") return [];
+    csvText = csvText.replace(/^\uFEFF/, "");
+
+    const firstLine = csvText.split(/\r?\n/).find((l) => l.trim().length > 0) || "";
+    const commaCount = (firstLine.match(/,/g) || []).length;
+    const semiCount = (firstLine.match(/;/g) || []).length;
+    const tabCount = (firstLine.match(/\t/g) || []).length;
+    const pipeCount = (firstLine.match(/\|/g) || []).length;
+
+    let delim = ",";
+    if (semiCount > commaCount && semiCount > tabCount) delim = ";";
+    else if (tabCount > commaCount && tabCount > semiCount) delim = "\t";
+    else if (pipeCount > commaCount && pipeCount > semiCount) delim = "|";
+
     const lines = [];
     let row = [];
     let inQuotes = false;
     let cur = "";
+
     for (let i = 0; i < csvText.length; i++) {
       const c = csvText[i];
       const next = csvText[i + 1];
@@ -1863,7 +2095,7 @@
         } else {
           inQuotes = !inQuotes;
         }
-      } else if (c === "," && !inQuotes) {
+      } else if (c === delim && !inQuotes) {
         row.push(cur.trim());
         cur = "";
       } else if ((c === "\r" || c === "\n") && !inQuotes) {
@@ -1887,34 +2119,23 @@
 
     for (let i = 1; i < lines.length; i++) {
       const vals = lines[i];
-      const obj = {};
-      headers.forEach((h, idx) => {
-        const val = vals[idx] !== undefined ? vals[idx] : "";
-        if (h.includes("name") || h.includes("title")) obj.name = val;
-        else if (h.includes("cat")) obj.category = val;
-        else if (h.includes("org") || h.includes("prov") || h.includes("vendor")) obj.organization = val;
-        else if (h.includes("exp")) obj.expiryDate = val;
-        else if (h.includes("issue")) obj.issueDate = val;
-        else if (h.includes("remind")) obj.reminderDate = val;
-        else if (h.includes("cost") || h.includes("price") || h.includes("amount")) obj.cost = parseFloat(val) || 0;
-        else if (h.includes("curr")) obj.currency = val.toUpperCase();
-        else if (h.includes("prior")) obj.priority = val;
-        else if (h.includes("resp") || h.includes("owner")) obj.responsiblePerson = val;
-        else if (h.includes("ref")) obj.referenceNumber = val;
-        else if (h.includes("cycle") || h.includes("recur")) obj.recurringCycle = val;
-        else if (h.includes("note") || h.includes("desc")) obj.notes = val;
-      });
-
-      if (obj.name && obj.expiryDate) {
-        if (!obj.category || !CATEGORIES.includes(obj.category)) obj.category = "Contract";
-        if (!obj.priority || !PRIORITIES.includes(obj.priority)) obj.priority = "Medium";
-        if (!obj.currency || !CURRENCIES.includes(obj.currency)) obj.currency = "USD";
-        if (!obj.issueDate) obj.issueDate = todayISO();
-        if (!obj.reminderDate) obj.reminderDate = addDays(obj.expiryDate, -14);
-        if (!obj.recurringCycle) obj.recurringCycle = "Yearly";
-        records.push(obj);
-      }
+      const rec = mapRowToRecord(vals, headers);
+      if (rec) records.push(rec);
     }
+    return records;
+  }
+
+  function parseSheetRows(sheetRows) {
+    if (!Array.isArray(sheetRows) || !sheetRows.length) return [];
+    const records = [];
+    sheetRows.forEach((rowObj) => {
+      if (typeof rowObj !== "object" || !rowObj) return;
+      const keys = Object.keys(rowObj);
+      const headers = keys.map((k) => k.toLowerCase().replace(/[^a-z0-9]/g, ""));
+      const vals = keys.map((k) => rowObj[k]);
+      const rec = mapRowToRecord(vals, headers);
+      if (rec) records.push(rec);
+    });
     return records;
   }
 
@@ -2218,6 +2439,9 @@
     exportCSV,
     exportICS,
     parseCSVText,
+    parseSheetRows,
+    normalizeDate,
+    mapRowToRecord,
     importRecords,
     downloadCSVTemplate,
     openCommandPalette,

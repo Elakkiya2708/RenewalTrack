@@ -312,14 +312,30 @@
       <button class="modal-close" data-close-modal="importModal"><i data-lucide="x" class="icon"></i></button>
     </div>
     <div class="modal-body">
-      <div class="upload-dropzone" id="importDropzone">
+      <div class="upload-dropzone" id="importDropzone" style="cursor:pointer;">
         <i data-lucide="file-spreadsheet" class="dropzone-icon" style="color:var(--accent);width:40px;height:40px;margin-bottom:8px;"></i>
         <div class="dropzone-text">
-          <strong style="display:block;font-size:14px;color:var(--text-hi);margin-bottom:4px;">Drag &amp; drop your CSV spreadsheet here, or <label for="csvFileInput" class="dropzone-browse" style="color:var(--accent);cursor:pointer;text-decoration:underline;">browse files</label></strong>
-          <span style="font-size:12px;color:var(--text-low);">Accepted format: .csv with columns for Name, Category, Provider, Expiry Date, Cost, Priority</span>
+          <strong style="display:block;font-size:14px;color:var(--text-hi);margin-bottom:4px;">Drag &amp; drop your spreadsheet or CSV here, or <span class="dropzone-browse" style="color:var(--accent);text-decoration:underline;">browse files</span></strong>
+          <span style="font-size:12px;color:var(--text-low);display:block;">Supports <strong>.csv</strong>, <strong>.xlsx</strong>, <strong>.xls</strong>, <strong>.tsv</strong> (Excel, Google Sheets, or CSV)</span>
+          <div style="margin-top:8px;font-size:11.5px;color:var(--text-mid);">
+            Need a template? <button type="button" id="downloadTemplateBtn" class="link-btn" style="color:var(--accent);text-decoration:underline;background:none;border:none;padding:0;font:inherit;cursor:pointer;font-weight:600;"><i data-lucide="download" class="icon" style="width:12px;height:12px;vertical-align:middle;"></i> Download Sample CSV</button>
+          </div>
         </div>
-        <input type="file" id="csvFileInput" accept=".csv,text/csv" style="display:none;" />
+        <input type="file" id="csvFileInput" accept=".csv,.xlsx,.xls,.tsv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="display:none;" />
       </div>
+
+      <div id="importFileInfo" style="display:none;margin-top:14px;padding:10px 14px;background:var(--bg-surface-2);border:1px solid var(--border);border-radius:var(--r-md);align-items:center;justify-content:space-between;font-size:13px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <i data-lucide="file-check" class="icon" style="color:var(--color-success,#10b981);width:18px;height:18px;"></i>
+          <div>
+            <strong id="importFileName" style="color:var(--text-hi);">filename.csv</strong>
+            <span id="importFileSize" style="color:var(--text-muted);font-size:12px;margin-left:6px;">(0 KB)</span>
+          </div>
+        </div>
+        <button type="button" id="importClearFileBtn" class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:11px;">Change File</button>
+      </div>
+
+      <div id="importErrorAlert" style="display:none;margin-top:14px;padding:12px 14px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:var(--r-md);color:#ef4444;font-size:12.5px;line-height:1.5;"></div>
 
       <div id="importPreviewSection" style="display:none;margin-top:20px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
@@ -371,6 +387,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="js/records.js"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script>RTS.refreshIcons();</script>
