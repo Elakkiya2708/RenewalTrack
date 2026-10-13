@@ -246,23 +246,7 @@
     if (state.status) list = list.filter((r) => RTS.computeStatus(r) === state.status);
     if (state.priority) list = list.filter((r) => r.priority === state.priority);
     if (state.assignment === "assigned") {
-      const curUser = RTS.auth.getCurrentUser();
-      const uEmail = (curUser.email || "").toLowerCase();
-      const uName = (curUser.fullName || "").toLowerCase();
-      const uId = curUser.id || "";
-      list = list.filter((r) => {
-        const assignedId = r.assignedToId || r.assigned_to_id || "";
-        const respEmail = (r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || r.responsible_email || "").toLowerCase();
-        const respName = (r.assignedToName || r.assigned_to_name || r.responsiblePerson || r.responsible_person || "").toLowerCase();
-        const createdBy = (r.createdBy || "").toLowerCase();
-        return (
-          (uId && assignedId === uId) ||
-          (uEmail && respEmail === uEmail) ||
-          (uName && respName === uName) ||
-          (uName && respName.includes(uName)) ||
-          (uEmail && createdBy === uEmail)
-        );
-      });
+      list = list.filter((r) => (RTS.auth.isAssignedRenewal ? RTS.auth.isAssignedRenewal(r) : false));
     }
 
     list.sort((a, b) => {
@@ -288,6 +272,11 @@
     countEl.textContent = count;
     bar.style.display = count > 0 ? "flex" : "none";
 
+    const deleteBtn = document.getElementById("bulkDeleteBtn");
+    if (deleteBtn) {
+      deleteBtn.style.display = RTS.auth.isAdmin() ? "" : "none";
+    }
+
     const allCurrent = getFilteredSorted();
     if (selectAllCheckbox) {
       selectAllCheckbox.checked = allCurrent.length > 0 && allCurrent.every((r) => selectedIds.has(r.id));
@@ -297,6 +286,7 @@
 
   function renderTable() {
     const isViewer = RTS.auth.isViewer();
+    const isAdmin = RTS.auth.isAdmin();
     const thSelect = document.querySelector(".data-table thead tr th:first-child");
     if (thSelect) {
       thSelect.style.display = isViewer ? "none" : "";
@@ -327,8 +317,11 @@
           const status = RTS.computeStatus(r);
           const isChecked = !isViewer && selectedIds.has(r.id);
           const cycleTxt = RTS.cycleLabel(r.recurringCycle || "Yearly");
-          const canEdit = !isViewer && RTS.auth.canEditRenewal(r);
-          const canDelete = !isViewer && (RTS.auth.isAdmin() || (RTS.auth.isEmployee() && canEdit));
+          // Requirement: In the Renewal Records table, hide Edit and Delete buttons for Employee and Viewer. Only Admin can edit or delete renewals.
+          const canEdit = isAdmin;
+          const canDelete = isAdmin;
+          const isAssigned = RTS.auth.isAssignedRenewal ? RTS.auth.isAssignedRenewal(r) : false;
+          const canRenew = !isViewer && (isAdmin || (RTS.auth.isEmployee() && isAssigned));
           return `
           <tr class="${isChecked ? "row-selected" : ""}">
             ${
@@ -355,7 +348,7 @@
             <td>
               <div class="row-actions">
                 <a class="icon-btn" href="details.html?id=${r.id}" aria-label="View details" title="View details"><i data-lucide="eye" class="icon"></i></a>
-                ${canEdit ? `<button class="icon-btn" aria-label="Renew" title="Mark as Renewed" onclick="RecordsPage.openRenew('${r.id}')"><i data-lucide="refresh-cw" class="icon"></i></button>` : ""}
+                ${canRenew ? `<button class="icon-btn" aria-label="Renew" title="Mark as Renewed" onclick="RecordsPage.openRenew('${r.id}')"><i data-lucide="refresh-cw" class="icon"></i></button>` : ""}
                 ${canEdit ? `<button class="icon-btn" aria-label="Edit" title="Edit" onclick="RecordsPage.openEdit('${r.id}')"><i data-lucide="edit-3" class="icon"></i></button>` : ""}
                 ${canDelete ? `<button class="icon-btn" aria-label="Delete" title="Delete" onclick="RecordsPage.openDelete('${r.id}')"><i data-lucide="trash-2" class="icon"></i></button>` : ""}
               </div>
@@ -469,16 +462,12 @@
   }
 
   async function openEdit(id) {
-    if (RTS.auth.isViewer()) {
-      RTS.toast("Viewer role has read-only access and cannot edit renewals.", "error");
+    if (!RTS.auth.isAdmin()) {
+      RTS.toast("Access denied. Only Administrators can edit renewal records.", "error");
       return;
     }
     const record = RTS.data.getRenewalById(id);
     if (!record) return;
-    if (RTS.auth.isEmployee() && !RTS.auth.canEditRenewal(record)) {
-      RTS.toast("Access denied. You can only edit renewals assigned to you.", "error");
-      return;
-    }
     editingId = id;
     resetForm();
 
@@ -671,6 +660,10 @@
     };
 
     if (editingId) {
+      if (!RTS.auth.isAdmin()) {
+        RTS.toast("Access denied. Only Administrators can edit renewal records.", "error");
+        return;
+      }
       RTS.data.updateRenewal(editingId, data);
       RTS.toast("Renewal record updated successfully.", "success");
     } else {
@@ -684,16 +677,12 @@
   /* ------------------------------ Delete ---------------------------------- */
 
   function openDelete(id) {
-    if (RTS.auth.isViewer()) {
-      RTS.toast("Viewer role has read-only access and cannot delete renewals.", "error");
+    if (!RTS.auth.isAdmin()) {
+      RTS.toast("Access denied. Only Administrators can delete renewal records.", "error");
       return;
     }
     const record = RTS.data.getRenewalById(id);
     if (!record) return;
-    if (RTS.auth.isEmployee() && !RTS.auth.canDeleteRenewal(record)) {
-      RTS.toast("Access denied. You can only delete renewals assigned to you.", "error");
-      return;
-    }
     deleteTargetId = id;
     document.getElementById("deleteRecordName").textContent = record.name;
     RTS.modal.open("deleteModal");
@@ -701,6 +690,10 @@
 
   function confirmDelete() {
     if (!deleteTargetId) return;
+    if (!RTS.auth.isAdmin()) {
+      RTS.toast("Access denied. Only Administrators can delete renewal records.", "error");
+      return;
+    }
     RTS.data.deleteRenewal(deleteTargetId);
     selectedIds.delete(deleteTargetId);
     RTS.toast("Renewal record deleted.", "success");
@@ -796,19 +789,9 @@
     if (deleteBtn) {
       deleteBtn.addEventListener("click", () => {
         if (!selectedIds.size) return;
-        if (RTS.auth.isViewer()) {
-          RTS.toast("Viewer role has read-only access.", "error");
+        if (!RTS.auth.isAdmin()) {
+          RTS.toast("Access denied. Only Administrators can delete renewal records.", "error");
           return;
-        }
-        if (RTS.auth.isEmployee()) {
-          const unauthorized = Array.from(selectedIds).filter((id) => {
-            const r = RTS.data.getRenewalById(id);
-            return !RTS.auth.canDeleteRenewal(r);
-          });
-          if (unauthorized.length > 0) {
-            RTS.toast(`Cannot delete ${unauthorized.length} record(s) assigned to other team members.`, "warning");
-            return;
-          }
         }
         const modal = document.getElementById("bulkConfirmModal");
         document.getElementById("bulkConfirmTitle").textContent = "Delete Selected Records";
@@ -1150,7 +1133,11 @@
     const editId = params.get("edit");
     if (editId) {
       history.replaceState(null, "", window.location.pathname);
-      openEdit(editId);
+      if (RTS.auth.isAdmin()) {
+        openEdit(editId);
+      } else {
+        RTS.toast("Access denied. Only Administrators can edit renewal records.", "error");
+      }
     }
     if (window.location.hash === "#add") {
       history.replaceState(null, "", window.location.pathname);

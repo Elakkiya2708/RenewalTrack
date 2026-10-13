@@ -65,11 +65,11 @@ function isRenewalAssignedToUser(renewal, user) {
   const createdBy = (renewal.createdBy || "").trim().toLowerCase();
 
   return (
-    (uId && assignedId === uId) ||
-    (uEmail && assignedEmail === uEmail) ||
-    (uName && assignedName === uName) ||
-    (uName && (assignedName.includes(uName) || uName.includes(assignedName))) ||
-    (uEmail && createdBy === uEmail)
+    (uId && assignedId && assignedId === uId) ||
+    (uEmail && assignedEmail && assignedEmail === uEmail) ||
+    (uName && assignedName && assignedName === uName) ||
+    (uName && assignedName && (assignedName.includes(uName) || uName.includes(assignedName))) ||
+    (uEmail && createdBy && createdBy === uEmail)
   );
 }
 
@@ -275,7 +275,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-// PUT /api/renewals/:id — Update renewal (enforces assignment RBAC)
+// PUT /api/renewals/:id — Update renewal (enforces Admin-only edit permissions)
 router.put("/:id", async (req, res) => {
   try {
     const actor = await getReqUser(req);
@@ -283,11 +283,11 @@ router.put("/:id", async (req, res) => {
       return res.status(401).json({ ok: false, error: "Authentication required. Please log in." });
     }
 
-    // RBAC: Viewers cannot update renewals
-    if (actor.role === "Viewer") {
+    // RBAC: Only Admin can edit renewals
+    if (actor.role !== "Admin") {
       return res.status(403).json({
         ok: false,
-        error: "Access denied. Viewer role has read-only access and cannot modify renewals.",
+        error: "Access denied. Only Administrators can edit renewal records.",
       });
     }
 
@@ -299,32 +299,6 @@ router.put("/:id", async (req, res) => {
     const updates = { ...req.body };
     const existingAssigneeId = existing.assignedToId || existing.assigned_to_id || null;
     const existingAssigneeName = existing.assignedToName || existing.responsiblePerson || "Unassigned";
-
-    // Requirement 6: Employees can manage their assigned renewals only and must not change assignments
-    if (actor.role === "Employee") {
-      if (!isRenewalAssignedToUser(existing, actor)) {
-        return res.status(403).json({
-          ok: false,
-          error: "Access denied. Employees may only manage renewals assigned to them.",
-        });
-      }
-
-      // Requirement 6: Employees must NOT change assignments
-      if (
-        updates.assignedToId !== undefined &&
-        String(updates.assignedToId || "") !== String(existingAssigneeId || "")
-      ) {
-        return res.status(403).json({
-          ok: false,
-          error: "Access denied. Only Administrators can assign or reassign renewals.",
-        });
-      }
-
-      // Preserve existing assignment
-      updates.assignedToId = existingAssigneeId || actor.id;
-      updates.assignedToName = existing.assignedToName || existing.responsiblePerson || actor.fullName;
-      updates.assignedToEmail = existing.assignedToEmail || existing.responsibleEmail || actor.email;
-    }
 
     let isReassigned = false;
     let newlyAssignedUser = null;
@@ -465,7 +439,7 @@ router.delete("/", async (req, res) => {
   }
 });
 
-// DELETE /api/renewals/:id — Delete single renewal (enforces assigned owner check)
+// DELETE /api/renewals/:id — Delete single renewal (Admin only)
 router.delete("/:id", async (req, res) => {
   try {
     const actor = await getReqUser(req);
@@ -473,27 +447,17 @@ router.delete("/:id", async (req, res) => {
       return res.status(401).json({ ok: false, error: "Authentication required. Please log in." });
     }
 
-    // RBAC: Viewers cannot delete renewals
-    if (actor.role === "Viewer") {
+    // RBAC: Only Admin can delete renewals
+    if (actor.role !== "Admin") {
       return res.status(403).json({
         ok: false,
-        error: "Access denied. Viewer role has read-only access and cannot delete renewals.",
+        error: "Access denied. Only Administrators can delete renewal records.",
       });
     }
 
     const existing = await db.getRenewalById(req.params.id);
     if (!existing) {
       return res.status(404).json({ ok: false, error: "Renewal record not found." });
-    }
-
-    // RBAC Requirement 6: Employees can only delete renewals assigned to them
-    if (actor.role === "Employee") {
-      if (!isRenewalAssignedToUser(existing, actor)) {
-        return res.status(403).json({
-          ok: false,
-          error: "Access denied. Employees may only delete renewals assigned to them.",
-        });
-      }
     }
 
     await db.deleteRenewal(req.params.id);
@@ -588,6 +552,109 @@ router.post("/:id/mark-renewed", async (req, res) => {
       targetType: "renewal",
       targetId: saved.id,
       details: `Marked "${saved.name}" as renewed. New expiry: ${newExpiryDate}.`,
+    });
+
+    res.json({ ok: true, data: saved });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/renewals/:id/snooze — Snooze reminder (Admin or assigned Employee)
+router.post("/:id/snooze", async (req, res) => {
+  try {
+    const actor = await getReqUser(req);
+    if (!actor) {
+      return res.status(401).json({ ok: false, error: "Authentication required. Please log in." });
+    }
+    if (actor.role === "Viewer") {
+      return res.status(403).json({
+        ok: false,
+        error: "Access denied. Viewer role has read-only access and cannot snooze reminders.",
+      });
+    }
+    const record = await db.getRenewalById(req.params.id);
+    if (!record) {
+      return res.status(404).json({ ok: false, error: "Renewal record not found." });
+    }
+    if (actor.role === "Employee" && !isRenewalAssignedToUser(record, actor)) {
+      return res.status(403).json({
+        ok: false,
+        error: "Access denied. Employees may only snooze reminders assigned to them.",
+      });
+    }
+
+    const days = Number(req.body.days) || 7;
+    let newDate = req.body.reminderDate;
+    if (!newDate) {
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      newDate = d.toISOString().slice(0, 10);
+    }
+    const updatedRecord = {
+      ...record,
+      reminderDate: newDate,
+      reminderCompleted: false,
+    };
+    const saved = await db.saveRenewal(updatedRecord);
+
+    await db.logAudit({
+      actorId: actor.id || "usr",
+      actorName: actor.fullName,
+      actorEmail: actor.email,
+      actorRole: actor.role,
+      action: "REMINDER_SNOOZED",
+      targetType: "renewal",
+      targetId: saved.id,
+      details: `Snoozed reminder for "${saved.name}" to ${newDate}.`,
+    });
+
+    res.json({ ok: true, data: saved });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/renewals/:id/reminder-status — Update reminder completion status (Admin or assigned Employee)
+router.post("/:id/reminder-status", async (req, res) => {
+  try {
+    const actor = await getReqUser(req);
+    if (!actor) {
+      return res.status(401).json({ ok: false, error: "Authentication required. Please log in." });
+    }
+    if (actor.role === "Viewer") {
+      return res.status(403).json({
+        ok: false,
+        error: "Access denied. Viewer role has read-only access.",
+      });
+    }
+    const record = await db.getRenewalById(req.params.id);
+    if (!record) {
+      return res.status(404).json({ ok: false, error: "Renewal record not found." });
+    }
+    if (actor.role === "Employee" && !isRenewalAssignedToUser(record, actor)) {
+      return res.status(403).json({
+        ok: false,
+        error: "Access denied. Employees may only manage reminders assigned to them.",
+      });
+    }
+
+    const completed = req.body.reminderCompleted === true;
+    const updatedRecord = {
+      ...record,
+      reminderCompleted: completed,
+    };
+    const saved = await db.saveRenewal(updatedRecord);
+
+    await db.logAudit({
+      actorId: actor.id || "usr",
+      actorName: actor.fullName,
+      actorEmail: actor.email,
+      actorRole: actor.role,
+      action: completed ? "REMINDER_COMPLETED" : "REMINDER_REOPENED",
+      targetType: "renewal",
+      targetId: saved.id,
+      details: `Reminder for "${saved.name}" marked as ${completed ? "completed" : "reopened"}.`,
     });
 
     res.json({ ok: true, data: saved });

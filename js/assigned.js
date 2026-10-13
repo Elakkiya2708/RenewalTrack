@@ -146,8 +146,6 @@
               <div class="row-actions">
                 <a class="icon-btn" href="details.html?id=${r.id}" aria-label="View details" title="View details"><i data-lucide="eye" class="icon"></i></a>
                 <button class="icon-btn" aria-label="Renew" title="Mark as Renewed" onclick="AssignedPage.openRenew('${r.id}')"><i data-lucide="refresh-cw" class="icon"></i></button>
-                <button class="icon-btn" aria-label="Edit" title="Edit" onclick="AssignedPage.openEdit('${r.id}')"><i data-lucide="edit-3" class="icon"></i></button>
-                <button class="icon-btn" aria-label="Delete" title="Delete" onclick="AssignedPage.openDelete('${r.id}')"><i data-lucide="trash-2" class="icon"></i></button>
               </div>
             </td>
           </tr>`;
@@ -179,6 +177,10 @@
   }
 
   function openEdit(id) {
+    if (!RTS.auth.isAdmin()) {
+      RTS.toast("Access denied. Only Administrators can edit renewals.", "error");
+      return;
+    }
     window.location.href = `records.html?edit=${encodeURIComponent(id)}`;
   }
 
@@ -311,6 +313,10 @@
   }
 
   function openDelete(id) {
+    if (!RTS.auth.isAdmin()) {
+      RTS.toast("Access denied. Only Administrators can delete renewals.", "error");
+      return;
+    }
     const record = RTS.data.getRenewalById(id);
     if (!record) return;
     deleteTargetId = id;
@@ -320,6 +326,10 @@
 
   function confirmDelete() {
     if (!deleteTargetId) return;
+    if (!RTS.auth.isAdmin()) {
+      RTS.toast("Access denied. Only Administrators can delete renewals.", "error");
+      return;
+    }
     RTS.data.deleteRenewal(deleteTargetId);
     RTS.toast("Renewal record deleted.", "success");
     deleteTargetId = null;

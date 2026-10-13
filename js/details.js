@@ -146,7 +146,8 @@
     const id = getId();
     const record = RTS.data.getRenewalById(id);
     const canEdit = RTS.auth.canEditRenewal(record);
-    const canDelete = RTS.auth.isAdmin() || (RTS.auth.isEmployee() && canEdit);
+    const canDelete = RTS.auth.canDeleteRenewal(record);
+    const canRenew = !RTS.auth.isViewer() && (RTS.auth.isAdmin() || (RTS.auth.isEmployee() && RTS.auth.isAssignedRenewal(record)));
 
     const editBtn = document.getElementById("editBtn");
     if (editBtn) {
@@ -180,6 +181,10 @@
     const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
     if (confirmDeleteBtn) {
       confirmDeleteBtn.addEventListener("click", () => {
+        if (!RTS.auth.isAdmin()) {
+          RTS.toast("Access denied. Only Administrators can delete renewal records.", "error");
+          return;
+        }
         RTS.data.deleteRenewal(id);
         RTS.toast("Renewal record deleted.", "success");
         setTimeout(() => (window.location.href = "records.html"), 500);
@@ -202,7 +207,7 @@
 
     const renewBtn = document.getElementById("renewBtn");
     if (renewBtn) {
-      if (!canEdit) {
+      if (!canRenew) {
         renewBtn.style.display = "none";
       } else {
         renewBtn.addEventListener("click", () => {

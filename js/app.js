@@ -482,23 +482,7 @@
   function getRenewals() {
     const all = getRawRenewals();
     if (isEmployee()) {
-      const user = getCurrentUser();
-      const uId = user.id ? String(user.id) : "";
-      const uEmail = (user.email || "").toLowerCase();
-      const uName = (user.fullName || "").toLowerCase();
-      return all.filter((r) => {
-        const assignedId = r.assignedToId || r.assigned_to_id ? String(r.assignedToId || r.assigned_to_id) : "";
-        const respEmail = (r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || r.responsible_email || "").toLowerCase();
-        const respName = (r.assignedToName || r.assigned_to_name || r.responsiblePerson || r.responsible_person || "").toLowerCase();
-        const createdBy = (r.createdBy || "").toLowerCase();
-        return (
-          (uId && assignedId === uId) ||
-          (uEmail && respEmail === uEmail) ||
-          (uName && respName === uName) ||
-          (uName && (respName.includes(uName) || uName.includes(respName))) ||
-          (uEmail && createdBy === uEmail)
-        );
-      });
+      return all.filter((r) => isAssignedRenewal(r));
     }
     return all;
   }
@@ -624,24 +608,14 @@
   }
 
   function updateRenewal(id, data) {
+    if (!isAdmin()) {
+      console.warn("Access denied. Only Administrators can edit renewal records.");
+      return null;
+    }
     const list = getRawRenewals();
     const idx = list.findIndex((r) => r.id === id);
     if (idx === -1) return null;
     const oldRecord = list[idx];
-
-    if (isEmployee() && !canEditRenewal(oldRecord)) {
-      console.warn("Access denied. Employees may only manage renewals assigned to them.");
-      return null;
-    }
-
-    if (isEmployee()) {
-      // Employees cannot reassign renewals
-      data.assignedToId = oldRecord.assignedToId || oldRecord.assigned_to_id;
-      data.assignedToName = oldRecord.assignedToName || oldRecord.assigned_to_name || oldRecord.responsiblePerson;
-      data.assignedToEmail = oldRecord.assignedToEmail || oldRecord.assigned_to_email || oldRecord.responsibleEmail;
-      data.responsiblePerson = data.assignedToName;
-      data.responsibleEmail = data.assignedToEmail;
-    }
 
     // If expiryDate is advancing forward to a new date, automatically record history!
     if (data.expiryDate && oldRecord.expiryDate && data.expiryDate !== oldRecord.expiryDate) {
@@ -682,15 +656,18 @@
   }
 
   function deleteRenewal(id) {
+    if (!isAdmin()) {
+      console.warn("Access denied. Only Administrators can delete renewal records.");
+      return;
+    }
     const list = getRawRenewals();
     const target = list.find((r) => r.id === id);
     if (!target) return;
-    if (isEmployee() && !canDeleteRenewal(target)) {
-      console.warn("Access denied. Employees may only delete renewals assigned to them.");
-      return;
-    }
     const updated = list.filter((r) => r.id !== id);
     saveRenewals(updated);
+    try {
+      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { id, deleted: true } }));
+    } catch (e) {}
     syncRenewalToBackend("DELETE", "/api/renewals/" + encodeURIComponent(id));
   }
 
@@ -700,8 +677,8 @@
     if (idx === -1) return null;
     const record = list[idx];
 
-    if (isEmployee() && !canEditRenewal(record)) {
-      console.warn("Access denied. Employees may only renew their assigned renewals.");
+    if (!canManageAssignedRenewal(record)) {
+      console.warn("Access denied. Employees may only renew records assigned to them.");
       return null;
     }
 
@@ -758,16 +735,26 @@
     return record;
   }
 
-  function snoozeReminder(id, days) {
+  function snoozeReminder(id, days, customDate) {
     const list = getRawRenewals();
     const idx = list.findIndex((r) => r.id === id);
     if (idx === -1) return null;
     const record = list[idx];
-    if (isEmployee() && !canEditRenewal(record)) return null;
-    const newDate = addDays(todayISO(), days || 7);
+    if (!canManageAssignedRenewal(record)) {
+      console.warn("Access denied. You may only snooze reminders assigned to you.");
+      return null;
+    }
+    const newDate = customDate || addDays(todayISO(), days || 7);
     list[idx].reminderDate = newDate;
     list[idx].reminderCompleted = false;
     saveRenewals(list);
+    try {
+      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { id, record: list[idx] } }));
+    } catch (e) {}
+    syncRenewalToBackend("POST", "/api/renewals/" + encodeURIComponent(id) + "/snooze", {
+      reminderDate: newDate,
+      days: days || 7,
+    });
     return list[idx];
   }
 
@@ -782,7 +769,7 @@
       const idx = list.findIndex((r) => r.id === id);
       if (idx !== -1) {
         const record = list[idx];
-        if (isEmployee() && !canEditRenewal(record)) return;
+        if (!canManageAssignedRenewal(record)) return;
         const cycle = record.recurringCycle || "Yearly";
         const newExpiry = calculateNextExpiry(record.expiryDate, cycle);
         const historyEntry = {
@@ -828,18 +815,23 @@
 
   function bulkDelete(ids) {
     if (!ids || !ids.length) return 0;
+    if (!isAdmin()) {
+      console.warn("Access denied. Only Administrators can delete renewal records.");
+      return 0;
+    }
     let list = getRawRenewals();
     const before = list.length;
     const toDelete = ids.filter((id) => {
       const target = list.find((r) => r.id === id);
-      if (!target) return false;
-      if (isEmployee() && !canDeleteRenewal(target)) return false;
-      return true;
+      return !!target;
     });
     list = list.filter((r) => !toDelete.includes(r.id));
     saveRenewals(list);
+    try {
+      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { count: toDelete.length, deleted: true } }));
+    } catch (e) {}
     toDelete.forEach((id) => {
-      syncRenewalToBackend('DELETE', '/api/renewals/' + encodeURIComponent(id));
+      syncRenewalToBackend("DELETE", "/api/renewals/" + encodeURIComponent(id));
     });
     return before - list.length;
   }
@@ -865,12 +857,28 @@
   }
 
   function toggleReminderCompleted(id, completed, options) {
+    const list = getRawRenewals();
+    const idx = list.findIndex((r) => r.id === id);
+    if (idx === -1) return null;
+    const record = list[idx];
+    if (!canManageAssignedRenewal(record)) {
+      console.warn("Access denied. You may only manage reminders assigned to you.");
+      return null;
+    }
     if (completed && options && options.renew) {
       return markAsRenewed(id, {
         notes: options.notes || "Completed & renewed via Reminders",
       });
     }
-    return updateRenewal(id, { reminderCompleted: completed });
+    list[idx].reminderCompleted = completed;
+    saveRenewals(list);
+    try {
+      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { id, record: list[idx] } }));
+    } catch (e) {}
+    syncRenewalToBackend("POST", "/api/renewals/" + encodeURIComponent(id) + "/reminder-status", {
+      reminderCompleted: completed,
+    });
+    return list[idx];
   }
 
   function getAllDocuments() {
@@ -1225,44 +1233,42 @@
     return getCurrentUser().role === "Viewer";
   }
 
-  function canEditRenewal(r) {
+  function isAssignedRenewal(r) {
     if (!r) return false;
-    if (isAdmin()) return true;
-    if (isViewer()) return false;
     const user = getCurrentUser();
     const uEmail = (user.email || "").toLowerCase();
     const uName = (user.fullName || "").toLowerCase();
-    const assignedId = r.assignedToId || r.assigned_to_id || "";
+    const uId = user.id ? String(user.id) : "";
+    const assignedId = r.assignedToId || r.assigned_to_id ? String(r.assignedToId || r.assigned_to_id) : "";
     const respEmail = (r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || r.responsible_email || "").toLowerCase();
     const respName = (r.assignedToName || r.assigned_to_name || r.responsiblePerson || r.responsible_person || "").toLowerCase();
     const createdBy = (r.createdBy || "").toLowerCase();
     return (
-      (assignedId && user.id && assignedId === user.id) ||
-      (uEmail && respEmail === uEmail) ||
-      (uName && respName === uName) ||
-      (uName && (respName.includes(uName) || uName.includes(respName))) ||
-      (uEmail && createdBy === uEmail)
+      (uId && assignedId && assignedId === uId) ||
+      (uEmail && respEmail && respEmail === uEmail) ||
+      (uName && respName && respName === uName) ||
+      (uName && respName && (respName.includes(uName) || uName.includes(respName))) ||
+      (uEmail && createdBy && createdBy === uEmail)
     );
+  }
+
+  function canEditRenewal(r) {
+    if (!r) return false;
+    // Only Admin can edit renewal records
+    return isAdmin();
   }
 
   function canDeleteRenewal(r) {
     if (!r) return false;
+    // Only Admin can delete renewal records
+    return isAdmin();
+  }
+
+  function canManageAssignedRenewal(r) {
+    if (!r) return false;
     if (isAdmin()) return true;
     if (isViewer()) return false;
-    const user = getCurrentUser();
-    const uEmail = (user.email || "").toLowerCase();
-    const uName = (user.fullName || "").toLowerCase();
-    const assignedId = r.assignedToId || r.assigned_to_id || "";
-    const respEmail = (r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || r.responsible_email || "").toLowerCase();
-    const respName = (r.assignedToName || r.assigned_to_name || r.responsiblePerson || r.responsible_person || "").toLowerCase();
-    const createdBy = (r.createdBy || "").toLowerCase();
-    return (
-      (assignedId && user.id && assignedId === user.id) ||
-      (uEmail && respEmail === uEmail) ||
-      (uName && respName === uName) ||
-      (uName && (respName.includes(uName) || uName.includes(respName))) ||
-      (uEmail && createdBy === uEmail)
-    );
+    return isEmployee() && isAssignedRenewal(r);
   }
 
   function requireAuth() {
@@ -2813,6 +2819,8 @@
       applyViewerRestrictions,
       canEditRenewal,
       canDeleteRenewal,
+      isAssignedRenewal,
+      canManageAssignedRenewal,
       redirectIfAuthed,
       registerAccount,
       getAccounts,
