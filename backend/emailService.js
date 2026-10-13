@@ -278,9 +278,19 @@ const emailService = {
       }
       try {
         const resend = new Resend(config.RESEND_API_KEY);
-        const { data, error } = await resend.apiKeys.list().catch(() => ({ data: null }));
+        const { data, error } = await resend.apiKeys.list().catch((err) => ({ error: err }));
         if (error) {
-          return { ok: false, provider: "resend", error: error.message };
+          // In Resend, keys created with "Sending access" return "restricted to only send emails".
+          // This confirms the key is authentic and active with sending permissions.
+          const msg = error.message || String(error);
+          if (msg.includes("restricted to only send emails") || error.name === "restricted_api_key") {
+            return {
+              ok: true,
+              provider: "resend",
+              message: "Resend API key verified (Sending access active).",
+            };
+          }
+          return { ok: false, provider: "resend", error: msg };
         }
         return {
           ok: true,
@@ -288,10 +298,18 @@ const emailService = {
           message: "Resend API connection and API key verified successfully.",
         };
       } catch (err) {
+        const msg = err.message || String(err);
+        if (msg.includes("restricted to only send emails") || err.name === "restricted_api_key") {
+          return {
+            ok: true,
+            provider: "resend",
+            message: "Resend API key verified (Sending access active).",
+          };
+        }
         return {
           ok: false,
           provider: "resend",
-          error: `Resend authentication check failed: ${err.message}`,
+          error: `Resend authentication check failed: ${msg}`,
         };
       }
     } else {
