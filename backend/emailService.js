@@ -37,7 +37,11 @@ function getDb() {
 // Redact API keys, tokens, and sensitive secrets from error messages and logs
 function sanitizeSecrets(str) {
   if (!str) return "";
-  const s = String(str);
+  let s = String(str);
+  const gmailPass = (config.GMAIL_APP_PASSWORD || config.SMTP_PASS || "").replace(/\s+/g, "");
+  if (gmailPass && gmailPass.length >= 8) {
+    s = s.split(gmailPass).join("[REDACTED_PASSWORD]");
+  }
   return s
     .replace(/re_[a-zA-Z0-9_]{10,}/g, "[REDACTED_API_KEY]")
     .replace(/Bearer\s+[a-zA-Z0-9_\-\.]+/gi, "Bearer [REDACTED_TOKEN]")
@@ -272,7 +276,9 @@ const emailService = {
     const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
     const isResend = provider === "resend";
     const hasResendKey = Boolean(config.RESEND_API_KEY && config.RESEND_API_KEY.trim());
-    const hasSmtpCreds = Boolean(config.SMTP_USER && config.SMTP_PASS && config.SMTP_PASS.trim());
+    const smtpUser = (config.GMAIL_USER || config.SMTP_USER || "").trim();
+    const smtpPass = (config.GMAIL_APP_PASSWORD || config.SMTP_PASS || "").replace(/\s+/g, "");
+    const hasSmtpCreds = Boolean(smtpUser && smtpPass);
 
     const isConfigured = isResend ? hasResendKey : hasSmtpCreds;
 
@@ -283,7 +289,7 @@ const emailService = {
       hasSmtpCreds,
       smtpHost: config.SMTP_HOST || "smtp.gmail.com",
       smtpPort: config.SMTP_PORT || 587,
-      smtpUser: config.SMTP_USER ? `${config.SMTP_USER.slice(0, 3)}***@***` : null,
+      smtpUser: smtpUser ? `${smtpUser.slice(0, 3)}***@***` : null,
       fromAddress: this.getFromAddress(),
       enabled: config.EMAIL_SEND_ENABLED !== false,
     };
@@ -336,8 +342,10 @@ const emailService = {
       }
     } else {
       // Nodemailer (Gmail SMTP or custom SMTP)
-      if (!config.SMTP_USER || !config.SMTP_PASS) {
-        const err = "SMTP_USER and/or SMTP_PASS are missing in .env. Configure your Gmail address and 16-character Google App Password.";
+      const user = (config.GMAIL_USER || config.SMTP_USER || "").trim();
+      const pass = (config.GMAIL_APP_PASSWORD || config.SMTP_PASS || "").replace(/\s+/g, "");
+      if (!user || !pass) {
+        const err = "GMAIL_USER and/or GMAIL_APP_PASSWORD are missing in .env. Configure your Gmail address and 16-character Google App Password.";
         return { ok: false, provider: "nodemailer", error: err, unconfigured: true };
       }
 
@@ -347,13 +355,13 @@ const emailService = {
         return {
           ok: true,
           provider: "nodemailer",
-          message: `SMTP connection established and authenticated successfully with ${config.SMTP_HOST || 'Gmail'}!`,
+          message: `Gmail SMTP connection established and authenticated successfully with smtp.gmail.com!`,
         };
       } catch (err) {
         return {
           ok: false,
           provider: "nodemailer",
-          error: `SMTP connection/authentication failed: ${err.message}`,
+          error: `Gmail SMTP connection/authentication failed: ${err.message}`,
         };
       }
     }
@@ -361,18 +369,22 @@ const emailService = {
 
   // Internal: Build Nodemailer transporter
   _createNodemailerTransporter() {
+    const user = (config.GMAIL_USER || config.SMTP_USER || "").trim();
+    const pass = (config.GMAIL_APP_PASSWORD || config.SMTP_PASS || "").replace(/\s+/g, "");
+
     const isGmail =
+      Boolean(config.GMAIL_USER || config.GMAIL_APP_PASSWORD) ||
       (config.SMTP_HOST && config.SMTP_HOST.toLowerCase().includes("gmail")) ||
       (config.SMTP_SERVICE && config.SMTP_SERVICE.toLowerCase() === "gmail") ||
-      (config.SMTP_USER && config.SMTP_USER.toLowerCase().endsWith("@gmail.com"));
+      (user && user.toLowerCase().endsWith("@gmail.com"));
 
     let transportOptions;
     if (isGmail) {
       transportOptions = {
         service: "gmail",
         auth: {
-          user: config.SMTP_USER,
-          pass: config.SMTP_PASS, // 16-character Google App Password
+          user,
+          pass, // 16-character Google App Password
         },
       };
     } else {
@@ -381,10 +393,10 @@ const emailService = {
         port: config.SMTP_PORT || 587,
         secure: config.SMTP_SECURE,
         auth:
-          config.SMTP_USER && config.SMTP_PASS
+          user && pass
             ? {
-                user: config.SMTP_USER,
-                pass: config.SMTP_PASS,
+                user,
+                pass,
               }
             : undefined,
         tls: {
@@ -398,8 +410,10 @@ const emailService = {
 
   // Internal: Send via Nodemailer (SMTP / Gmail)
   async _sendViaNodemailer({ from, to, subject, html, text, renewal, isAlertEmail = false }) {
-    if (!config.SMTP_USER || !config.SMTP_PASS) {
-      const err = "Cannot send real email: SMTP_USER and SMTP_PASS are not configured in .env.";
+    const user = (config.GMAIL_USER || config.SMTP_USER || "").trim();
+    const pass = (config.GMAIL_APP_PASSWORD || config.SMTP_PASS || "").replace(/\s+/g, "");
+    if (!user || !pass) {
+      const err = "Cannot send real email: GMAIL_USER and GMAIL_APP_PASSWORD are not configured in .env.";
       console.error(`[Nodemailer Error] ${err}`);
       return { success: false, error: err, unconfigured: true, provider: "nodemailer" };
     }

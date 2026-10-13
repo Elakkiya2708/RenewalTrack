@@ -22,15 +22,17 @@ const config = {
   EMAIL_PROVIDER: (process.env.EMAIL_PROVIDER || "nodemailer").toLowerCase(), // 'nodemailer' (SMTP/Gmail) or 'resend'
   EMAIL_SEND_ENABLED: process.env.EMAIL_SEND_ENABLED !== "false", // Real delivery enabled by default unless explicitly disabled with 'false'
 
-  // Nodemailer SMTP Settings (e.g. Gmail SMTP)
+  // Gmail SMTP & Nodemailer Settings
+  GMAIL_USER: (process.env.GMAIL_USER || process.env.SMTP_USER || "").trim(),
+  GMAIL_APP_PASSWORD: (process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || "").replace(/\s+/g, ""),
   SMTP_HOST: process.env.SMTP_HOST || "smtp.gmail.com",
   SMTP_PORT: parseInt(process.env.SMTP_PORT || "587", 10),
   SMTP_SECURE: process.env.SMTP_SECURE === "true" || process.env.SMTP_PORT === "465",
-  SMTP_SERVICE: process.env.SMTP_SERVICE || (process.env.SMTP_HOST && process.env.SMTP_HOST.includes("gmail") ? "gmail" : ""),
-  SMTP_USER: (process.env.SMTP_USER || process.env.GMAIL_USER || "").trim(),
-  SMTP_PASS: (process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || "").replace(/\s+/g, ""),
-  EMAIL_FROM: process.env.EMAIL_FROM || process.env.FROM_EMAIL || "RenewalTrack <elakkiya270806@gmail.com>",
-  FROM_EMAIL: process.env.EMAIL_FROM || process.env.FROM_EMAIL || "RenewalTrack <elakkiya270806@gmail.com>",
+  SMTP_SERVICE: process.env.SMTP_SERVICE || (process.env.SMTP_HOST && process.env.SMTP_HOST.includes("gmail") ? "gmail" : (process.env.GMAIL_USER ? "gmail" : "")),
+  SMTP_USER: (process.env.GMAIL_USER || process.env.SMTP_USER || "").trim(),
+  SMTP_PASS: (process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || "").replace(/\s+/g, ""),
+  EMAIL_FROM: process.env.EMAIL_FROM || process.env.FROM_EMAIL || (process.env.GMAIL_USER ? `RenewalTrack <${process.env.GMAIL_USER}>` : "RenewalTrack <elakkiya270806@gmail.com>"),
+  FROM_EMAIL: process.env.EMAIL_FROM || process.env.FROM_EMAIL || (process.env.GMAIL_USER ? `RenewalTrack <${process.env.GMAIL_USER}>` : "RenewalTrack <elakkiya270806@gmail.com>"),
   FROM_NAME: process.env.FROM_NAME || "RenewalTrack Alerts",
 
   // Resend API Settings
