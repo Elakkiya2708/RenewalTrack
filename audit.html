@@ -126,6 +126,7 @@
             <select id="actionFilter" class="input" style="height:34px;font-size:13px;width:190px;padding:4px 8px;">
               <option value="">All Actions</option>
               <option value="RENEWAL">Renewal Operations</option>
+              <option value="EMAIL">Email &amp; Delivery Failures</option>
               <option value="LOGIN_AUTH">Logins &amp; Authentication</option>
               <option value="INVITE">Team Invitations</option>
               <option value="ROLE_ACCOUNT">Role &amp; Team Status</option>
@@ -214,11 +215,12 @@
       const action = (l.action || "").toUpperCase();
       if (actionFilter) {
         if (actionFilter === "RENEWAL" && !action.includes("RENEWAL")) return false;
+        if (actionFilter === "EMAIL" && !action.includes("EMAIL") && !action.includes("DELIVER") && !action.includes("ALERT") && !action.includes("BOUNCE")) return false;
         if (actionFilter === "LOGIN_AUTH" && !action.includes("LOGIN") && !action.includes("AUTH") && !action.includes("REGISTER")) return false;
         if (actionFilter === "INVITE" && !action.includes("INVIT")) return false;
         if (actionFilter === "ROLE_ACCOUNT" && !action.includes("ROLE") && !action.includes("DEACTIVAT") && !action.includes("ACTIVAT") && !action.includes("MEMBER")) return false;
         if (actionFilter === "SYSTEM" && !action.includes("SYSTEM")) return false;
-        if (!["RENEWAL", "LOGIN_AUTH", "INVITE", "ROLE_ACCOUNT", "SYSTEM"].includes(actionFilter) && !action.includes(actionFilter.toUpperCase())) return false;
+        if (!["RENEWAL", "EMAIL", "LOGIN_AUTH", "INVITE", "ROLE_ACCOUNT", "SYSTEM"].includes(actionFilter) && !action.includes(actionFilter.toUpperCase())) return false;
       }
       if (search) {
         const actorName = l.actor_name || l.actorName || "";
@@ -290,10 +292,10 @@
     if (act.includes("CREATE") || act.includes("ACCEPTED") || act.includes("RENEWED") || act.includes("LOGIN")) {
       return `<span class="status-pill status-active">${escapeHtml(action)}</span>`;
     }
-    if (act.includes("DELETE") || act.includes("DEACTIVATE") || act.includes("REVOKE") || act.includes("REJECTED")) {
+    if (act.includes("DELETE") || act.includes("DEACTIVATE") || act.includes("REVOKE") || act.includes("REJECTED") || act.includes("FAIL") || act.includes("BOUNCE")) {
       return `<span class="status-pill status-deactivated">${escapeHtml(action)}</span>`;
     }
-    if (act.includes("ROLE") || act.includes("UPDATE") || act.includes("INVITE") || act.includes("REGISTER")) {
+    if (act.includes("ROLE") || act.includes("UPDATE") || act.includes("INVITE") || act.includes("REGISTER") || act.includes("ALERT")) {
       return `<span class="status-pill status-pending">${escapeHtml(action)}</span>`;
     }
     return `<span class="status-pill">${escapeHtml(action)}</span>`;

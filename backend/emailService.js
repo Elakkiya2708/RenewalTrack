@@ -25,6 +25,29 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
+// Lazily load database to prevent circular CommonJS dependency
+function getDb() {
+  try {
+    return require("./db");
+  } catch (e) {
+    return null;
+  }
+}
+
+// Redact API keys, tokens, and sensitive secrets from error messages and logs
+function sanitizeSecrets(str) {
+  if (!str) return "";
+  const s = String(str);
+  return s
+    .replace(/re_[a-zA-Z0-9_]{10,}/g, "[REDACTED_API_KEY]")
+    .replace(/Bearer\s+[a-zA-Z0-9_\-\.]+/gi, "Bearer [REDACTED_TOKEN]")
+    .replace(/(password|secret|pass|apiKey|api_key|token)[:=]\s*["']?[^"'\s&]+["']?/gi, "$1=[REDACTED]");
+}
+
+// In-memory deduplication cache for delivery failure alerts (15-minute TTL)
+const failureAlertCache = new Map();
+const DEDUP_WINDOW_MS = 15 * 60 * 1000;
+
 // Format priority badge in HTML
 function getPriorityColor(priority) {
   switch ((priority || "").toLowerCase()) {
@@ -375,7 +398,7 @@ const emailService = {
   },
 
   // Internal: Send via Nodemailer (SMTP / Gmail)
-  async _sendViaNodemailer({ from, to, subject, html, text, renewal }) {
+  async _sendViaNodemailer({ from, to, subject, html, text, renewal, isAlertEmail = false }) {
     if (!config.SMTP_USER || !config.SMTP_PASS) {
       const err = "Cannot send real email: SMTP_USER and SMTP_PASS are not configured in .env.";
       console.error(`[Nodemailer Error] ${err}`);
@@ -404,10 +427,11 @@ const emailService = {
         delivered: true,
       };
     } catch (err) {
-      console.error(`[Nodemailer Delivery Error] Failed sending to ${to}: ${err.message}`);
+      const cleanErr = sanitizeSecrets(err.message);
+      console.error(`[Nodemailer Delivery Error] Failed sending to ${to}: ${cleanErr}`);
       return {
         success: false,
-        error: err.message,
+        error: cleanErr,
         provider: "nodemailer",
         delivered: false,
       };
@@ -415,7 +439,7 @@ const emailService = {
   },
 
   // Internal: Send via Resend API
-  async _sendViaResend({ from, to, subject, html, text, renewal }) {
+  async _sendViaResend({ from, to, subject, html, text, renewal, isAlertEmail = false }) {
     if (!config.RESEND_API_KEY || !config.RESEND_API_KEY.trim()) {
       const err = "Cannot send real email: RESEND_API_KEY is not configured in .env.";
       console.error(`[Resend Error] ${err}`);
@@ -436,10 +460,11 @@ const emailService = {
       });
 
       if (error) {
-        console.error(`[Resend API Error] Failed sending to ${to}: ${error.message}`);
+        const cleanErr = sanitizeSecrets(error.message || String(error));
+        console.error(`[Resend API Error] Failed sending to ${to}: ${cleanErr}`);
         return {
           success: false,
-          error: error.message,
+          error: cleanErr,
           provider: "resend",
           delivered: false,
         };
@@ -453,10 +478,11 @@ const emailService = {
         delivered: true,
       };
     } catch (err) {
-      console.error(`[Resend Delivery Error] Failed sending to ${to}: ${err.message}`);
+      const cleanErr = sanitizeSecrets(err.message || String(err));
+      console.error(`[Resend Delivery Error] Failed sending to ${to}: ${cleanErr}`);
       return {
         success: false,
-        error: err.message,
+        error: cleanErr,
         provider: "resend",
         delivered: false,
       };
@@ -503,8 +529,9 @@ const emailService = {
     const fromAddress = this.getFromAddress();
     const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
 
+    let result;
     if (provider === "resend") {
-      return await this._sendViaResend({
+      result = await this._sendViaResend({
         from: fromAddress,
         to: recipientEmail,
         subject,
@@ -513,7 +540,7 @@ const emailService = {
         renewal,
       });
     } else {
-      return await this._sendViaNodemailer({
+      result = await this._sendViaNodemailer({
         from: fromAddress,
         to: recipientEmail,
         subject,
@@ -522,6 +549,22 @@ const emailService = {
         renewal,
       });
     }
+
+    if (result && !result.success) {
+      console.warn(`[Reminder Email Warning] Email delivery to ${recipientEmail} not completed: ${result.error}`);
+      await this.notifyDeliveryFailure({
+        recipientEmail,
+        recipientName,
+        employeeDetails: { name: recipientName, email: recipientEmail, role: "Employee" },
+        renewalName: renewal.name,
+        failureTime: new Date().toISOString(),
+        reason: result.error || "Reminder email delivery failed",
+        emailType: `Renewal Reminder (${interval || daysRemaining + 'd'})`,
+        context: { renewal, interval, daysRemaining, provider },
+      });
+    }
+
+    return result;
   },
 
   // Send a direct test email (for testing real delivery to an inbox)
@@ -646,6 +689,16 @@ const emailService = {
       console.log(`[Invitation Email Success] Invitation email delivered to ${to} via ${result.provider}. Message ID: ${result.messageId}`);
     } else {
       console.warn(`[Invitation Email Warning] Email delivery to ${to} not completed: ${result.error}`);
+      await this.notifyDeliveryFailure({
+        recipientEmail: to,
+        recipientName: fullName,
+        employeeDetails: { name: fullName, email: to, role },
+        renewalName: "Team Workspace Invitation",
+        failureTime: new Date().toISOString(),
+        reason: result.error || "Invitation email delivery failed",
+        emailType: "Team Member Invitation",
+        context: { role, invitedBy, provider },
+      });
     }
     return result;
   },
@@ -768,6 +821,16 @@ const emailService = {
     if (!isValidEmail(to)) {
       const err = `Invalid recipient email address: "${to}"`;
       console.warn(`[Assignment Email Validation] ${err}`);
+      await this.notifyDeliveryFailure({
+        recipientEmail: to,
+        recipientName,
+        employeeDetails: { name: recipientName, email: to, role: "Employee" },
+        renewalName: renewal ? renewal.name : "Renewal Record",
+        failureTime: new Date().toISOString(),
+        reason: err,
+        emailType: isReassignment ? "Renewal Reassignment" : "Renewal Assignment",
+        context: { renewal, assignedBy },
+      });
       return { success: false, error: err, isInvalidEmail: true };
     }
 
@@ -881,6 +944,20 @@ const emailService = {
       result = await this._sendViaNodemailer({ from, to, subject, html, text, renewal });
     }
 
+    if (result && !result.success) {
+      console.warn(`[Assignment Email Warning] Email delivery to ${to} not completed: ${result.error}`);
+      await this.notifyDeliveryFailure({
+        recipientEmail: to,
+        recipientName,
+        employeeDetails: { name: recipientName, email: to, role: "Employee" },
+        renewalName: renewal ? renewal.name : "Renewal Record",
+        failureTime: new Date().toISOString(),
+        reason: result.error || "Assignment email delivery failed",
+        emailType: isReassignment ? "Renewal Reassignment" : "Renewal Assignment",
+        context: { renewal, assignedBy, provider },
+      });
+    }
+
     return result;
   },
 
@@ -981,6 +1058,318 @@ const emailService = {
     }
 
     return result;
+  },
+
+  // Helper method to sanitize secrets from text
+  sanitizeSecrets(str) {
+    return sanitizeSecrets(str);
+  },
+
+  // Helper method to clear the alert deduplication cache (useful for testing or cache reset)
+  clearAlertDeduplicationCache() {
+    failureAlertCache.clear();
+  },
+
+  /**
+   * Real Email Delivery Failure Alert System:
+   * Dispatches a critical failure alert to elakkiyaohai@gmail.com whenever an employee
+   * assignment email, webhook bounce, or other important email dispatch fails.
+   *
+   * Includes:
+   * - Employee details (name, email, role, ID)
+   * - Renewal name
+   * - Failure timestamp
+   * - Sanitized failure reason (Resend API errors, bounce codes, etc.)
+   *
+   * Security & Safety Guarantees:
+   * - Prevents infinite retry loops (circuit breaker on alert emails)
+   * - Prevents duplicate alert spam via a 15-minute deduplication window
+   * - Securely logs to Admin Audit Logs if the Admin alert also fails
+   * - Redacts API keys and sensitive tokens
+   */
+  async notifyDeliveryFailure({
+    recipientEmail,
+    recipientName = "",
+    employeeDetails = null,
+    renewalName = "",
+    failureTime = null,
+    reason = "Email delivery failed",
+    emailType = "Employee Renewal Assignment",
+    context = {},
+    force = false,
+  }) {
+    const adminEmail = (config.ALERT_FALLBACK_EMAIL || "elakkiyaohai@gmail.com").trim().toLowerCase();
+    const cleanRecipient = (recipientEmail || "").trim().toLowerCase();
+    const cleanReason = sanitizeSecrets(reason || "Email delivery failed");
+    const failTimestamp = failureTime || new Date().toISOString();
+    const failDateFormatted = new Date(failTimestamp).toUTCString();
+
+    const empName = (employeeDetails && employeeDetails.name) || recipientName || cleanRecipient || "Employee";
+    const empEmail = (employeeDetails && employeeDetails.email) || cleanRecipient || "Unknown Email";
+    const empRole = (employeeDetails && employeeDetails.role) || "Employee";
+    const empId = (employeeDetails && employeeDetails.id) || "N/A";
+    const recRenewalName = renewalName || (context.renewal && context.renewal.name) || "Renewal Record";
+
+    // 1. RECURSION & INFINITE RETRY CIRCUIT BREAKER
+    // If the failed email was an alert itself, or if recipient is the admin alert email itself:
+    if (context.isAlertEmail === true || emailType === "DELIVERY_FAILURE_ALERT" || cleanRecipient === adminEmail) {
+      console.warn(`[Alert Loop Breaker] Preventing alert recursion for ${adminEmail}. Logging directly to Admin Audit Logs.`);
+      const db = getDb();
+      if (db && typeof db.logAudit === "function") {
+        await db.logAudit({
+          actorId: "system",
+          actorName: "Email Delivery System",
+          actorEmail: "system@renewguard.com",
+          actorRole: "System",
+          action: "EMAIL_ALERT_FAILED",
+          targetType: "admin_alert",
+          targetId: adminEmail,
+          details: `CRITICAL: Failure alert delivery failed to ${adminEmail}. Primary failure was for ${cleanRecipient} (${recRenewalName}). Error: ${cleanReason}`,
+        });
+      }
+      return { success: false, loopPrevented: true, loggedToAudit: true, error: cleanReason };
+    }
+
+    // 2. DEDUPLICATION CACHE (15-Minute Window)
+    const dedupKey = `${cleanRecipient}:${emailType.toLowerCase()}:${recRenewalName.toLowerCase()}:${cleanReason.slice(0, 40).toLowerCase()}`;
+    const now = Date.now();
+    const lastAlertTime = failureAlertCache.get(dedupKey);
+
+    if (!force && lastAlertTime && (now - lastAlertTime < DEDUP_WINDOW_MS)) {
+      console.log(`[Alert Deduplication] Duplicate failure alert suppressed for ${cleanRecipient} within 15-minute window.`);
+      const db = getDb();
+      if (db && typeof db.logAudit === "function") {
+        await db.logAudit({
+          actorId: "system",
+          actorName: "Email Delivery System",
+          actorEmail: "system@renewguard.com",
+          actorRole: "System",
+          action: "EMAIL_DELIVERY_FAILURE",
+          targetType: "email_delivery",
+          targetId: cleanRecipient,
+          details: `Email delivery failure for ${emailType} to ${empName} (${empEmail}) on renewal "${recRenewalName}". Duplicate Admin email alert suppressed (already notified within 15m). Reason: ${cleanReason}`,
+        });
+      }
+      return { success: true, duplicateSuppressed: true, loggedToAudit: true };
+    }
+
+    // 3. BUILD ALERT EMAIL
+    const subject = `[ALERT] Email Delivery Failure: ${emailType} - ${recRenewalName}`;
+    const appUrl = config.APP_URL || `http://localhost:${config.PORT}`;
+    const auditUrl = `${appUrl}/audit.html`;
+    const detailsUrl = context.renewal && context.renewal.id ? `${appUrl}/details.html?id=${encodeURIComponent(context.renewal.id)}` : `${appUrl}/records.html`;
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;line-height:1.5;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#0f172a;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width:620px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.3);border:1px solid #334155;">
+          <tr>
+            <td style="background:linear-gradient(135deg, #991b1b 0%, #dc2626 100%);padding:24px 32px;border-bottom:3px solid #7f1d1d;">
+              <table role="presentation" width="100%">
+                <tr>
+                  <td>
+                    <div style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
+                      <span style="color:#fca5a5;">Renew</span>Guard
+                    </div>
+                    <div style="font-size:12px;color:#fecaca;margin-top:2px;">
+                      Automated Email Delivery Failure Alert
+                    </div>
+                  </td>
+                  <td align="right">
+                    <span style="display:inline-block;padding:6px 14px;background-color:rgba(0,0,0,0.3);color:#ffffff;font-size:11px;font-weight:800;border-radius:20px;text-transform:uppercase;letter-spacing:0.5px;border:1px solid rgba(255,255,255,0.3);">
+                      DELIVERY FAILURE
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 32px 24px;">
+              <h2 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#0f172a;">
+                Attention Administrator,
+              </h2>
+              <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">
+                An automated email dispatch failed to reach the intended employee. Below are the employee specifics, renewal record details, timestamp, and failure diagnosis.
+              </p>
+              
+              <!-- Failure Context Box -->
+              <div style="background-color:#fef2f2;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:8px;padding:20px;margin-bottom:24px;">
+                <table role="presentation" width="100%">
+                  <tr>
+                    <td style="padding:6px 0;font-size:13px;color:#991b1b;font-weight:700;width:150px;">Email Event:</td>
+                    <td style="padding:6px 0;font-size:14px;font-weight:700;color:#7f1d1d;">${escapeHtml(emailType)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;border-top:1px solid #fee2e2;">Employee Name:</td>
+                    <td style="padding:6px 0;font-size:13px;font-weight:600;color:#0f172a;border-top:1px solid #fee2e2;">${escapeHtml(empName)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;border-top:1px solid #fee2e2;">Employee Email:</td>
+                    <td style="padding:6px 0;font-size:13px;font-weight:700;color:#dc2626;border-top:1px solid #fee2e2;">${escapeHtml(empEmail)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;border-top:1px solid #fee2e2;">Employee Role &amp; ID:</td>
+                    <td style="padding:6px 0;font-size:13px;color:#334155;border-top:1px solid #fee2e2;">${escapeHtml(empRole)} ${empId !== 'N/A' ? `(${escapeHtml(empId)})` : ''}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;border-top:1px solid #fee2e2;">Renewal Name:</td>
+                    <td style="padding:6px 0;font-size:14px;font-weight:700;color:#0f172a;border-top:1px solid #fee2e2;">${escapeHtml(recRenewalName)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;border-top:1px solid #fee2e2;">Failure Time:</td>
+                    <td style="padding:6px 0;font-size:13px;font-weight:600;color:#0f172a;border-top:1px solid #fee2e2;">${escapeHtml(failDateFormatted)} (${escapeHtml(failTimestamp)})</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0 4px;font-size:13px;color:#991b1b;font-weight:700;border-top:1px solid #fee2e2;vertical-align:top;">Failure Reason:</td>
+                    <td style="padding:8px 0 4px;font-size:13px;color:#991b1b;font-family:monospace;border-top:1px solid #fee2e2;word-break:break-all;">
+                      ${escapeHtml(cleanReason)}
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- Actionable guidance -->
+              <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:24px;">
+                <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px;">Recommended Next Steps:</div>
+                <ul style="margin:0;padding-left:20px;font-size:13px;color:#475569;line-height:1.6;">
+                  <li>Verify that <strong>${escapeHtml(empEmail)}</strong> is typed correctly and able to receive external emails.</li>
+                  <li>If using Resend sandbox mode (<code>onboarding@resend.dev</code>), Resend restricts delivery to the verified account owner until a custom domain is configured.</li>
+                  <li>Review the full incident report in the RenewGuard Admin Audit Logs.</li>
+                </ul>
+              </div>
+
+              <div style="text-align:center;margin:28px 0;">
+                <a href="${auditUrl}" style="background-color:#0f172a;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 24px;border-radius:6px;display:inline-block;margin-right:8px;">
+                  Open Audit Logs &rarr;
+                </a>
+                <a href="${detailsUrl}" style="background-color:#4f46e5;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 24px;border-radius:6px;display:inline-block;">
+                  View Renewal &rarr;
+                </a>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center;">
+              &copy; 2026 RenewGuard Inc. &bull; Automated Critical Incident Alert &bull; Target: ${escapeHtml(adminEmail)}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    const text = `RenewGuard Critical Alert: Email Delivery Failure\n\nAttention Administrator (${adminEmail}),\n\nAn automated email dispatch could not be delivered:\n- Event: ${emailType}\n- Employee: ${empName} (${empEmail})\n- Role/ID: ${empRole} ${empId !== 'N/A' ? `(${empId})` : ''}\n- Renewal: ${recRenewalName}\n- Failure Time: ${failDateFormatted} (${failTimestamp})\n- Failure Reason: ${cleanReason}\n\nAudit Logs: ${auditUrl}\nRenewal Details: ${detailsUrl}`;
+
+    const from = this.getFromAddress();
+    const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
+
+    console.log(`[Alert Dispatch] Sending delivery failure alert to Admin <${adminEmail}> via ${provider}...`);
+
+    let sendResult = null;
+    let alertSucceeded = false;
+    let alertError = null;
+
+    try {
+      if (provider === "resend") {
+        sendResult = await this._sendViaResend({
+          from,
+          to: adminEmail,
+          subject,
+          html,
+          text,
+          renewal: { name: `Alert: ${recRenewalName}` },
+          isAlertEmail: true,
+        });
+      } else {
+        sendResult = await this._sendViaNodemailer({
+          from,
+          to: adminEmail,
+          subject,
+          html,
+          text,
+          renewal: { name: `Alert: ${recRenewalName}` },
+          isAlertEmail: true,
+        });
+      }
+      alertSucceeded = Boolean(sendResult && sendResult.success);
+      if (!alertSucceeded) {
+        alertError = sanitizeSecrets((sendResult && sendResult.error) || "Provider rejected alert email");
+      }
+    } catch (e) {
+      alertSucceeded = false;
+      alertError = sanitizeSecrets(e.message || String(e));
+    }
+
+    // Set cache entry on both success or attempted delivery to prevent hammering
+    failureAlertCache.set(dedupKey, Date.now());
+
+    const db = getDb();
+
+    if (alertSucceeded) {
+      console.log(`[Alert Dispatch Success] Failure alert successfully delivered to Admin <${adminEmail}>. Message ID: ${sendResult.messageId}`);
+      if (db && typeof db.logAudit === "function") {
+        await db.logAudit({
+          actorId: "system",
+          actorName: "Email Delivery System",
+          actorEmail: "system@renewguard.com",
+          actorRole: "System",
+          action: "EMAIL_DELIVERY_FAILURE",
+          targetType: "email_delivery",
+          targetId: cleanRecipient,
+          details: `Email delivery failed for ${emailType} to ${empName} (${empEmail}) on renewal "${recRenewalName}". Reason: ${cleanReason}. Failure alert sent to Admin (${adminEmail}).`,
+        });
+      }
+      return {
+        success: true,
+        adminNotified: true,
+        adminEmail,
+        messageId: sendResult.messageId,
+        loggedToAudit: true,
+      };
+    } else {
+      // Admin alert failed! FALLBACK TO ADMIN AUDIT LOGS
+      console.error(`[Alert Dispatch FAILED] Could not deliver alert to Admin <${adminEmail}>: ${alertError}. Writing fail-safe incident to Admin Audit Logs.`);
+      if (db && typeof db.logAudit === "function") {
+        await db.logAudit({
+          actorId: "system",
+          actorName: "Email Delivery System",
+          actorEmail: "system@renewguard.com",
+          actorRole: "System",
+          action: "EMAIL_DELIVERY_FAILURE",
+          targetType: "email_delivery",
+          targetId: cleanRecipient,
+          details: `Email delivery failed for ${emailType} to ${empName} (${empEmail}) on renewal "${recRenewalName}". Reason: ${cleanReason}. (Notice: Admin alert email dispatch failed: ${alertError})`,
+        });
+        await db.logAudit({
+          actorId: "system",
+          actorName: "Email Delivery System",
+          actorEmail: "system@renewguard.com",
+          actorRole: "System",
+          action: "EMAIL_ALERT_FAILED",
+          targetType: "admin_alert",
+          targetId: adminEmail,
+          details: `CRITICAL: Failed to deliver failure alert to Admin (${adminEmail}). Alert Error: ${alertError}. Primary failure for ${empEmail}: ${cleanReason}.`,
+        });
+      }
+      return {
+        success: false,
+        adminAlertFailed: true,
+        adminEmail,
+        alertError,
+        loggedToAudit: true,
+        error: alertError,
+      };
+    }
   },
 };
 

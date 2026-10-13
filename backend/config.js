@@ -35,6 +35,7 @@ const config = {
   // Resend API Settings
   RESEND_API_KEY: process.env.RESEND_API_KEY || "",
   RESEND_FROM: process.env.RESEND_FROM || "onboarding@resend.dev",
+  RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET || "",
 
   // Background Reminder Scheduler (node-cron)
   // Default is daily at 08:00 AM ('0 8 * * *')
