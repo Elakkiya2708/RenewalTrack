@@ -252,11 +252,8 @@ const emailService = {
     const fromName = config.FROM_NAME || "RenewGuard Alerts";
 
     if (provider === "resend") {
-      // For Resend: if a verified custom sender is specified, use it; otherwise use Resend sandbox default
-      const fromEmail =
-        config.FROM_EMAIL && !config.FROM_EMAIL.includes("renewguard.com")
-          ? config.FROM_EMAIL
-          : (config.RESEND_FROM || "onboarding@resend.dev");
+      // For Resend: use EMAIL_FROM from .env (e.g. onboarding@resend.dev or custom verified domain)
+      const fromEmail = (config.EMAIL_FROM || config.RESEND_FROM || config.FROM_EMAIL || "onboarding@resend.dev").trim();
       return `"${fromName}" <${fromEmail}>`;
     }
 
@@ -1055,6 +1052,20 @@ const emailService = {
       result = await this._sendViaResend({ from, to, subject, html, text, renewal: { name: "Password Reset" } });
     } else {
       result = await this._sendViaNodemailer({ from, to, subject, html, text, renewal: { name: "Password Reset" } });
+    }
+
+    if (result && !result.success) {
+      console.warn(`[Password Reset Warning] Email delivery to ${to} not completed: ${result.error}`);
+      await this.notifyDeliveryFailure({
+        recipientEmail: to,
+        recipientName,
+        employeeDetails: { name: recipientName, email: to },
+        renewalName: "Account Security Password Reset",
+        failureTime: new Date().toISOString(),
+        reason: result.error || "Password reset email delivery failed",
+        emailType: "Password Reset Email",
+        context: { provider },
+      });
     }
 
     return result;

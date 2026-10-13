@@ -29,12 +29,13 @@ const config = {
   SMTP_SERVICE: process.env.SMTP_SERVICE || (process.env.SMTP_HOST && process.env.SMTP_HOST.includes("gmail") ? "gmail" : ""),
   SMTP_USER: process.env.SMTP_USER || "",
   SMTP_PASS: process.env.SMTP_PASS || "",
-  FROM_EMAIL: process.env.FROM_EMAIL || process.env.EMAIL_FROM || "",
+  EMAIL_FROM: process.env.EMAIL_FROM || process.env.FROM_EMAIL || "onboarding@resend.dev",
+  FROM_EMAIL: process.env.EMAIL_FROM || process.env.FROM_EMAIL || "onboarding@resend.dev",
   FROM_NAME: process.env.FROM_NAME || "RenewGuard Alerts",
 
   // Resend API Settings
   RESEND_API_KEY: process.env.RESEND_API_KEY || "",
-  RESEND_FROM: process.env.RESEND_FROM || "onboarding@resend.dev",
+  RESEND_FROM: process.env.EMAIL_FROM || process.env.RESEND_FROM || "onboarding@resend.dev",
   RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET || "",
 
   // Background Reminder Scheduler (node-cron)
