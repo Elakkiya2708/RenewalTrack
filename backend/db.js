@@ -362,9 +362,27 @@ const db = {
       }
     }
 
+    let sanitizedHistory = renewalData.history;
+    if (sanitizedHistory) {
+      if (typeof sanitizedHistory === "string") {
+        try { sanitizedHistory = JSON.parse(sanitizedHistory); } catch (e) { sanitizedHistory = []; }
+      }
+      if (Array.isArray(sanitizedHistory)) {
+        const seen = new Set();
+        sanitizedHistory = sanitizedHistory.filter((h) => {
+          if (!h || typeof h !== "object") return false;
+          const k = `${h.newExpiry || ''}_${h.renewalDate || ''}`;
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+      }
+    }
+
     const record = {
       ...renewalData,
       id,
+      history: sanitizedHistory || [],
       assignedToId,
       assignedToName,
       assignedToEmail,

@@ -442,6 +442,11 @@
     RTS.initLayout();
     wire();
     render();
+    if (RTS.data && RTS.data.syncFromBackend) {
+      RTS.data.syncFromBackend().then(() => {
+        render();
+      });
+    }
     RTS.refreshIcons();
 
     window.addEventListener("rts-language-changed", () => {

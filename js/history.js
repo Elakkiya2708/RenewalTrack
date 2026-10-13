@@ -114,7 +114,7 @@
       render();
     });
     window.addEventListener("storage", (e) => {
-      if (e.key === "rts_renewals_v1") {
+      if (e.key === "rts_renewals" || (RTS.KEYS && e.key === RTS.KEYS.RENEWALS)) {
         render();
       }
     });
@@ -125,6 +125,11 @@
     populateCategoryFilter();
     wire();
     render();
+    if (RTS.data && RTS.data.syncFromBackend) {
+      RTS.data.syncFromBackend().then(() => {
+        render();
+      });
+    }
     RTS.refreshIcons();
   });
 })();

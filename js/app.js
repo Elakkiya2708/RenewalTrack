@@ -507,7 +507,67 @@
     return clean;
   }
 
-  function syncRenewalToBackend(method, url, body) {
+  // Cross-tab and component data synchronization via BroadcastChannel
+  let syncBroadcastChannel = null;
+  try {
+    if (typeof BroadcastChannel !== "undefined") {
+      syncBroadcastChannel = new BroadcastChannel("renewguard_data_sync");
+      syncBroadcastChannel.onmessage = (evt) => {
+        if (evt && evt.data && evt.data.type === "renewal-data-updated") {
+          syncRenewalsFromBackend({ broadcast: false }).then(() => {
+            try {
+              window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: evt.data.detail }));
+            } catch (_) {}
+          });
+        }
+      };
+    }
+  } catch (e) {
+    console.warn("[RTS Sync] BroadcastChannel initialization failed:", e);
+  }
+
+  function broadcastDataSync(detail = {}) {
+    try {
+      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail }));
+    } catch (_) {}
+    try {
+      if (syncBroadcastChannel) {
+        syncBroadcastChannel.postMessage({ type: "renewal-data-updated", detail, timestamp: Date.now() });
+      }
+    } catch (_) {}
+  }
+
+  // Cross-tab storage event synchronization
+  try {
+    window.addEventListener("storage", (e) => {
+      if (e.key === STORAGE_KEYS.RENEWALS || e.key === "rts_renewals") {
+        try {
+          window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { storageEvent: true } }));
+        } catch (_) {}
+      }
+    });
+  } catch (_) {}
+
+  // Helper to deduplicate history arrays
+  function deduplicateHistory(history) {
+    if (typeof history === "string") {
+      try { history = JSON.parse(history); } catch (e) { history = []; }
+    }
+    if (!Array.isArray(history)) return [];
+    const seen = new Set();
+    const result = [];
+    for (const h of history) {
+      if (!h || typeof h !== "object") continue;
+      const key = `${h.previousExpiry || ''}_${h.newExpiry || ''}_${h.renewalDate || ''}_${h.cost || ''}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(h);
+      }
+    }
+    return result;
+  }
+
+  async function syncRenewalToBackend(method, url, body) {
     try {
       const token = (global.RTS && global.RTS.auth && typeof global.RTS.auth.getToken === "function" && global.RTS.auth.getToken()) || localStorage.getItem("rts_jwt_token") || localStorage.getItem("rts_auth_token");
       const user = getCurrentUser();
@@ -517,27 +577,49 @@
         "x-user-email": user.email || "",
       };
       if (token) headers["Authorization"] = "Bearer " + token;
-      fetch(apiUrl(url), {
+
+      const res = await fetch(apiUrl(url), {
         method,
         headers,
         body: body ? JSON.stringify(body) : undefined,
-      }).then(async (res) => {
-        if (res.ok) {
-          const json = await res.json().catch(() => null);
-          if (json && json.ok && json.data) {
+      });
+
+      if (res.ok) {
+        const json = await res.json().catch(() => null);
+        if (json && json.ok) {
+          if (json.data) {
             const raw = getRawRenewals();
             const idx = raw.findIndex((r) => r.id === json.data.id);
             if (idx >= 0) {
               raw[idx] = Object.assign({}, raw[idx], json.data);
               saveRenewals(raw);
+            } else if (method === "POST" && !url.includes("mark-renewed") && !url.includes("snooze") && !url.includes("reminder-status")) {
+              raw.unshift(json.data);
+              saveRenewals(raw);
             }
           }
+          broadcastDataSync({ method, url, data: json ? json.data : null });
+          return json;
         }
-      }).catch(() => {});
-    } catch (e) {}
+        broadcastDataSync({ method, url });
+        return json || { ok: true };
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        const errMsg = errJson.error || `Operation rejected by server (${res.status} ${res.statusText})`;
+        console.error(`[RTS Sync Error] ${method} ${url}:`, errMsg);
+        showToast(errMsg, "error");
+        // Roll back any optimistic client divergence by refetching actual database state
+        await syncRenewalsFromBackend({ broadcast: true });
+        return { ok: false, error: errMsg, status: res.status };
+      }
+    } catch (e) {
+      console.warn(`[RTS Network Sync Error] ${method} ${url}:`, e);
+      return { ok: false, error: e.message };
+    }
   }
 
-  async function syncRenewalsFromBackend() {
+  async function syncRenewalsFromBackend(options = {}) {
+    const shouldBroadcast = options && options.broadcast !== false;
     const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH);
     const user = getCurrentUser();
     try {
@@ -567,9 +649,11 @@
           } else {
             saveRenewals(data.data);
           }
-          try {
-            window.dispatchEvent(new CustomEvent("rts-renewal-updated"));
-          } catch (e) {}
+          if (shouldBroadcast) {
+            try {
+              window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { fromServer: true } }));
+            } catch (e) {}
+          }
           return data.data;
         }
       }
@@ -603,6 +687,7 @@
     );
     list.unshift(record);
     saveRenewals(list);
+    broadcastDataSync({ id: record.id, record, created: true });
     syncRenewalToBackend("POST", "/api/renewals", record);
     return record;
   }
@@ -638,19 +723,22 @@
           try { hist = JSON.parse(hist); } catch (e) { hist = []; }
         }
         if (!Array.isArray(hist)) hist = [];
-        data.history = [historyEntry, ...hist];
+        const isDup = hist.some(
+          (h) => h && h.previousExpiry === oldRecord.expiryDate && h.newExpiry === data.expiryDate && h.renewalDate === historyEntry.renewalDate
+        );
+        data.history = isDup ? deduplicateHistory(hist) : deduplicateHistory([historyEntry, ...hist]);
         data.lastRenewedAt = todayISO();
         data.reminderCompleted = false;
       }
     }
 
+    if (data.history) {
+      data.history = deduplicateHistory(data.history);
+    }
+
     list[idx] = Object.assign({}, list[idx], data);
     saveRenewals(list);
-
-    try {
-      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { id, record: list[idx] } }));
-    } catch (e) {}
-
+    broadcastDataSync({ id, record: list[idx] });
     syncRenewalToBackend("PUT", "/api/renewals/" + encodeURIComponent(id), list[idx]);
     return list[idx];
   }
@@ -665,9 +753,7 @@
     if (!target) return;
     const updated = list.filter((r) => r.id !== id);
     saveRenewals(updated);
-    try {
-      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { id, deleted: true } }));
-    } catch (e) {}
+    broadcastDataSync({ id, deleted: true });
     syncRenewalToBackend("DELETE", "/api/renewals/" + encodeURIComponent(id));
   }
 
@@ -705,7 +791,15 @@
     }
     if (!Array.isArray(existingHistory)) existingHistory = [];
 
-    record.history = [historyEntry, ...existingHistory];
+    const isDup = existingHistory.some(
+      (h) => h && (
+        (h.previousExpiry === record.expiryDate && h.newExpiry === newExpiry && h.renewalDate === renewalDate) ||
+        (h.newExpiry === newExpiry && h.renewalDate === renewalDate)
+      )
+    );
+    const combinedHistory = isDup ? existingHistory : [historyEntry, ...existingHistory];
+
+    record.history = deduplicateHistory(combinedHistory);
     record.issueDate = renewalDate;
     record.expiryDate = newExpiry;
     record.lastRenewedAt = renewalDate;
@@ -719,14 +813,13 @@
     list[idx] = record;
     saveRenewals(list);
 
-    try {
-      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { id, record, historyEntry } }));
-    } catch (e) {}
+    broadcastDataSync({ id, record, historyEntry });
 
     syncRenewalToBackend("POST", "/api/renewals/" + encodeURIComponent(id) + "/mark-renewed", {
       ...payload,
       renewalDate,
       newExpiryDate: newExpiry,
+      reminderDate: record.reminderDate,
       renewedBy,
       cost: historyEntry.cost,
       currency: historyEntry.currency,
@@ -748,9 +841,7 @@
     list[idx].reminderDate = newDate;
     list[idx].reminderCompleted = false;
     saveRenewals(list);
-    try {
-      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { id, record: list[idx] } }));
-    } catch (e) {}
+    broadcastDataSync({ id, record: list[idx] });
     syncRenewalToBackend("POST", "/api/renewals/" + encodeURIComponent(id) + "/snooze", {
       reminderDate: newDate,
       days: days || 7,
@@ -787,7 +878,10 @@
           try { hist = JSON.parse(hist); } catch (e) { hist = []; }
         }
         if (!Array.isArray(hist)) hist = [];
-        record.history = [historyEntry, ...hist];
+        const isDup = hist.some(
+          (h) => h && h.previousExpiry === record.expiryDate && h.newExpiry === newExpiry && h.renewalDate === historyEntry.renewalDate
+        );
+        record.history = isDup ? deduplicateHistory(hist) : deduplicateHistory([historyEntry, ...hist]);
         record.issueDate = historyEntry.renewalDate;
         record.expiryDate = newExpiry;
         record.lastRenewedAt = historyEntry.renewalDate;
@@ -798,6 +892,7 @@
 
         syncRenewalToBackend("POST", "/api/renewals/" + encodeURIComponent(id) + "/mark-renewed", {
           newExpiryDate: newExpiry,
+          reminderDate: record.reminderDate,
           cost: record.cost,
           currency: record.currency,
           recurringCycle: cycle,
@@ -807,9 +902,7 @@
       }
     });
     saveRenewals(list);
-    try {
-      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { count } }));
-    } catch (e) {}
+    broadcastDataSync({ count });
     return count;
   }
 
@@ -827,9 +920,7 @@
     });
     list = list.filter((r) => !toDelete.includes(r.id));
     saveRenewals(list);
-    try {
-      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { count: toDelete.length, deleted: true } }));
-    } catch (e) {}
+    broadcastDataSync({ count: toDelete.length, deleted: true });
     toDelete.forEach((id) => {
       syncRenewalToBackend("DELETE", "/api/renewals/" + encodeURIComponent(id));
     });
@@ -872,9 +963,7 @@
     }
     list[idx].reminderCompleted = completed;
     saveRenewals(list);
-    try {
-      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { id, record: list[idx] } }));
-    } catch (e) {}
+    broadcastDataSync({ id, record: list[idx] });
     syncRenewalToBackend("POST", "/api/renewals/" + encodeURIComponent(id) + "/reminder-status", {
       reminderCompleted: completed,
     });
@@ -895,18 +984,14 @@
   function getAllHistory() {
     const renewals = getRenewals();
     const rows = [];
+    const seen = new Set();
     renewals.forEach((r) => {
-      let hist = r.history;
-      if (typeof hist === "string") {
-        try {
-          hist = JSON.parse(hist);
-        } catch (e) {
-          hist = [];
-        }
-      }
-      if (!Array.isArray(hist)) hist = [];
+      const hist = deduplicateHistory(r.history);
       hist.forEach((h) => {
         if (!h || typeof h !== "object") return;
+        const dedupeKey = `${r.id}_${h.previousExpiry || ''}_${h.newExpiry || ''}_${h.renewalDate || ''}_${h.cost || ''}`;
+        if (seen.has(dedupeKey)) return;
+        seen.add(dedupeKey);
         rows.push(
           Object.assign({}, h, {
             renewalId: r.id,
@@ -937,6 +1022,7 @@
 
   function clearAllRenewals() {
     saveRenewals([]);
+    broadcastDataSync({ cleared: true });
     syncRenewalToBackend('DELETE', '/api/renewals');
   }
 
@@ -2623,9 +2709,7 @@
       syncRenewalToBackend("POST", "/api/renewals", r);
     });
 
-    try {
-      window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { count: newRecords.length } }));
-    } catch (e) {}
+    broadcastDataSync({ count: newRecords.length, imported: true });
 
     return newRecords.length;
   }

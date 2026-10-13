@@ -274,6 +274,16 @@
     RTS.initLayout();
     renderAll();
 
+    if (RTS.data && RTS.data.syncFromBackend) {
+      RTS.data.syncFromBackend().then(() => {
+        renderAll();
+      });
+    }
+
+    window.addEventListener("rts-renewal-updated", () => {
+      renderAll();
+    });
+
     window.addEventListener("rts-language-changed", () => {
       renderAll();
     });

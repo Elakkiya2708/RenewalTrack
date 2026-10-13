@@ -110,6 +110,7 @@ router.get("/history", async (req, res) => {
       list = list.filter((r) => isRenewalAssignedToUser(r, actor));
     }
     const rows = [];
+    const seen = new Set();
     list.forEach((r) => {
       let hist = r.history;
       if (typeof hist === "string") {
@@ -118,6 +119,9 @@ router.get("/history", async (req, res) => {
       if (!Array.isArray(hist)) hist = [];
       hist.forEach((h) => {
         if (!h || typeof h !== "object") return;
+        const dedupeKey = `${r.id}_${h.newExpiry || ''}_${h.renewalDate || ''}`;
+        if (seen.has(dedupeKey)) return;
+        seen.add(dedupeKey);
         rows.push({
           ...h,
           renewalId: r.id,
@@ -543,14 +547,35 @@ router.post("/:id/mark-renewed", async (req, res) => {
     }
     if (!Array.isArray(existingHistory)) existingHistory = [];
 
+    // Deduplicate history: avoid identical duplicate transitions
+    const isDuplicate =
+      record.expiryDate === newExpiryDate ||
+      existingHistory.some(
+        (h) =>
+          h &&
+          (h.newExpiry === newExpiryDate ||
+            (h.previousExpiry === record.expiryDate && h.newExpiry === newExpiryDate))
+      );
+    const finalHistory = isDuplicate ? existingHistory : [historyEntry, ...existingHistory];
+
+    let nextReminderDate = req.body.reminderDate;
+    if (!nextReminderDate && newExpiryDate) {
+      const d = new Date(newExpiryDate);
+      if (!isNaN(d.getTime())) {
+        d.setDate(d.getDate() - 14);
+        nextReminderDate = d.toISOString().slice(0, 10);
+      }
+    }
+
     const updatedRecord = {
       ...record,
-      history: [historyEntry, ...existingHistory],
+      history: finalHistory,
       issueDate: historyEntry.renewalDate,
       expiryDate: newExpiryDate,
       lastRenewedAt: historyEntry.renewalDate,
       reminderCompleted: false,
       recurringCycle: recurringCycle || record.recurringCycle,
+      reminderDate: nextReminderDate || record.reminderDate,
     };
 
     const saved = await db.saveRenewal(updatedRecord);

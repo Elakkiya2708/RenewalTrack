@@ -196,7 +196,16 @@
     wireToolbar();
     wireUploadModal();
     render();
+    if (RTS.data && RTS.data.syncFromBackend) {
+      RTS.data.syncFromBackend().then(() => {
+        render();
+      });
+    }
     RTS.refreshIcons();
+
+    window.addEventListener("rts-renewal-updated", () => {
+      render();
+    });
   });
 
   window.DocumentsPage = { download, openDelete };

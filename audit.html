@@ -339,6 +339,10 @@
     RTS.initLayout();
     loadLogs();
 
+    window.addEventListener("rts-renewal-updated", () => {
+      loadLogs();
+    });
+
     document.getElementById("auditSearch").addEventListener("input", renderLogs);
     document.getElementById("actionFilter").addEventListener("change", renderLogs);
     document.getElementById("refreshAuditBtn").addEventListener("click", () => {

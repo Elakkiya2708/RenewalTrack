@@ -131,6 +131,18 @@
     wireNav();
     RTS.refreshIcons();
 
+    if (RTS.data && RTS.data.syncFromBackend) {
+      RTS.data.syncFromBackend().then(() => {
+        renderCalendar();
+        renderUpcoming();
+      });
+    }
+
+    window.addEventListener("rts-renewal-updated", () => {
+      renderCalendar();
+      renderUpcoming();
+    });
+
     window.addEventListener("rts-language-changed", () => {
       renderCalendar();
       renderUpcoming();
