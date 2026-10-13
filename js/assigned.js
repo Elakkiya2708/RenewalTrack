@@ -23,25 +23,8 @@
   }
 
   function getMyRenewals() {
-    const user = getUser();
-    const uId = user.id ? String(user.id) : "";
-    const uEmail = (user.email || "").toLowerCase();
-    const uName = (user.fullName || user.name || "").toLowerCase();
-
     const all = RTS.data.getRenewals();
-    return all.filter((r) => {
-      const assignedId = r.assignedToId || r.assigned_to_id ? String(r.assignedToId || r.assigned_to_id) : "";
-      const assignedEmail = (r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || r.responsible_email || "").toLowerCase();
-      const assignedName = (r.assignedToName || r.assigned_to_name || r.responsiblePerson || r.responsible_person || "").toLowerCase();
-      const createdBy = (r.createdBy || "").toLowerCase();
-
-      return (
-        (uId && assignedId === uId) ||
-        (uEmail && assignedEmail === uEmail) ||
-        (uName && assignedName === uName) ||
-        (uEmail && createdBy === uEmail)
-      );
-    });
+    return all.filter((r) => RTS.auth.isAssignedRenewal(r));
   }
 
   function updateKpis(myList) {
@@ -187,6 +170,14 @@
   function openRenew(id) {
     const curRecord = RTS.data.getRenewalById(id);
     if (!curRecord) return;
+    if (RTS.auth.isViewer()) {
+      RTS.toast("Viewer role has read-only access and cannot renew records.", "error");
+      return;
+    }
+    if (RTS.auth.isEmployee() && !RTS.auth.canRenewRenewal(curRecord)) {
+      RTS.toast("Access denied. You can only renew records assigned to your account.", "error");
+      return;
+    }
 
     const targetInput = document.getElementById("renewTargetId");
     if (targetInput) targetInput.value = id;

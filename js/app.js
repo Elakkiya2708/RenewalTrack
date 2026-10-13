@@ -634,21 +634,7 @@
       if (res.ok) {
         const data = await res.json();
         if (data && data.ok && Array.isArray(data.data)) {
-          if (isAdmin()) {
-            saveRenewals(data.data);
-          } else if (isEmployee()) {
-            const currentLocal = getRawRenewals();
-            const serverMap = new Map(data.data.map((r) => [r.id, r]));
-            const merged = currentLocal.map((r) => serverMap.has(r.id) ? serverMap.get(r.id) : r);
-            data.data.forEach((r) => {
-              if (!merged.some((m) => m.id === r.id)) {
-                merged.unshift(r);
-              }
-            });
-            saveRenewals(merged);
-          } else {
-            saveRenewals(data.data);
-          }
+          saveRenewals(data.data);
           if (shouldBroadcast) {
             try {
               window.dispatchEvent(new CustomEvent("rts-renewal-updated", { detail: { fromServer: true } }));
@@ -1398,20 +1384,25 @@
   function isAssignedRenewal(r) {
     if (!r) return false;
     const user = getCurrentUser();
-    const uEmail = (user.email || "").toLowerCase();
-    const uName = (user.fullName || "").toLowerCase();
+    const uEmail = (user.email || "").toLowerCase().trim();
+    const uName = (user.fullName || user.name || "").toLowerCase().trim();
     const uId = user.id ? String(user.id) : "";
     const assignedId = r.assignedToId || r.assigned_to_id ? String(r.assignedToId || r.assigned_to_id) : "";
-    const respEmail = (r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || r.responsible_email || "").toLowerCase();
-    const respName = (r.assignedToName || r.assigned_to_name || r.responsiblePerson || r.responsible_person || "").toLowerCase();
-    const createdBy = (r.createdBy || "").toLowerCase();
-    return (
-      (uId && assignedId && assignedId === uId) ||
-      (uEmail && respEmail && respEmail === uEmail) ||
-      (uName && respName && respName === uName) ||
-      (uName && respName && (respName.includes(uName) || uName.includes(respName))) ||
-      (uEmail && createdBy && createdBy === uEmail)
-    );
+    const respEmail = (r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || r.responsible_email || "").toLowerCase().trim();
+    const respName = (r.assignedToName || r.assigned_to_name || r.responsiblePerson || r.responsible_person || "").toLowerCase().trim();
+
+    if (assignedId) {
+      if (uId && assignedId === uId) return true;
+      if (uEmail && respEmail && respEmail === uEmail) return true;
+      return false;
+    }
+    if (respEmail) {
+      return uEmail === respEmail;
+    }
+    if (respName && respName !== "unassigned") {
+      return uName === respName;
+    }
+    return false;
   }
 
   function canEditRenewal(r) {
@@ -1430,6 +1421,13 @@
     if (!r) return false;
     if (isAdmin()) return true;
     if (isViewer()) return false;
+    return isEmployee() && isAssignedRenewal(r);
+  }
+
+  function canRenewRenewal(r) {
+    if (!r) return false;
+    if (isViewer()) return false;
+    if (isAdmin()) return true;
     return isEmployee() && isAssignedRenewal(r);
   }
 
@@ -2981,6 +2979,7 @@
       canDeleteRenewal,
       isAssignedRenewal,
       canManageAssignedRenewal,
+      canRenewRenewal,
       redirectIfAuthed,
       registerAccount,
       getAccounts,

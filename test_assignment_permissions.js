@@ -150,17 +150,17 @@ async function runTests() {
   });
   assert(reassignToViewer.status === 400, "Reassigning renewal to Viewer rejected with 400 Bad Request");
 
-  // 7. Employee 1 Isolation: Cannot see or manage Employee 2's renewal
-  console.log("\n7. Testing Employee role isolation...");
+  // 7. Employee 1 Isolation: Can view Employee 2's renewal, but has read-only access (no renew, no edit, no delete)
+  console.log("\n7. Testing Employee view access and action isolation...");
   const emp1Renewals = await request("/api/renewals", {
     headers: { Authorization: `Bearer ${emp1Token}` },
   });
-  assert(emp1Renewals.status === 200, "Employee 1 fetched assigned renewals");
+  assert(emp1Renewals.status === 200, "Employee 1 fetched renewals list");
   const emp1List = emp1Renewals.data.data;
   const canEmp1SeeRenewal1 = emp1List.some((r) => r.id === renewal1.id);
-  assert(!canEmp1SeeRenewal1, "Employee 1 does NOT see renewal reassigned to Employee 2 in GET /api/renewals");
+  assert(canEmp1SeeRenewal1, "Employee 1 CAN view renewal reassigned to Employee 2 in GET /api/renewals");
 
-  // Employee 2 DOES see it
+  // Employee 2 also sees it
   const emp2Renewals = await request("/api/renewals", {
     headers: { Authorization: `Bearer ${emp2Token}` },
   });
@@ -168,11 +168,11 @@ async function runTests() {
   const canEmp2SeeRenewal1 = emp2List.some((r) => r.id === renewal1.id);
   assert(canEmp2SeeRenewal1, "Employee 2 sees their assigned renewal in GET /api/renewals");
 
-  // Employee 1 attempts GET /api/renewals/:id on renewal1 -> 403 Forbidden
+  // Employee 1 can view details via GET /api/renewals/:id
   const emp1GetSingle = await request(`/api/renewals/${renewal1.id}`, {
     headers: { Authorization: `Bearer ${emp1Token}` },
   });
-  assert(emp1GetSingle.status === 403, "Employee 1 cannot view unassigned renewal via GET /:id (403 Forbidden)");
+  assert(emp1GetSingle.status === 200, "Employee 1 CAN view renewal details via GET /:id (200 OK)");
 
   // Employee 1 attempts PUT /api/renewals/:id on renewal1 -> 403 Forbidden
   const emp1Edit = await request(`/api/renewals/${renewal1.id}`, {
@@ -195,7 +195,7 @@ async function runTests() {
     headers: { Authorization: `Bearer ${emp1Token}` },
     body: { newExpiryDate: "2027-11-30" },
   });
-  assert(emp1Renew.status === 403, "Employee 1 cannot mark-renew unassigned renewal (403 Forbidden)");
+  assert(emp1Renew.status === 403, "Employee 1 cannot mark-renew renewal assigned to Employee 2 (403 Forbidden)");
 
   // 8. Employee 2 Cannot Reassign their Renewal
   console.log("\n8. Testing Employee cannot reassign renewals...");
@@ -208,19 +208,19 @@ async function runTests() {
 
   // 9. Employee 2 Can Manage their Assigned Renewal
   console.log("\n9. Testing Employee 2 managing their assigned renewal...");
-  const emp2ValidEdit = await request(`/api/renewals/${renewal1.id}`, {
+  const emp2EditAttempt = await request(`/api/renewals/${renewal1.id}`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${emp2Token}` },
     body: { notes: "Verified and up to date by raja." },
   });
-  assert(emp2ValidEdit.status === 200 && emp2ValidEdit.data.ok, "Employee 2 can update their assigned renewal");
+  assert(emp2EditAttempt.status === 403, "Employee 2 cannot edit general renewal details (Admin only, 403 Forbidden)");
 
   const emp2ValidRenew = await request(`/api/renewals/${renewal1.id}/mark-renewed`, {
     method: "POST",
     headers: { Authorization: `Bearer ${emp2Token}` },
     body: { newExpiryDate: "2027-11-30", notes: "Renewed for 1 year" },
   });
-  assert(emp2ValidRenew.status === 200 && emp2ValidRenew.data.ok, "Employee 2 can renew their assigned renewal");
+  assert(emp2ValidRenew.status === 200 && emp2ValidRenew.data.ok, "Employee 2 CAN renew their assigned renewal (200 OK)");
 
   // 10. Clean up test record using Admin token
   console.log("\n10. Cleaning up test records...");

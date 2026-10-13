@@ -49,7 +49,7 @@
         .map((r) => {
           const status = reminderStatus(r);
           const isViewer = RTS.auth.isViewer();
-          const canManage = !isViewer && RTS.auth.canEditRenewal(r);
+          const canManage = !isViewer && RTS.auth.canManageAssignedRenewal(r);
           let actionContent = "";
           if (isViewer) {
             actionContent = `<span class="cell-sub" style="font-size:12px;color:var(--text-muted);"><i data-lucide="lock" style="width:12px;height:12px;vertical-align:-1px;"></i> Read-only</span>`;
@@ -96,7 +96,7 @@
     }
     const record = RTS.data.getRenewalById(id);
     if (!record) return;
-    if (RTS.auth.isEmployee() && !RTS.auth.canEditRenewal(record)) {
+    if (RTS.auth.isEmployee() && !RTS.auth.canManageAssignedRenewal(record)) {
       RTS.toast("Access denied. You can only manage reminders for assigned renewals.", "error");
       return;
     }
@@ -127,7 +127,7 @@
     }
     const record = RTS.data.getRenewalById(id);
     if (!record) return;
-    if (RTS.auth.isEmployee() && !RTS.auth.canEditRenewal(record)) {
+    if (RTS.auth.isEmployee() && !RTS.auth.canManageAssignedRenewal(record)) {
       RTS.toast("Access denied. You can only snooze reminders for assigned renewals.", "error");
       return;
     }
@@ -286,7 +286,7 @@
     }
     const curRecord = RTS.data.getRenewalById(id);
     if (!curRecord) return;
-    if (RTS.auth.isEmployee() && !RTS.auth.canEditRenewal(curRecord)) {
+    if (RTS.auth.isEmployee() && !RTS.auth.canRenewRenewal(curRecord)) {
       RTS.toast("Access denied. You can only renew records assigned to you.", "error");
       return;
     }

@@ -180,6 +180,9 @@
       }
     }
     if (!name || name === "Unassigned") {
+      if (RTS.auth.isAdmin()) {
+        return `<button type="button" class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 8px;color:var(--accent);display:inline-flex;align-items:center;gap:4px;" onclick="RecordsPage.openEdit('${r.id}')" title="Assign renewal to active employee"><i data-lucide="user-plus" style="width:12px;height:12px;"></i> Assign</button>`;
+      }
       return `<span class="cell-sub" style="color:var(--text-muted);display:inline-flex;align-items:center;gap:4px;font-size:12px;">Unassigned</span>`;
     }
     const initials = name
@@ -1160,7 +1163,7 @@
     }
     const curRecord = RTS.data.getRenewalById(id);
     if (!curRecord) return;
-    if (RTS.auth.isEmployee() && !RTS.auth.canEditRenewal(curRecord)) {
+    if (RTS.auth.isEmployee() && !RTS.auth.canRenewRenewal(curRecord)) {
       RTS.toast("Access denied. You can only renew records assigned to you.", "error");
       return;
     }

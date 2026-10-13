@@ -62,23 +62,36 @@ function isRenewalAssignedToUser(renewal, user) {
   const assignedId = renewal.assignedToId || renewal.assigned_to_id ? String(renewal.assignedToId || renewal.assigned_to_id) : "";
   const assignedEmail = (renewal.assignedToEmail || renewal.assigned_to_email || renewal.responsibleEmail || renewal.responsible_email || "").trim().toLowerCase();
   const assignedName = (renewal.assignedToName || renewal.assigned_to_name || renewal.responsiblePerson || renewal.responsible_person || "").trim().toLowerCase();
-  const createdBy = (renewal.createdBy || "").trim().toLowerCase();
 
-  return (
-    (uId && assignedId && assignedId === uId) ||
-    (uEmail && assignedEmail && assignedEmail === uEmail) ||
-    (uName && assignedName && assignedName === uName) ||
-    (uName && assignedName && (assignedName.includes(uName) || uName.includes(assignedName))) ||
-    (uEmail && createdBy && createdBy === uEmail)
-  );
+  // If assignedId is present, check against user id or email
+  if (assignedId) {
+    if (uId && assignedId === uId) return true;
+    if (uEmail && assignedEmail && assignedEmail === uEmail) return true;
+    return false;
+  }
+
+  // If no assignedId, check assignedEmail
+  if (assignedEmail) {
+    return uEmail === assignedEmail;
+  }
+
+  // If no email, check assignedName if valid
+  if (assignedName && assignedName !== "unassigned") {
+    return uName === assignedName;
+  }
+
+  return false;
 }
 
-// GET /api/renewals — Get renewals (Employees see and manage only their assigned renewals)
+// GET /api/renewals — Get renewals (All users can view company renewals; scope=assigned filters for personal work)
 router.get("/", async (req, res) => {
   try {
     const actor = await getReqUser(req);
+    if (actor && actor.status === "deactivated") {
+      return res.status(403).json({ ok: false, error: "Access denied. Account has been deactivated." });
+    }
     let list = await db.getRenewals();
-    if (actor && actor.role === "Employee") {
+    if ((req.query.scope === "assigned" || req.query.assigned === "me") && actor && actor.role === "Employee") {
       list = list.filter((r) => isRenewalAssignedToUser(r, actor));
     }
     res.json({ ok: true, data: list });
@@ -101,12 +114,15 @@ router.get("/assignees", async (req, res) => {
   }
 });
 
-// GET /api/renewals/history — Get aggregated renewal history (filtered for employees)
+// GET /api/renewals/history — Get aggregated renewal history (All users can view history, or scope=assigned for personal)
 router.get("/history", async (req, res) => {
   try {
     const actor = await getReqUser(req);
+    if (actor && actor.status === "deactivated") {
+      return res.status(403).json({ ok: false, error: "Access denied. Account has been deactivated." });
+    }
     let list = await db.getRenewals();
-    if (actor && actor.role === "Employee") {
+    if ((req.query.scope === "assigned" || req.query.assigned === "me") && actor && actor.role === "Employee") {
       list = list.filter((r) => isRenewalAssignedToUser(r, actor));
     }
     const rows = [];
@@ -138,21 +154,16 @@ router.get("/history", async (req, res) => {
   }
 });
 
-// GET /api/renewals/:id — Get renewal by ID (Employees can only view renewals assigned to them)
+// GET /api/renewals/:id — Get renewal by ID (Employees can view any renewal, including those assigned to others)
 router.get("/:id", async (req, res) => {
   try {
+    const actor = await getReqUser(req);
+    if (actor && actor.status === "deactivated") {
+      return res.status(403).json({ ok: false, error: "Access denied. Account has been deactivated." });
+    }
     const record = await db.getRenewalById(req.params.id);
     if (!record) {
       return res.status(404).json({ ok: false, error: "Renewal record not found." });
-    }
-    const actor = await getReqUser(req);
-    if (actor && actor.role === "Employee") {
-      if (!isRenewalAssignedToUser(record, actor)) {
-        return res.status(403).json({
-          ok: false,
-          error: "Access denied. Employees may only view renewals assigned to them.",
-        });
-      }
     }
     res.json({ ok: true, data: record });
   } catch (err) {
@@ -313,61 +324,70 @@ router.put("/:id", async (req, res) => {
     let isReassigned = false;
     let newlyAssignedUser = null;
 
-    // Requirement 2: Only Admins can assign or reassign renewals
-    if (actor.role === "Admin" && updates.assignedToId !== undefined) {
-      if (updates.assignedToId && updates.assignedToId !== existingAssigneeId) {
-        // Validate user ID from database
-        newlyAssignedUser = await db.getUserById(updates.assignedToId);
-        if (!newlyAssignedUser) {
-          return res.status(400).json({
-            ok: false,
-            error: `Invalid assigned employee ID "${updates.assignedToId}". User does not exist.`,
-          });
+    // Requirement: Only Admins can assign or reassign renewals
+    if (actor.role === "Admin") {
+      if (updates.assignedToId === undefined && (updates.assignedToEmail || updates.responsibleEmail)) {
+        const emailToLookup = (updates.assignedToEmail || updates.responsibleEmail).trim().toLowerCase();
+        const userByEmail = await db.getUserByEmail(emailToLookup);
+        if (userByEmail && userByEmail.role === "Employee" && userByEmail.status !== "deactivated") {
+          updates.assignedToId = userByEmail.id;
         }
-        if (newlyAssignedUser.status === "deactivated") {
-          return res.status(400).json({
-            ok: false,
-            error: `Cannot assign renewal to deactivated user "${newlyAssignedUser.fullName}".`,
-          });
+      }
+      if (updates.assignedToId !== undefined) {
+        if (updates.assignedToId && updates.assignedToId !== existingAssigneeId) {
+          // Validate user ID from database
+          newlyAssignedUser = await db.getUserById(updates.assignedToId);
+          if (!newlyAssignedUser) {
+            return res.status(400).json({
+              ok: false,
+              error: `Invalid assigned employee ID "${updates.assignedToId}". User does not exist.`,
+            });
+          }
+          if (newlyAssignedUser.status === "deactivated") {
+            return res.status(400).json({
+              ok: false,
+              error: `Cannot assign renewal to deactivated user "${newlyAssignedUser.fullName}".`,
+            });
+          }
+          if (newlyAssignedUser.role !== "Employee") {
+            return res.status(400).json({
+              ok: false,
+              error: `Cannot assign renewal to ${newlyAssignedUser.role} "${newlyAssignedUser.fullName}". Renewals can only be assigned to active Employees.`,
+            });
+          }
+          updates.assignedToId = newlyAssignedUser.id;
+          updates.assignedToName = newlyAssignedUser.fullName;
+          updates.assignedToEmail = newlyAssignedUser.email;
+          updates.responsiblePerson = newlyAssignedUser.fullName;
+          updates.responsibleEmail = newlyAssignedUser.email;
+          isReassigned = true;
+        } else if (updates.assignedToId) {
+          const currentAssignee = await db.getUserById(updates.assignedToId);
+          if (currentAssignee) {
+            updates.assignedToName = updates.assignedToName || currentAssignee.fullName;
+            updates.assignedToEmail = updates.assignedToEmail || currentAssignee.email;
+            updates.responsiblePerson = updates.responsiblePerson || currentAssignee.fullName;
+            updates.responsibleEmail = updates.responsibleEmail || currentAssignee.email;
+          }
+        } else if (!updates.assignedToId) {
+          if (existingAssigneeId) {
+            await db.logAudit({
+              actorId: actor.id || "admin",
+              actorName: actor.fullName,
+              actorEmail: actor.email,
+              actorRole: actor.role,
+              action: "RENEWAL_UNASSIGNED",
+              targetType: "renewal",
+              targetId: req.params.id,
+              details: `Unassigned renewal "${existing.name}" (previously assigned to ${existingAssigneeName}).`,
+            });
+          }
+          updates.assignedToId = null;
+          updates.assignedToName = null;
+          updates.assignedToEmail = null;
+          updates.responsiblePerson = "";
+          updates.responsibleEmail = "";
         }
-        if (newlyAssignedUser.role !== "Employee") {
-          return res.status(400).json({
-            ok: false,
-            error: `Cannot assign renewal to ${newlyAssignedUser.role} "${newlyAssignedUser.fullName}". Renewals can only be assigned to active Employees.`,
-          });
-        }
-        updates.assignedToId = newlyAssignedUser.id;
-        updates.assignedToName = newlyAssignedUser.fullName;
-        updates.assignedToEmail = newlyAssignedUser.email;
-        updates.responsiblePerson = newlyAssignedUser.fullName;
-        updates.responsibleEmail = newlyAssignedUser.email;
-        isReassigned = true;
-      } else if (updates.assignedToId) {
-        const currentAssignee = await db.getUserById(updates.assignedToId);
-        if (currentAssignee) {
-          updates.assignedToName = updates.assignedToName || currentAssignee.fullName;
-          updates.assignedToEmail = updates.assignedToEmail || currentAssignee.email;
-          updates.responsiblePerson = updates.responsiblePerson || currentAssignee.fullName;
-          updates.responsibleEmail = updates.responsibleEmail || currentAssignee.email;
-        }
-      } else if (!updates.assignedToId) {
-        if (existingAssigneeId) {
-          await db.logAudit({
-            actorId: actor.id || "admin",
-            actorName: actor.fullName,
-            actorEmail: actor.email,
-            actorRole: actor.role,
-            action: "RENEWAL_UNASSIGNED",
-            targetType: "renewal",
-            targetId: req.params.id,
-            details: `Unassigned renewal "${existing.name}" (previously assigned to ${existingAssigneeName}).`,
-          });
-        }
-        updates.assignedToId = null;
-        updates.assignedToName = null;
-        updates.assignedToEmail = null;
-        updates.responsiblePerson = "";
-        updates.responsibleEmail = "";
       }
     }
 

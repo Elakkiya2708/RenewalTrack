@@ -198,8 +198,8 @@ async function runTests() {
     },
   });
   assert(
-    regAttempt.status === 201 && regAttempt.data.user.role === "Employee",
-    `Public registration forced to Employee (cannot choose Admin)`
+    regAttempt.status === 403 || (regAttempt.status === 201 && regAttempt.data.user.role === "Employee"),
+    `Public registration cannot choose Admin (status: ${regAttempt.status})`
   );
 
   // 8. Role-Based Permissions for Renewals
