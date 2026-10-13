@@ -132,6 +132,22 @@
             const nameInput = document.getElementById("regName");
             if (nameInput) nameInput.value = inv.fullName;
           }
+          RTS.refreshIcons();
+        } else {
+          if (banner) {
+            banner.style.display = "block";
+            banner.style.background = "rgba(239, 68, 68, 0.1)";
+            banner.style.borderColor = "rgba(239, 68, 68, 0.3)";
+            banner.innerHTML = `
+              <div style="font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:2px;color:var(--danger, #ef4444);">
+                <i data-lucide="alert-triangle" class="icon" style="width:14px;height:14px;"></i>
+                Invalid or Expired Invitation
+              </div>
+              <div style="color:var(--text);font-size:12px;">${(data && data.error) || "This invitation link is invalid or has expired. Please ask your administrator to send a new invite."}</div>
+            `;
+            if (tokenInput) tokenInput.value = "";
+            RTS.refreshIcons();
+          }
         }
       } catch (err) {
         console.warn("Could not fetch invitation info:", err);

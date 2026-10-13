@@ -68,8 +68,15 @@ router.put("/members/:id/status", async (req, res) => {
 router.post("/invites", async (req, res) => {
   try {
     const { email, fullName, role } = req.body;
-    if (!email) {
-      return res.status(400).json({ ok: false, error: "Recipient email is required." });
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      return res.status(400).json({ ok: false, error: "A valid recipient work email is required." });
+    }
+
+    if (!role || !["Employee", "Viewer"].includes(role)) {
+      return res.status(400).json({
+        ok: false,
+        error: "Invitations can only be sent for Employee or Viewer roles. Administrator privileges cannot be granted via invitation.",
+      });
     }
 
     const invite = await db.createInvitation({ email, fullName, role }, req.user);
@@ -79,8 +86,10 @@ router.post("/invites", async (req, res) => {
       invitation: invite,
       inviteUrl: invite.inviteUrl,
       emailSent: invite.emailSent,
-      emailSimulated: invite.emailSimulated,
-      message: `Invitation successfully dispatched to ${email}.`,
+      emailError: invite.emailError,
+      message: invite.emailSent
+        ? `Invitation email successfully dispatched to ${email}.`
+        : `Invitation created, but email could not be delivered: ${invite.emailError || "Email provider credentials not configured in .env."}`,
     });
   } catch (err) {
     res.status(400).json({ ok: false, error: err.message });

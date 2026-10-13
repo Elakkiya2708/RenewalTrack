@@ -616,11 +616,20 @@ const emailService = {
     const from = this.getFromAddress();
     const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
 
+    console.log(`[Invitation Email Dispatch] Sending invitation email to ${to} (${role}) via ${provider}...`);
+    let result;
     if (provider === "resend") {
-      return await this._sendViaResend({ from, to, subject, html, text, renewal: { name: "Team Invitation" } });
+      result = await this._sendViaResend({ from, to, subject, html, text, renewal: { name: "Team Invitation" } });
     } else {
-      return await this._sendViaNodemailer({ from, to, subject, html, text, renewal: { name: "Team Invitation" } });
+      result = await this._sendViaNodemailer({ from, to, subject, html, text, renewal: { name: "Team Invitation" } });
     }
+
+    if (result.success) {
+      console.log(`[Invitation Email Success] Invitation email delivered to ${to} via ${result.provider}. Message ID: ${result.messageId}`);
+    } else {
+      console.warn(`[Invitation Email Warning] Email delivery to ${to} not completed: ${result.error}`);
+    }
+    return result;
   },
 
   // Real Email Delivery: Send renewal assignment / reassignment notification email

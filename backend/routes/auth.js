@@ -223,7 +223,13 @@ router.post("/register", async (req, res) => {
     // 1. If invited with a token, process invitation acceptance
     if (inviteToken) {
       try {
-        const user = await db.acceptInvitation(inviteToken, { fullName, mobile, password });
+        const hashedPassword = hashPassword(password);
+        const user = await db.acceptInvitation(inviteToken, {
+          fullName,
+          mobile,
+          password: hashedPassword,
+          passwordHash: hashedPassword,
+        });
         const token = generateToken(user);
         return res.status(201).json({
           ok: true,
@@ -243,19 +249,28 @@ router.post("/register", async (req, res) => {
     }
 
     // 2. Public registration (without token)
+    // NEVER ALLOW PUBLIC REGISTRATION TO GRANT ADMIN ACCESS
+    if (req.body.role && req.body.role.toLowerCase() === "admin") {
+      return res.status(403).json({
+        ok: false,
+        error: "Public registration cannot grant Administrator access. Administrator privileges must be assigned by an existing admin.",
+      });
+    }
+
     const existing = await db.getUserByEmail(cleanEmail);
     if (existing) {
       return res.status(409).json({ ok: false, error: "An account with this email already exists." });
     }
 
-    // PUBLIC REGISTRATION MUST NEVER ALLOW USERS TO CHOOSE ADMIN
-    // Default public registration to 'Employee'
+    // Public registration strictly defaults to 'Employee', never Admin
+    const hashedPassword = hashPassword(password);
     const newAccount = {
       id: `usr-${Date.now()}`,
       fullName: fullName.trim(),
       email: cleanEmail,
       mobile: mobile || "",
-      password,
+      password: hashedPassword,
+      passwordHash: hashedPassword,
       role: "Employee",
       status: "active",
       createdAt: new Date().toISOString(),
@@ -342,12 +357,15 @@ router.get("/invite-info/:token", async (req, res) => {
     if (invite.status !== "pending") {
       return res.status(400).json({ ok: false, error: `This invitation has already been ${invite.status}.` });
     }
+    if (new Date(invite.expiresAt || invite.expires_at) < new Date()) {
+      return res.status(400).json({ ok: false, error: "This invitation has expired. Please ask an administrator to send a new invite." });
+    }
     const info = {
       email: invite.email,
       fullName: invite.fullName,
       role: invite.role,
-      invitedByName: invite.invitedByName,
-      expiresAt: invite.expiresAt,
+      invitedByName: invite.invitedByName || invite.invited_by_name || "Admin",
+      expiresAt: invite.expiresAt || invite.expires_at,
     };
     res.json({
       ok: true,

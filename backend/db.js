@@ -810,15 +810,29 @@ const db = {
       throw new Error("A valid email address is required.");
     }
     const cleanEmail = email.trim().toLowerCase();
-    const cleanRole = ["Employee", "Viewer"].includes(role) ? role : "Employee";
 
-    // Check if user is already registered
+    // Prevent unauthorized role escalation: Role must strictly be 'Employee' or 'Viewer'
+    if (!role || !["Employee", "Viewer"].includes(role)) {
+      throw new Error("Invalid role specified. Invitations can only be sent for 'Employee' or 'Viewer' roles. Administrator privileges cannot be granted via invitation.");
+    }
+    const cleanRole = role;
+
+    // 1. Check if user is already registered in the system
     const existingUser = await this.getUserByEmail(cleanEmail);
     if (existingUser) {
       throw new Error(`A user with email "${cleanEmail}" is already registered.`);
     }
 
-    const token = `inv-${crypto.randomBytes(16).toString("hex")}`;
+    // 2. Prevent duplicate active pending invitations
+    const allInvites = await this.getInvitations();
+    const existingPending = allInvites.find(
+      (i) => i.email.toLowerCase() === cleanEmail && i.status === "pending" && new Date(i.expiresAt || i.expires_at) > new Date()
+    );
+    if (existingPending) {
+      throw new Error(`An active invitation for "${cleanEmail}" already exists and is pending acceptance. Revoke the existing invitation or wait for it to expire.`);
+    }
+
+    const token = `inv-${crypto.randomBytes(32).toString("hex")}`;
     const expiresAt = new Date(Date.now() + 48 * 3600 * 1000).toISOString(); // 48 hours
 
     const invite = {
@@ -865,14 +879,16 @@ const db = {
       action: "MEMBER_INVITED",
       targetType: "invitation",
       targetId: invite.id,
-      details: `Sent invitation to ${cleanEmail} for role ${cleanRole} (Expires: 48h).`,
+      details: `Sent invitation to ${cleanEmail} for role ${cleanRole} (Expires: 48h). Email delivery: ${emailResult.success ? 'Delivered' : emailResult.error || 'Failed'}.`,
     });
 
     return {
       ...invite,
       inviteUrl,
-      emailSent: emailResult.success,
-      emailSimulated: emailResult.simulated,
+      emailSent: emailResult.success === true,
+      emailError: emailResult.error || null,
+      emailProvider: emailResult.provider || config.EMAIL_PROVIDER,
+      messageId: emailResult.messageId || null,
     };
   },
 
@@ -896,7 +912,7 @@ const db = {
     const invite = invites.find((i) => i.token === token);
     if (!invite) return null;
 
-    if (new Date(invite.expiresAt) < new Date() && invite.status === "pending") {
+    if (new Date(invite.expiresAt || invite.expires_at) < new Date() && invite.status === "pending") {
       invite.status = "expired";
       const store = getLocalStore();
       const idx = (store.invitations || []).findIndex((i) => i.token === token);
@@ -911,15 +927,28 @@ const db = {
     const invite = await this.getInvitationByToken(token);
     if (!invite) throw new Error("Invalid invitation token.");
     if (invite.status !== "pending") throw new Error(`Invitation is no longer pending (current status: ${invite.status}).`);
-    if (new Date(invite.expiresAt) < new Date()) throw new Error("Invitation has expired. Please ask an Admin to resend an invite.");
+    if (new Date(invite.expiresAt || invite.expires_at) < new Date()) {
+      throw new Error("Invitation has expired. Please ask an Admin to resend an invite.");
+    }
+
+    // Double check email isn't already taken
+    const existing = await this.getUserByEmail(invite.email);
+    if (existing) {
+      throw new Error(`An account with email "${invite.email}" is already registered.`);
+    }
+
+    // Role is strictly assigned from invitation in database — no escalation permitted
+    const assignedRole = ["Employee", "Viewer"].includes(invite.role) ? invite.role : "Employee";
+    const passwordVal = registrationData.passwordHash || registrationData.password;
 
     const newUser = {
       id: `usr-${Date.now()}`,
       fullName: (registrationData.fullName || invite.fullName || "").trim(),
-      email: invite.email,
+      email: invite.email.toLowerCase(),
       mobile: registrationData.mobile || "",
-      password: registrationData.password,
-      role: invite.role, // strictly assigned by Admin
+      password: passwordVal,
+      passwordHash: passwordVal,
+      role: assignedRole, // strictly assigned by Admin
       status: "active",
       createdAt: new Date().toISOString(),
     };
