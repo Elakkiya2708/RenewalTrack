@@ -632,6 +632,119 @@ const emailService = {
     return result;
   },
 
+  // Real Email Delivery: Notify Admin when an invited member accepts their invitation
+  async sendInvitationAcceptanceNotification({ to, adminName, memberName, memberEmail, role, acceptedAt }) {
+    if (!isValidEmail(to)) {
+      const err = `Invalid admin recipient email address: "${to}"`;
+      console.warn(`[Invite Acceptance Email Validation] ${err}`);
+      return { success: false, error: err, isInvalidEmail: true };
+    }
+
+    const recipientAdmin = adminName || "Administrator";
+    const acceptedDateFormatted = new Date(acceptedAt || Date.now()).toUTCString();
+    const appUrl = config.APP_URL || `http://localhost:${config.PORT}`;
+    const teamUrl = `${appUrl}/team.html`;
+    const subject = `Team Invitation Accepted: ${memberName} joined as ${role}`;
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;line-height:1.5;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width:600px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07);border:1px solid #e2e8f0;">
+          <tr>
+            <td style="background-color:#0f172a;padding:24px 32px;border-bottom:3px solid #10b981;">
+              <div style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
+                <span style="color:#818cf8;">Renew</span>Guard
+              </div>
+              <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
+                Team Management Notification
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 32px 24px;">
+              <div style="display:inline-block;padding:6px 12px;background-color:rgba(16,185,129,0.1);border-radius:999px;color:#059669;font-size:12px;font-weight:600;margin-bottom:16px;">
+                &#10003; Invitation Accepted &amp; Account Activated
+              </div>
+              <h2 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#0f172a;">
+                Hello ${escapeHtml(recipientAdmin)},
+              </h2>
+              <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">
+                Great news! <strong>${escapeHtml(memberName)}</strong> has accepted your invitation and successfully activated their account on RenewGuard.
+              </p>
+              <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px;">
+                <table role="presentation" width="100%">
+                  <tr>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;width:140px;">Member Name:</td>
+                    <td style="padding:6px 0;font-size:13px;font-weight:600;color:#0f172a;">${escapeHtml(memberName)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;">Email Address:</td>
+                    <td style="padding:6px 0;font-size:13px;font-weight:600;color:#0f172a;">${escapeHtml(memberEmail)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;">Assigned Role:</td>
+                    <td style="padding:6px 0;font-size:13px;font-weight:600;color:#4f46e5;">${escapeHtml(role)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;">Accepted On:</td>
+                    <td style="padding:6px 0;font-size:13px;font-weight:600;color:#0f172a;">${escapeHtml(acceptedDateFormatted)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;">Account Status:</td>
+                    <td style="padding:6px 0;font-size:13px;font-weight:600;color:#10b981;">Active</td>
+                  </tr>
+                </table>
+              </div>
+              <div style="text-align:center;margin:28px 0;">
+                <a href="${teamUrl}" style="background-color:#4f46e5;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 28px;border-radius:6px;display:inline-block;box-shadow:0 2px 4px rgba(79,70,229,0.3);">
+                  View Team Members &rarr;
+                </a>
+              </div>
+              <p style="margin:24px 0 0;font-size:12px;color:#94a3b8;line-height:1.5;">
+                This user is now ready to receive renewals or access permitted records based on their assigned role.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center;">
+              &copy; 2026 RenewGuard Inc. &bull; Team Management Automated Notification
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    const text = `RenewGuard Team Notification\n\nHello ${recipientAdmin},\n\n${memberName} (${memberEmail}) has accepted your invitation and activated their account with role: ${role}.\n\nAccepted On: ${acceptedDateFormatted}\nAccount Status: Active\n\nView your team members here: ${teamUrl}`;
+
+    const from = this.getFromAddress();
+    const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
+
+    console.log(`[Invite Acceptance Email Dispatch] Sending confirmation to admin ${to} for accepted member ${memberEmail} via ${provider}...`);
+    let result;
+    if (provider === "resend") {
+      result = await this._sendViaResend({ from, to, subject, html, text, renewal: { name: `Acceptance by ${memberName}` } });
+    } else {
+      result = await this._sendViaNodemailer({ from, to, subject, html, text, renewal: { name: `Acceptance by ${memberName}` } });
+    }
+
+    if (result.success) {
+      console.log(`[Invite Acceptance Email Success] Admin confirmation email delivered to ${to} via ${result.provider}. Message ID: ${result.messageId}`);
+    } else {
+      console.warn(`[Invite Acceptance Email Warning] Admin confirmation email to ${to} not completed: ${result.error}`);
+    }
+    return result;
+  },
+
   // Real Email Delivery: Send renewal assignment / reassignment notification email
   async sendAssignmentNotification({ to, recipientName, renewal, assignedBy, isReassignment = false, previousAssignee = "" }) {
     if (!isValidEmail(to)) {

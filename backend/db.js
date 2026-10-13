@@ -845,6 +845,10 @@ const db = {
       token,
       status: "pending",
       expiresAt,
+      adminNotified: false,
+      adminNotifiedAt: null,
+      adminNotificationStatus: "pending",
+      adminNotificationError: null,
       createdAt: new Date().toISOString(),
     };
 
@@ -953,14 +957,77 @@ const db = {
       createdAt: new Date().toISOString(),
     };
 
+    // Save and activate account in database FIRST (notify only after acceptance is verified)
     await this.saveUser(newUser);
 
     invite.status = "accepted";
     invite.acceptedAt = new Date().toISOString();
 
+    // Send real acceptance notification to the Admin who sent the invitation
+    // Prevent duplicate notifications: only send if not already notified
+    let adminNotifyResult = null;
+    if (!invite.adminNotified) {
+      const adminEmail = (invite.invitedBy || invite.invited_by || PRIMARY_ADMIN_EMAIL).toLowerCase();
+      let adminName = invite.invitedByName || invite.invited_by_name || "Administrator";
+      try {
+        const adminUser = await this.getUserByEmail(adminEmail);
+        if (adminUser && adminUser.fullName) {
+          adminName = adminUser.fullName;
+        }
+      } catch (e) {
+        // Fallback to invite.invitedByName
+      }
+
+      console.log(`[Invitation Acceptance] Account activated for ${newUser.fullName} (${newUser.email}, ${newUser.role}). Dispatching confirmation email to Admin ${adminEmail}...`);
+
+      try {
+        adminNotifyResult = await emailService.sendInvitationAcceptanceNotification({
+          to: adminEmail,
+          adminName,
+          memberName: newUser.fullName,
+          memberEmail: newUser.email,
+          role: newUser.role,
+          acceptedAt: invite.acceptedAt,
+        });
+
+        invite.adminNotified = adminNotifyResult.success === true;
+        invite.adminNotifiedAt = new Date().toISOString();
+        invite.adminNotificationStatus = adminNotifyResult.success ? "delivered" : "failed";
+        invite.adminNotificationError = adminNotifyResult.error || null;
+        invite.adminNotificationMessageId = adminNotifyResult.messageId || null;
+      } catch (notifyErr) {
+        console.warn(`[Invitation Acceptance Email Warning] Delivery failed: ${notifyErr.message}`);
+        invite.adminNotified = false;
+        invite.adminNotifiedAt = new Date().toISOString();
+        invite.adminNotificationStatus = "failed";
+        invite.adminNotificationError = notifyErr.message;
+        adminNotifyResult = { success: false, error: notifyErr.message };
+      }
+
+      // Log notification audit event
+      await this.logAudit({
+        actorId: newUser.id,
+        actorName: newUser.fullName,
+        actorEmail: newUser.email,
+        actorRole: newUser.role,
+        action: "INVITE_ACCEPTANCE_NOTIFIED",
+        targetType: "invitation",
+        targetId: invite.id,
+        details: `Invitation acceptance confirmation ${invite.adminNotificationStatus === "delivered" ? "sent to" : "delivery attempted to"} Admin ${adminEmail} (${adminName}) for ${newUser.fullName} (${newUser.email}, role: ${newUser.role}). Status: ${invite.adminNotificationStatus}.${invite.adminNotificationError ? ` Error: ${invite.adminNotificationError}` : ""}`,
+      });
+    } else {
+      console.log(`[Invitation Acceptance] Duplicate notification prevented for invitation ${invite.id}. Admin already notified at ${invite.adminNotifiedAt}.`);
+    }
+
     if (isConfigured()) {
       try {
-        await supabase.from("invitations").update({ status: "accepted", accepted_at: invite.acceptedAt }).eq("token", token);
+        await supabase.from("invitations").update({
+          status: "accepted",
+          accepted_at: invite.acceptedAt,
+          admin_notified: invite.adminNotified,
+          admin_notified_at: invite.adminNotifiedAt,
+          admin_notification_status: invite.adminNotificationStatus,
+        }).eq("token", token);
       } catch (e) {
         console.error(`[Supabase acceptInvitation error] ${e.message}`);
       }
@@ -984,6 +1051,8 @@ const db = {
       details: `Accepted team invitation and registered account with role ${newUser.role}.`,
     });
 
+    newUser._adminNotification = adminNotifyResult;
+    newUser._invite = invite;
     return newUser;
   },
 

@@ -242,6 +242,8 @@ router.post("/register", async (req, res) => {
             role: user.role,
             status: user.status,
           },
+          adminNotified: user._invite ? user._invite.adminNotified : (user._adminNotification ? user._adminNotification.success : false),
+          adminNotification: user._adminNotification || null,
         });
       } catch (inviteErr) {
         return res.status(400).json({ ok: false, error: inviteErr.message });

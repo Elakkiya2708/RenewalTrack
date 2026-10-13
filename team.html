@@ -512,6 +512,12 @@
       let statusBadge = `<span class="status-pill status-pending">Pending</span>`;
       if (inv.status === "accepted") {
         statusBadge = `<span class="status-pill status-active">Accepted</span>`;
+        if (inv.adminNotified === true || inv.admin_notified === true) {
+          const notifiedTime = (inv.adminNotifiedAt || inv.admin_notified_at) ? new Date(inv.adminNotifiedAt || inv.admin_notified_at).toLocaleTimeString() : "";
+          statusBadge += `<span style="display:block;font-size:10.5px;color:var(--success);margin-top:2px;" title="Admin confirmation email dispatched"><i data-lucide="bell" class="icon" style="width:10px;height:10px;vertical-align:middle;"></i> Admin notified${notifiedTime ? ` (${notifiedTime})` : ''}</span>`;
+        } else if (inv.adminNotificationStatus === "failed" || inv.admin_notification_status === "failed") {
+          statusBadge += `<span style="display:block;font-size:10.5px;color:var(--text-muted);margin-top:2px;" title="${escapeHtml(inv.adminNotificationError || inv.admin_notification_error || 'Email failure')}"><i data-lucide="bell-off" class="icon" style="width:10px;height:10px;vertical-align:middle;"></i> Notify failed</span>`;
+        }
       } else if (inv.status === "revoked") {
         statusBadge = `<span class="status-pill status-deactivated">Revoked</span>`;
       } else if (isExpired) {
