@@ -4,10 +4,34 @@
 
 const express = require("express");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const config = require("../config");
 const db = require("../db");
+const emailService = require("../emailService");
 
 const router = express.Router();
+
+// Password Hashing and Verification (scrypt with salt)
+function hashPassword(plainPassword) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(plainPassword, salt, 64).toString("hex");
+  return `scrypt$${salt}$${hash}`;
+}
+
+function verifyPassword(plainPassword, storedPassword, storedHash) {
+  const hashToTest = storedHash || storedPassword;
+  if (hashToTest && typeof hashToTest === "string" && hashToTest.startsWith("scrypt$")) {
+    const parts = hashToTest.split("$");
+    if (parts.length === 3) {
+      const salt = parts[1];
+      const key = parts[2];
+      const checkKey = crypto.scryptSync(plainPassword, salt, 64).toString("hex");
+      return crypto.timingSafeEqual(Buffer.from(key, "hex"), Buffer.from(checkKey, "hex"));
+    }
+  }
+  // Fallback for pre-seeded legacy accounts
+  return storedPassword === plainPassword;
+}
 
 // Middleware: Authenticate JWT Token (Strict DB Verification)
 async function authenticateToken(req, res, next) {
@@ -129,7 +153,7 @@ router.post("/login", async (req, res) => {
 
     const user = await db.getUserByEmail(cleanEmail);
 
-    if (!user || user.password !== password) {
+    if (!user || !verifyPassword(password, user.password, user.passwordHash)) {
       return res.status(401).json({ ok: false, error: "Invalid email or password." });
     }
 
@@ -347,14 +371,16 @@ router.post("/change-password", async (req, res) => {
     if (!user) {
       return res.status(404).json({ ok: false, error: "Account not found." });
     }
-    if (user.password !== currentPassword) {
+    if (!verifyPassword(currentPassword, user.password, user.passwordHash)) {
       return res.status(400).json({ ok: false, error: "Current password is incorrect." });
     }
     if (newPassword.length < 8) {
       return res.status(400).json({ ok: false, error: "New password must be at least 8 characters." });
     }
 
-    user.password = newPassword;
+    const hashed = hashPassword(newPassword);
+    user.password = hashed;
+    user.passwordHash = hashed;
     await db.saveUser(user);
 
     await db.logAudit({
@@ -371,6 +397,148 @@ router.post("/change-password", async (req, res) => {
     res.json({ ok: true, message: "Password updated successfully." });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/auth/forgot-password — Request password reset email
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({ ok: false, error: "Please enter a valid email address." });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!emailService.isValidEmail(cleanEmail)) {
+      return res.status(400).json({ ok: false, error: "Please enter a valid email address format." });
+    }
+
+    const user = await db.getUserByEmail(cleanEmail);
+
+    // Requirement: Show clear success and error messages without revealing whether an email is registered
+    let emailSent = false;
+    let emailError = null;
+
+    if (user && user.status !== "deactivated") {
+      const resetRecord = await db.createPasswordReset(cleanEmail);
+      const appUrl = config.APP_URL || `http://localhost:${config.PORT || 3000}`;
+      const resetUrl = `${appUrl}/reset-password.html?token=${encodeURIComponent(resetRecord.token)}`;
+
+      await db.logAudit({
+        actorId: user.id,
+        actorName: user.fullName,
+        actorEmail: user.email,
+        actorRole: user.role,
+        action: "PASSWORD_RESET_REQUESTED",
+        targetType: "user",
+        targetId: user.id,
+        details: `Password reset link requested for ${user.email}.`,
+      });
+
+      try {
+        const sendResult = await emailService.sendPasswordResetEmail({
+          to: user.email,
+          fullName: user.fullName,
+          resetUrl,
+          expiresMinutes: 30,
+        });
+        emailSent = sendResult.success;
+        if (!sendResult.success) {
+          emailError = sendResult.error;
+          console.warn(`[Forgot Password Warning] Email delivery to ${cleanEmail} failed: ${sendResult.error}`);
+        } else {
+          console.log(`[Forgot Password Success] Password reset email sent to ${cleanEmail} via ${sendResult.provider}. Message ID: ${sendResult.messageId}`);
+        }
+      } catch (sendErr) {
+        console.error(`[Forgot Password Error] Failed to send email: ${sendErr.message}`);
+        emailError = sendErr.message;
+      }
+    } else {
+      console.log(`[Forgot Password] Request received for unregister/deactivated email: ${cleanEmail}. Returning generic message.`);
+    }
+
+    // Generic response to prevent user enumeration
+    res.json({
+      ok: true,
+      message: "If an account with that email exists, a password reset link has been sent. Please check your inbox.",
+      emailSent,
+      emailError,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// GET /api/auth/verify-reset-token/:token — Check token validity on reset page load
+router.get("/verify-reset-token/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const reset = await db.getPasswordResetByToken(token);
+    if (!reset) {
+      return res.status(400).json({ ok: false, error: "Invalid password reset link." });
+    }
+    if (reset.used) {
+      return res.status(400).json({ ok: false, error: "This password reset link has already been used. Please request a new one." });
+    }
+    if (new Date(reset.expiresAt) < new Date()) {
+      return res.status(400).json({ ok: false, error: "This password reset link has expired. Please request a new one." });
+    }
+
+    const parts = reset.email.split("@");
+    const masked = (parts[0].slice(0, 2) || "*") + "***@" + (parts[1] || "");
+
+    res.json({
+      ok: true,
+      valid: true,
+      emailMasked: masked,
+      maskedEmail: masked,
+      expiresAt: reset.expiresAt,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/auth/reset-password — Set new password with valid token
+router.post("/reset-password", async (req, res) => {
+  try {
+    const { token, newPassword, confirmPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ ok: false, error: "Reset token and new password are required." });
+    }
+
+    if (confirmPassword !== undefined && newPassword !== confirmPassword) {
+      return res.status(400).json({ ok: false, error: "Passwords do not match." });
+    }
+
+    if (typeof newPassword !== "string" || newPassword.length < 8) {
+      return res.status(400).json({ ok: false, error: "New password must be at least 8 characters long." });
+    }
+
+    if (!/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      return res.status(400).json({ ok: false, error: "Password must contain at least one letter and one number." });
+    }
+
+    const hashedPassword = hashPassword(newPassword);
+    const user = await db.consumePasswordReset(token, hashedPassword);
+
+    await db.logAudit({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: "PASSWORD_RESET_COMPLETED",
+      targetType: "user",
+      targetId: user.id,
+      details: `Password was successfully reset using verified email token for ${user.email}.`,
+    });
+
+    res.json({
+      ok: true,
+      message: "Your password has been reset successfully. You can now sign in with your new password.",
+    });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err.message });
   }
 });
 

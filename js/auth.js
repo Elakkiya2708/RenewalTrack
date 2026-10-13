@@ -215,11 +215,166 @@
     });
   }
 
+  function initForgotPasswordPage() {
+    const form = document.getElementById("forgotPasswordForm");
+    if (!form) return;
+
+    RTS.auth.redirectIfAuthed();
+
+    const emailInput = document.getElementById("forgotEmail");
+    const emailField = document.getElementById("forgotEmailField");
+    const formContainer = document.getElementById("forgotFormContainer");
+    const successContainer = document.getElementById("forgotSuccessContainer");
+    const sentEmailSpan = document.getElementById("sentEmailAddress");
+
+    const params = new URLSearchParams(window.location.search);
+    const paramEmail = params.get("email");
+    if (paramEmail && emailInput) {
+      emailInput.value = paramEmail;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearErrors(form);
+
+      const email = (emailInput?.value || "").trim();
+      if (!EMAIL_RE.test(email)) {
+        setFieldError(emailField, "Enter a valid email address.");
+        return;
+      }
+
+      const submitBtn = form.querySelector("button[type='submit']");
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<span class="loading-spinner" style="width:14px;height:14px;"></span> Sending Link…`;
+      }
+
+      const result = await RTS.auth.requestPasswordReset(email);
+
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `Send Reset Link`;
+      }
+
+      if (sentEmailSpan) sentEmailSpan.textContent = email;
+      if (formContainer) formContainer.style.display = "none";
+      if (successContainer) {
+        successContainer.style.display = "block";
+      } else {
+        RTS.toast(result.message, "success");
+      }
+      RTS.refreshIcons();
+    });
+  }
+
+  async function initResetPasswordPage() {
+    const form = document.getElementById("resetPasswordForm");
+    if (!form) return;
+
+    wireShowHide();
+
+    const loadingState = document.getElementById("resetLoadingState");
+    const invalidState = document.getElementById("resetInvalidState");
+    const invalidMessage = document.getElementById("resetInvalidMessage");
+    const validState = document.getElementById("resetValidState");
+    const successState = document.getElementById("resetSuccessState");
+    const maskedEmailSpan = document.getElementById("resetMaskedEmail");
+
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+
+    if (!token) {
+      if (loadingState) loadingState.style.display = "none";
+      if (invalidState) {
+        invalidState.style.display = "block";
+        if (invalidMessage) invalidMessage.textContent = "No password reset token was provided in the link. Please request a new reset email.";
+      }
+      RTS.refreshIcons();
+      return;
+    }
+
+    const check = await RTS.auth.verifyResetToken(token);
+    if (loadingState) loadingState.style.display = "none";
+
+    if (!check.ok) {
+      if (invalidState) {
+        invalidState.style.display = "block";
+        if (invalidMessage) invalidMessage.textContent = check.error || "This reset link is invalid, has expired, or has already been used.";
+      }
+      RTS.refreshIcons();
+      return;
+    }
+
+    if (validState) validState.style.display = "block";
+    if (maskedEmailSpan && check.maskedEmail) {
+      maskedEmailSpan.textContent = check.maskedEmail;
+    }
+    RTS.refreshIcons();
+
+    const newPassInput = document.getElementById("resetNewPassword");
+    const confirmPassInput = document.getElementById("resetConfirmPassword");
+    const newPassField = document.getElementById("resetNewPasswordField");
+    const confirmPassField = document.getElementById("resetConfirmPasswordField");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearErrors(form);
+
+      const newPass = newPassInput ? newPassInput.value : "";
+      const confirmPass = confirmPassInput ? confirmPassInput.value : "";
+
+      let valid = true;
+      if (!newPass || newPass.length < 8) {
+        setFieldError(newPassField, "Password must be at least 8 characters long.");
+        valid = false;
+      } else if (!/[A-Za-z]/.test(newPass) || !/[0-9]/.test(newPass)) {
+        setFieldError(newPassField, "Password must contain both letters and numbers.");
+        valid = false;
+      }
+
+      if (newPass !== confirmPass) {
+        setFieldError(confirmPassField, "Passwords do not match.");
+        valid = false;
+      }
+
+      if (!valid) return;
+
+      const submitBtn = form.querySelector("button[type='submit']");
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<span class="loading-spinner" style="width:14px;height:14px;"></span> Updating Password…`;
+      }
+
+      const res = await RTS.auth.resetPassword(token, newPass, confirmPass);
+
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `Save New Password`;
+      }
+
+      if (!res.ok) {
+        RTS.toast(res.error, "error");
+        setFieldError(newPassField, res.error);
+        return;
+      }
+
+      if (validState) validState.style.display = "none";
+      if (successState) successState.style.display = "block";
+      RTS.toast("Password reset successfully! Redirecting to sign in…", "success");
+      RTS.refreshIcons();
+      setTimeout(() => {
+        window.location.href = "login.html";
+      }, 2200);
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     RTS.ensureSeed();
     RTS.settings.applyTheme(RTS.settings.getSettings().theme);
     initLoginPage();
     initRegisterPage();
+    initForgotPasswordPage();
+    initResetPasswordPage();
     RTS.refreshIcons();
   });
 })();

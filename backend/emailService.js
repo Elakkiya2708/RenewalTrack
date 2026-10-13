@@ -743,6 +743,105 @@ const emailService = {
 
     return result;
   },
+
+  // Real Email Delivery: Send secure password reset email
+  async sendPasswordResetEmail({ to, fullName, resetUrl, expiresMinutes = 30 }) {
+    if (!isValidEmail(to)) {
+      const err = `Invalid recipient email address: "${to}"`;
+      console.warn(`[Password Reset Email Validation] ${err}`);
+      return { success: false, error: err, isInvalidEmail: true };
+    }
+
+    const recipientName = fullName || to.split("@")[0];
+    const subject = "Reset Your RenewGuard Password";
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Reset Your RenewGuard Password</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;line-height:1.5;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width:600px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07);border:1px solid #e2e8f0;">
+          <tr>
+            <td style="background-color:#0f172a;padding:24px 32px;border-bottom:3px solid #6366f1;">
+              <table role="presentation" width="100%">
+                <tr>
+                  <td>
+                    <div style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
+                      <span style="color:#818cf8;">Renew</span>Guard
+                    </div>
+                    <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
+                      Account Security &amp; Password Recovery
+                    </div>
+                  </td>
+                  <td align="right">
+                    <span style="display:inline-block;padding:5px 12px;background-color:#ef4444;color:#ffffff;font-size:11px;font-weight:700;border-radius:16px;text-transform:uppercase;">
+                      Password Reset
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 32px 24px;">
+              <h2 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#0f172a;">
+                Hello, ${escapeHtml(recipientName)}!
+              </h2>
+              <p style="margin:0 0 16px;color:#475569;font-size:15px;line-height:1.6;">
+                We received a request to reset the password for your RenewGuard account (<strong>${escapeHtml(to)}</strong>).
+              </p>
+              <p style="margin:0 0 24px;color:#475569;font-size:15px;line-height:1.6;">
+                Click the secure button below to set a new password. This link is single-use and will expire in <strong>${expiresMinutes} minutes</strong>.
+              </p>
+              <div style="text-align:center;margin:28px 0;">
+                <a href="${resetUrl}" style="background-color:#4f46e5;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 32px;border-radius:6px;display:inline-block;box-shadow:0 2px 4px rgba(79,70,229,0.3);">
+                  Reset Your Password &rarr;
+                </a>
+              </div>
+              <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:24px 0;">
+                <p style="margin:0;font-size:13px;color:#64748b;line-height:1.5;">
+                  <strong>Security Note:</strong> If you did not request this password reset, please ignore this email. Your password will remain unchanged and your account remains secure.
+                </p>
+              </div>
+              <p style="margin:24px 0 0;font-size:12px;color:#94a3b8;line-height:1.5;word-break:break-all;">
+                If the button above does not work, copy and paste this link into your browser:<br>
+                <a href="${resetUrl}" style="color:#6366f1;">${resetUrl}</a>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center;">
+              &copy; 2026 RenewGuard Inc. &bull; Automated Security Notification
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    const text = `Hello ${recipientName},\n\nWe received a request to reset your RenewGuard password.\n\nPlease reset your password using this link (expires in ${expiresMinutes} minutes):\n${resetUrl}\n\nIf you did not request this, please ignore this email.`;
+
+    const from = this.getFromAddress();
+    const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
+
+    console.log(`[Password Reset Email Dispatch] Sending reset link to ${to} via ${provider}...`);
+
+    let result;
+    if (provider === "resend") {
+      result = await this._sendViaResend({ from, to, subject, html, text, renewal: { name: "Password Reset" } });
+    } else {
+      result = await this._sendViaNodemailer({ from, to, subject, html, text, renewal: { name: "Password Reset" } });
+    }
+
+    return result;
+  },
 };
 
 module.exports = emailService;

@@ -1183,6 +1183,82 @@
     return { ok: true };
   }
 
+  async function requestPasswordReset(email) {
+    const cleanEmail = (email || "").trim().toLowerCase();
+    try {
+      const res = await fetch(apiUrl("/api/auth/forgot-password"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: cleanEmail }),
+      });
+      const data = await res.json();
+      return {
+        ok: true,
+        message: data.message || "If an account with that email exists, a password reset link has been sent. Please check your inbox.",
+        emailDispatched: !!data.emailDispatched,
+      };
+    } catch (err) {
+      console.warn("[RTS] forgot-password request failed:", err);
+      return {
+        ok: true,
+        message: "If an account with that email exists, a password reset link has been sent. Please check your inbox.",
+      };
+    }
+  }
+
+  async function verifyResetToken(token) {
+    if (!token) return { ok: false, error: "Missing reset token." };
+    try {
+      const res = await fetch(apiUrl("/api/auth/verify-reset-token/" + encodeURIComponent(token)));
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        return { ok: false, error: data.error || "Invalid or expired password reset link." };
+      }
+      return { ok: true, email: data.email, maskedEmail: data.maskedEmail };
+    } catch (err) {
+      console.warn("[RTS] verify-reset-token error:", err);
+      return { ok: false, error: "Unable to verify reset token. Please check your network connection." };
+    }
+  }
+
+  async function resetPassword(token, newPassword, confirmPassword) {
+    if (!token) return { ok: false, error: "Missing reset token." };
+    if (!newPassword || newPassword.length < 8) {
+      return { ok: false, error: "Password must be at least 8 characters long and contain both letters and numbers." };
+    }
+    if (newPassword !== confirmPassword) {
+      return { ok: false, error: "Passwords do not match." };
+    }
+    try {
+      const res = await fetch(apiUrl("/api/auth/reset-password"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, newPassword, confirmPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        return { ok: false, error: data.error || "Failed to reset password." };
+      }
+      // Also update local accounts cache if present
+      try {
+        const accounts = getAccounts();
+        const userEmail = data.email;
+        if (userEmail) {
+          const idx = accounts.findIndex((a) => a.email.toLowerCase() === userEmail.toLowerCase());
+          if (idx >= 0) {
+            accounts[idx].password = newPassword;
+            writeJSON(STORAGE_KEYS.ACCOUNTS, accounts);
+          }
+        }
+      } catch (e) {}
+
+      return { ok: true, message: data.message || "Password has been successfully reset." };
+    } catch (err) {
+      console.warn("[RTS] reset-password error:", err);
+      return { ok: false, error: "Server error resetting password. Please try again." };
+    }
+  }
+
   function logout() {
     localStorage.removeItem(STORAGE_KEYS.AUTH);
     localStorage.removeItem("rts_jwt_token");
@@ -2825,6 +2901,9 @@
       registerAccount,
       getAccounts,
       changePassword,
+      requestPasswordReset,
+      verifyResetToken,
+      resetPassword,
       getToken: () => localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH) || "",
     },
     team: {

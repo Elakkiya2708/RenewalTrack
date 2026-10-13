@@ -84,7 +84,7 @@
         <div class="field" id="loginPasswordField">
           <div class="field-label-row">
             <label for="loginPassword">Password <span class="req">*</span></label>
-            <a class="link forgot-link" href="#" id="forgotPasswordLink">Forgot password?</a>
+            <a class="link forgot-link" href="forgot-password.html" id="forgotPasswordLink">Forgot password?</a>
           </div>
           <div class="password-field">
             <input class="input" type="password" id="loginPassword" placeholder="Enter your password" autocomplete="current-password" />
@@ -114,10 +114,16 @@
 <script src="js/auth.js"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script>
-  document.getElementById("forgotPasswordLink").addEventListener("click", function (e) {
-    e.preventDefault();
-    RTS.toast("Password reset link sent to your email (demo).", "info");
-  });
+  const forgotLink = document.getElementById("forgotPasswordLink");
+  if (forgotLink) {
+    forgotLink.addEventListener("click", function (e) {
+      const emailVal = (document.getElementById("loginEmail")?.value || "").trim();
+      if (emailVal) {
+        e.preventDefault();
+        window.location.href = "forgot-password.html?email=" + encodeURIComponent(emailVal);
+      }
+    });
+  }
   RTS.refreshIcons();
 </script>
 <script>

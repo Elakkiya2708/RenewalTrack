@@ -70,6 +70,10 @@ function getLocalStore() {
         store.users = [];
         changed = true;
       }
+      if (!store.password_resets) {
+        store.password_resets = [];
+        changed = true;
+      }
 
       // Remove unwanted demo account (Anita Sharma / demo@renewaltrack.com)
       const hadDemoUser = store.users.some(
@@ -161,6 +165,7 @@ function getLocalStore() {
     renewals: getInitialSeedRenewals(),
     reminder_logs: [],
     invitations: [],
+    password_resets: [],
     audit_logs: [
       {
         id: "log-seed-1",
@@ -1051,6 +1056,121 @@ const db = {
       );
     }
     return logs.slice(0, limit);
+  },
+
+  // 26. Create secure single-use password reset token (expires in 30 minutes)
+  async createPasswordReset(email) {
+    const cleanEmail = (email || "").trim().toLowerCase();
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    const record = {
+      id: `reset-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`,
+      email: cleanEmail,
+      token,
+      expiresAt,
+      used: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    const store = getLocalStore();
+    store.password_resets = store.password_resets || [];
+    // Mark previous unused tokens for this email as superseded
+    store.password_resets.forEach((r) => {
+      if (r.email === cleanEmail && !r.used) {
+        r.used = true;
+        r.superseded = true;
+      }
+    });
+    store.password_resets.push(record);
+    saveLocalStore(store);
+
+    if (isConfigured()) {
+      try {
+        await supabase.from("password_resets").insert({
+          id: record.id,
+          email: record.email,
+          token: record.token,
+          expires_at: record.expiresAt,
+          used: false,
+          created_at: record.createdAt,
+        });
+      } catch (e) {
+        console.warn(`[Supabase createPasswordReset error] ${e.message}`);
+      }
+    }
+
+    return record;
+  },
+
+  // 27. Get password reset record by token
+  async getPasswordResetByToken(token) {
+    if (!token || typeof token !== "string") return null;
+    if (isConfigured()) {
+      try {
+        const { data, error } = await supabase.from("password_resets").select("*").eq("token", token).single();
+        if (!error && data) return toCamelCase(data);
+      } catch (e) {}
+    }
+    const store = getLocalStore();
+    const list = store.password_resets || [];
+    return list.find((r) => r.token === token) || null;
+  },
+
+  // 28. Consume password reset token and update user password
+  async consumePasswordReset(token, newHashedPassword) {
+    const reset = await this.getPasswordResetByToken(token);
+    if (!reset) {
+      throw new Error("Invalid password reset token.");
+    }
+    if (reset.used) {
+      throw new Error("This password reset link has already been used. Please request a new one.");
+    }
+    if (new Date(reset.expiresAt) < new Date()) {
+      throw new Error("This password reset link has expired. Please request a new one.");
+    }
+
+    const user = await this.getUserByEmail(reset.email);
+    if (!user) {
+      throw new Error("User account associated with this reset link was not found.");
+    }
+
+    // Update user password and passwordHash
+    user.password = newHashedPassword;
+    user.passwordHash = newHashedPassword;
+    user.updatedAt = new Date().toISOString();
+    await this.saveUser(user);
+
+    // Invalidate token
+    reset.used = true;
+    reset.usedAt = new Date().toISOString();
+
+    const store = getLocalStore();
+    store.password_resets = store.password_resets || [];
+    const idx = store.password_resets.findIndex((r) => r.token === token);
+    if (idx >= 0) {
+      store.password_resets[idx] = reset;
+      saveLocalStore(store);
+    }
+
+    if (isConfigured()) {
+      try {
+        await supabase.from("password_resets").update({ used: true, used_at: reset.usedAt }).eq("token", token);
+      } catch (e) {}
+    }
+
+    return user;
+  },
+
+  // 29. List all password resets (for audit or internal query)
+  async getPasswordResets() {
+    if (isConfigured()) {
+      try {
+        const { data, error } = await supabase.from("password_resets").select("*").order("created_at", { ascending: false });
+        if (!error && data) return data.map(toCamelCase);
+      } catch (e) {}
+    }
+    const store = getLocalStore();
+    return store.password_resets || [];
   },
 };
 
