@@ -158,10 +158,22 @@ function getLocalStore() {
         }
       }
 
-      // Reassign legacy demo references in invitations
-      if (store.invitations) {
+      // Remove all automatic, sample, and demo invitations
+      if (store.invitations && Array.isArray(store.invitations)) {
+        const cleanInvites = store.invitations.filter((inv) => {
+          if (!inv || !inv.email) return false;
+          const em = (inv.email || "").toLowerCase().trim();
+          if (em === "demo@renewaltrack.com" || em.includes("sample") || inv.isSample || inv.autoAccept) return false;
+          return true;
+        });
+        if (cleanInvites.length !== store.invitations.length) {
+          store.invitations = cleanInvites;
+          changed = true;
+        }
+
+        // Ensure genuine invitations invitedBy is set to primary admin if legacy
         store.invitations.forEach((inv) => {
-          if (inv.invitedBy && inv.invitedBy.toLowerCase() === "demo@renewaltrack.com") {
+          if (inv.invitedBy && (inv.invitedBy.toLowerCase() === "demo@renewaltrack.com" || !inv.invitedBy)) {
             inv.invitedBy = PRIMARY_ADMIN_EMAIL;
             inv.invitedByName = PRIMARY_ADMIN_NAME;
             changed = true;
@@ -840,12 +852,18 @@ const db = {
     return counts;
   },
 
-  // 18. Create invitation with secure token, expiry, and email dispatch
+  // 18. Create invitation with secure token, expiry, and email dispatch (Manual Admin Action Only)
   async createInvitation({ email, fullName, role }, actor = {}) {
     if (!email || !email.includes("@")) {
       throw new Error("A valid email address is required.");
     }
     const cleanEmail = email.trim().toLowerCase();
+
+    // Enforce manual Admin authorization: only an Admin can invite new members
+    const actorRole = actor.role || (actor.email && actor.email.toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase() ? "Admin" : null);
+    if (actorRole !== "Admin") {
+      throw new Error("Access denied. Only an Administrator can manually invite new team members.");
+    }
 
     // Prevent unauthorized role escalation: Role must strictly be 'Employee' or 'Viewer'
     if (!role || !["Employee", "Viewer"].includes(role)) {
@@ -871,6 +889,7 @@ const db = {
     const token = `inv-${crypto.randomBytes(32).toString("hex")}`;
     const expiresAt = new Date(Date.now() + 48 * 3600 * 1000).toISOString(); // 48 hours
 
+    // Genuine manual Admin invitation: status is strictly pending, never auto-accepted
     const invite = {
       id: `inv-${Date.now()}`,
       email: cleanEmail,
@@ -885,6 +904,8 @@ const db = {
       adminNotifiedAt: null,
       adminNotificationStatus: "pending",
       adminNotificationError: null,
+      isSample: false,
+      autoAccept: false,
       createdAt: new Date().toISOString(),
     };
 
@@ -903,6 +924,8 @@ const db = {
     const appUrl = config.APP_URL || `http://localhost:${config.PORT}`;
     const inviteUrl = `${appUrl}/register.html?invite=${token}`;
 
+    console.log(`[Manual Admin Invitation] Admin ${invite.invitedBy} (${invite.invitedByName}) manually inviting ${cleanEmail} for role ${cleanRole}. Dispatching real invitation email...`);
+
     const emailResult = await emailService.sendInvitationEmail({
       to: cleanEmail,
       fullName: invite.fullName,
@@ -919,7 +942,7 @@ const db = {
       action: "MEMBER_INVITED",
       targetType: "invitation",
       targetId: invite.id,
-      details: `Sent invitation to ${cleanEmail} for role ${cleanRole} (Expires: 48h). Email delivery: ${emailResult.success ? 'Delivered' : emailResult.error || 'Failed'}.`,
+      details: `Manual invitation dispatched to ${cleanEmail} for role ${cleanRole} (Expires: 48h). Email delivery: ${emailResult.success ? 'Delivered' : emailResult.error || 'Failed'}.`,
     });
 
     return {
@@ -932,18 +955,54 @@ const db = {
     };
   },
 
-  // 19. Get all invitations
+  // 19. Get all genuine Admin-created invitations with actual statuses
   async getInvitations() {
+    let list = [];
     if (isConfigured()) {
       try {
         const { data, error } = await supabase.from("invitations").select("*").order("created_at", { ascending: false });
-        if (!error && data && data.length > 0) return data.map(toCamelCase);
+        if (!error && data && data.length > 0) list = data.map(toCamelCase);
       } catch (e) {
         console.error(`[Supabase getInvitations error] ${e.message}`);
       }
     }
+    if (!list || list.length === 0) {
+      const store = getLocalStore();
+      list = store.invitations || [];
+    }
+
+    const now = new Date();
     const store = getLocalStore();
-    return store.invitations || [];
+    let storeChanged = false;
+
+    // Filter to genuine Admin-created invitations and sync dynamic expiration status
+    const genuine = (list || [])
+      .filter((inv) => {
+        if (!inv || !inv.email) return false;
+        const em = (inv.email || "").toLowerCase().trim();
+        if (em === "demo@renewaltrack.com") return false;
+        if (inv.isSample === true || inv.autoAccept === true) return false;
+        return true;
+      })
+      .map((inv) => {
+        const exp = new Date(inv.expiresAt || inv.expires_at || 0);
+        // If pending and expired, reflect actual status
+        if (inv.status === "pending" && exp < now) {
+          inv.status = "expired";
+          const idx = (store.invitations || []).findIndex((i) => i.id === inv.id || i.token === inv.token);
+          if (idx >= 0 && store.invitations[idx].status !== "expired") {
+            store.invitations[idx].status = "expired";
+            storeChanged = true;
+          }
+        }
+        return inv;
+      });
+
+    if (storeChanged) {
+      saveLocalStore(store);
+    }
+
+    return genuine;
   },
 
   // 20. Get invitation by token
