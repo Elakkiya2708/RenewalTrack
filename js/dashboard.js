@@ -216,6 +216,313 @@
     document.getElementById("miniCalendar").innerHTML = html;
   }
 
+  let assignableEmployees = [];
+  let assigneesStatus = "idle"; // "idle" | "loading" | "success" | "empty" | "error"
+  let assigneesError = null;
+
+  async function loadAssignableEmployees() {
+    assigneesStatus = "loading";
+    assigneesError = null;
+    const sel = document.getElementById("in_assignedTo");
+    if (sel && (!assignableEmployees || !assignableEmployees.length)) {
+      sel.innerHTML = `<option value="" disabled selected>⏳ Loading active employees from database…</option>`;
+    }
+
+    try {
+      let result = null;
+      if (typeof RTS !== "undefined" && typeof RTS.getAssignableEmployees === "function") {
+        result = await RTS.getAssignableEmployees();
+      } else if (typeof RTS !== "undefined" && RTS.team && typeof RTS.team.getAssignableEmployees === "function") {
+        result = await RTS.team.getAssignableEmployees();
+      } else if (typeof RTS !== "undefined" && RTS.data && typeof RTS.data.getAssignableEmployees === "function") {
+        result = await RTS.data.getAssignableEmployees();
+      } else {
+        const url = (typeof RTS !== "undefined" && RTS.apiUrl ? RTS.apiUrl("/api/renewals/assignees") : "/api/renewals/assignees");
+        const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem("rts_auth_token");
+        const user = (RTS.auth && typeof RTS.auth.getCurrentUser === "function" ? RTS.auth.getCurrentUser() : null) || {};
+        const headers = {
+          Accept: "application/json",
+          "x-user-role": user.role || "Admin",
+          "x-user-email": user.email || "",
+        };
+        if (token) headers["Authorization"] = "Bearer " + token;
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const json = await res.json();
+          if (json && (json.ok || json.success) && Array.isArray(json.data)) {
+            result = { ok: true, status: json.data.length ? "success" : "empty", data: json.data };
+          }
+        }
+      }
+
+      if (result && (result.status === "error" || result.ok === false)) {
+        assignableEmployees = [];
+        assigneesStatus = "error";
+        assigneesError = result.error || "Failed to load employees from database";
+      } else if (result) {
+        const list = Array.isArray(result) ? result : (Array.isArray(result.data) ? result.data : []);
+        assignableEmployees = list;
+        assigneesStatus = list.length ? "success" : "empty";
+      } else {
+        assignableEmployees = [];
+        assigneesStatus = "error";
+        assigneesError = "Failed to load employees from database";
+      }
+    } catch (err) {
+      console.error("[Dashboard] Error loading assignable employees:", err);
+      assignableEmployees = [];
+      assigneesStatus = "error";
+      assigneesError = err.message || "Failed to load employees";
+    }
+
+    return assignableEmployees;
+  }
+
+  function populateAssigneeSelect(currentVal) {
+    const sel = document.getElementById("in_assignedTo");
+    if (!sel) return;
+
+    if (assigneesStatus === "loading") {
+      sel.innerHTML = `<option value="" disabled selected>⏳ Loading active employees from database…</option>`;
+      return;
+    }
+
+    if (assigneesStatus === "error") {
+      sel.innerHTML = `
+        <option value="">— Unassigned —</option>
+        <option value="" disabled selected>⚠️ Failed to load employees (Server/Network Error) — Click to retry</option>
+      `;
+      return;
+    }
+
+    if (assigneesStatus === "empty" || !assignableEmployees.length) {
+      sel.innerHTML = `<option value="">— Unassigned — (No active employees found in database)</option>`;
+      return;
+    }
+
+    sel.innerHTML = `<option value="">— Unassigned —</option>`;
+    assignableEmployees.forEach((emp) => {
+      const name = emp.fullName || emp.name || "Employee";
+      const email = emp.email || "";
+      const role = emp.role ? ` (${emp.role})` : "";
+      const isSelected = currentVal && String(emp.id) === String(currentVal);
+      sel.insertAdjacentHTML(
+        "beforeend",
+        `<option value="${emp.id}" ${isSelected ? "selected" : ""} data-name="${RTS.escapeHtml(name)}" data-email="${RTS.escapeHtml(email)}">${RTS.escapeHtml(name)}${role} — ${RTS.escapeHtml(email)}</option>`
+      );
+    });
+
+    if (currentVal) {
+      sel.value = currentVal;
+    } else {
+      sel.value = "";
+    }
+  }
+
+  function populateModalSelects() {
+    const catInput = document.getElementById("in_category");
+    if (catInput && !catInput.children.length) {
+      catInput.innerHTML = `<option value="">Select a category</option>`;
+      RTS.CATEGORIES.forEach((c) => {
+        catInput.insertAdjacentHTML("beforeend", `<option value="${c}">${c}</option>`);
+      });
+    }
+
+    const currencyInput = document.getElementById("in_currency");
+    if (currencyInput && !currencyInput.children.length) {
+      currencyInput.innerHTML = "";
+      RTS.CURRENCIES.forEach((c) => {
+        currencyInput.insertAdjacentHTML("beforeend", `<option value="${c}">${c}</option>`);
+      });
+      currencyInput.value = "USD";
+    }
+
+    const cycleInput = document.getElementById("in_recurringCycle");
+    if (cycleInput && !cycleInput.children.length) {
+      cycleInput.innerHTML = "";
+      RTS.RECURRING_CYCLES.forEach((c) => {
+        cycleInput.insertAdjacentHTML("beforeend", `<option value="${c}">${RTS.cycleLabel(c)}</option>`);
+      });
+      cycleInput.value = "Yearly";
+    }
+  }
+
+  function clearFieldErrors() {
+    document.querySelectorAll(".field.has-error").forEach((f) => f.classList.remove("has-error"));
+  }
+
+  function resetForm() {
+    clearFieldErrors();
+    const form = document.getElementById("renewalForm");
+    if (form) form.reset();
+    const today = RTS.todayISO();
+    const issueDateInput = document.getElementById("in_issueDate");
+    if (issueDateInput) issueDateInput.value = today;
+    const prio = document.getElementById("in_priority");
+    if (prio) prio.value = "Medium";
+    const curr = document.getElementById("in_currency");
+    if (curr) curr.value = "USD";
+    const cycle = document.getElementById("in_recurringCycle");
+    if (cycle) cycle.value = "Yearly";
+    const hiddenId = document.getElementById("renewalId");
+    if (hiddenId) hiddenId.value = "";
+    const hiddenResp = document.getElementById("in_responsible");
+    if (hiddenResp) hiddenResp.value = "";
+    const emailInput = document.getElementById("in_responsibleEmail");
+    if (emailInput) emailInput.value = "";
+  }
+
+  async function openQuickAdd() {
+    if (RTS.auth.isViewer && RTS.auth.isViewer()) {
+      RTS.toast("Viewer role has read-only access and cannot create renewals.", "error");
+      return;
+    }
+    resetForm();
+    populateModalSelects();
+
+    const sel = document.getElementById("in_assignedTo");
+    const help = document.getElementById("assignedToHelp");
+    const respInput = document.getElementById("in_responsible");
+    const emailInput = document.getElementById("in_responsibleEmail");
+
+    if (sel) {
+      sel.innerHTML = `<option value="" disabled selected>⏳ Loading active employees from database…</option>`;
+    }
+
+    await loadAssignableEmployees();
+
+    if (RTS.auth.isEmployee && RTS.auth.isEmployee()) {
+      const u = RTS.auth.getCurrentUser();
+      const matched = assignableEmployees.find(
+        (e) => String(e.id) === String(u.id) || (e.email && e.email.toLowerCase() === (u.email || "").toLowerCase())
+      );
+      const empId = matched ? matched.id : u.id;
+      populateAssigneeSelect(empId);
+      if (sel) {
+        sel.value = empId || "";
+        sel.disabled = true;
+      }
+      if (help) {
+        help.textContent = "Automatically assigned to your employee account.";
+      }
+      if (respInput) respInput.value = (matched && (matched.fullName || matched.name)) || u.fullName || u.name || "";
+      if (emailInput) emailInput.value = (matched && matched.email) || u.email || "";
+    } else {
+      populateAssigneeSelect("");
+      if (sel) {
+        sel.disabled = false;
+        sel.value = "";
+      }
+      if (help) {
+        help.textContent = "Assign to an active employee from database, or leave Unassigned.";
+      }
+      if (respInput) respInput.value = "";
+      if (emailInput) emailInput.value = "";
+    }
+
+    const title = document.getElementById("renewalModalTitle");
+    if (title) title.textContent = "Quick Add Renewal";
+    RTS.modal.open("renewalModal");
+  }
+
+  function validate() {
+    clearFieldErrors();
+    let valid = true;
+    const req = (id, fieldId) => {
+      const el = document.getElementById(id);
+      if (!el || !el.value.trim()) {
+        const f = document.getElementById(fieldId);
+        if (f) f.classList.add("has-error");
+        valid = false;
+      }
+    };
+    req("in_name", "f_name");
+    req("in_category", "f_category");
+    req("in_organization", "f_organization");
+    req("in_issueDate", "f_issueDate");
+    req("in_expiryDate", "f_expiryDate");
+
+    const issue = document.getElementById("in_issueDate").value;
+    const expiry = document.getElementById("in_expiryDate").value;
+    if (issue && expiry && expiry <= issue) {
+      document.getElementById("f_expiryDate").classList.add("has-error");
+      valid = false;
+    }
+
+    const reminder = document.getElementById("in_reminderDate").value;
+    if (reminder && expiry && reminder > expiry) {
+      document.getElementById("f_reminderDate").classList.add("has-error");
+      valid = false;
+    }
+
+    const cost = document.getElementById("in_cost").value;
+    if (cost !== "" && Number(cost) < 0) {
+      document.getElementById("f_cost").classList.add("has-error");
+      valid = false;
+    }
+
+    return valid;
+  }
+
+  function handleQuickAddSubmit(e) {
+    e.preventDefault();
+    if (!validate()) {
+      RTS.toast("Please fix the highlighted fields.", "error");
+      return;
+    }
+
+    const cycleInput = document.getElementById("in_recurringCycle");
+    const sel = document.getElementById("in_assignedTo");
+    const assignedId = sel && sel.value ? sel.value.trim() : null;
+    let assignedName = null;
+    let assignedEmail = null;
+
+    if (assignedId) {
+      const matchedEmp = assignableEmployees.find((emp) => String(emp.id) === String(assignedId));
+      assignedName = matchedEmp ? (matchedEmp.fullName || matchedEmp.name) : (document.getElementById("in_responsible").value.trim() || null);
+      assignedEmail = matchedEmp ? (matchedEmp.email || "") : (document.getElementById("in_responsibleEmail").value.trim() || "");
+    }
+
+    const data = {
+      name: document.getElementById("in_name").value.trim(),
+      category: document.getElementById("in_category").value,
+      priority: document.getElementById("in_priority").value,
+      recurringCycle: cycleInput ? cycleInput.value : "Yearly",
+      description: document.getElementById("in_description").value.trim(),
+      organization: document.getElementById("in_organization").value.trim(),
+      referenceNumber: document.getElementById("in_reference").value.trim(),
+      assignedToId: assignedId || null,
+      assignedToName: assignedName,
+      assignedToEmail: assignedEmail,
+      responsiblePerson: assignedName || "",
+      responsibleEmail: assignedEmail || "",
+      issueDate: document.getElementById("in_issueDate").value,
+      expiryDate: document.getElementById("in_expiryDate").value,
+      reminderDate: document.getElementById("in_reminderDate").value,
+      cost: document.getElementById("in_cost").value === "" ? null : Number(document.getElementById("in_cost").value),
+      currency: document.getElementById("in_currency").value,
+      notes: document.getElementById("in_notes").value.trim(),
+      documents: [],
+    };
+
+    RTS.data.addRenewal(data);
+    RTS.modal.close("renewalModal");
+    RTS.toast("Renewal record created successfully.", "success");
+
+    refreshDashboard();
+  }
+
+  function refreshDashboard() {
+    const { list, statuses } = renderStats();
+    applyRoleDashboard(list);
+    renderUpcoming(list);
+    renderStatusChart(statuses);
+    renderCategoryChart(list);
+    renderActivity(list);
+    renderMiniCalendar(list);
+    RTS.refreshIcons();
+  }
+
   function applyRoleDashboard(list) {
     const user = RTS.auth.getCurrentUser();
     const role = user.role || "Admin";
@@ -230,7 +537,7 @@
       if (subEl) subEl.textContent = "Full administrative overview of all renewals, team management, compliance, and audit logs.";
       if (actionsEl) {
         actionsEl.innerHTML = `
-          <a href="records.html#add" class="btn btn-primary"><i data-lucide="plus" class="icon"></i>Quick Add Renewal</a>
+          <button type="button" class="btn btn-primary" id="quickAddBtn"><i data-lucide="plus" class="icon"></i>Quick Add Renewal</button>
           <a href="team.html" class="btn btn-secondary"><i data-lucide="users" class="icon"></i>Team Members</a>
           <a href="audit.html" class="btn btn-secondary"><i data-lucide="clipboard-list" class="icon"></i>Audit Logs</a>
         `;
@@ -240,18 +547,20 @@
       if (subEl) subEl.textContent = "Team renewal overview. Manage and monitor your assigned renewals and compliance deadlines.";
       if (actionsEl) {
         actionsEl.innerHTML = `
-          <a href="records.html#add" class="btn btn-primary"><i data-lucide="plus" class="icon"></i>Add Renewal</a>
+          <button type="button" class="btn btn-primary" id="quickAddBtn"><i data-lucide="plus" class="icon"></i>Add Renewal</button>
         `;
       }
 
       // Check how many renewals are assigned to this employee
       const userEmail = (user.email || "").toLowerCase();
       const userName = (user.fullName || "").toLowerCase();
+      const userId = user.id ? String(user.id) : "";
       const assigned = list.filter((r) => {
-        const respEmail = (r.responsibleEmail || r.responsible_email || "").toLowerCase();
-        const respName = (r.responsiblePerson || r.responsible_person || "").toLowerCase();
+        const respEmail = (r.responsibleEmail || r.responsible_email || r.assignedToEmail || r.assigned_to_email || "").toLowerCase();
+        const respName = (r.responsiblePerson || r.responsible_person || r.assignedToName || r.assigned_to_name || "").toLowerCase();
+        const aId = r.assignedToId || r.assigned_to_id ? String(r.assignedToId || r.assigned_to_id) : "";
         const createdBy = (r.createdBy || "").toLowerCase();
-        return respEmail === userEmail || respName === userName || createdBy === userEmail;
+        return (userId && aId === userId) || respEmail === userEmail || respName === userName || createdBy === userEmail;
       });
 
       if (noticeEl) {
@@ -291,6 +600,12 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     RTS.initLayout();
+    if (RTS.data && RTS.data.syncFromBackend) {
+      RTS.data.syncFromBackend().then(() => {
+        refreshDashboard();
+      }).catch(() => {});
+    }
+
     const { list, statuses } = renderStats();
     applyRoleDashboard(list);
     renderUpcoming(list);
@@ -299,5 +614,41 @@
     renderActivity(list);
     renderMiniCalendar(list);
     RTS.refreshIcons();
+
+    // Modal & Quick Add wiring
+    const resetFormBtn = document.getElementById("resetFormBtn");
+    if (resetFormBtn) resetFormBtn.addEventListener("click", resetForm);
+
+    const renewalForm = document.getElementById("renewalForm");
+    if (renewalForm) renewalForm.addEventListener("submit", handleQuickAddSubmit);
+
+    const assignedSelect = document.getElementById("in_assignedTo");
+    if (assignedSelect) {
+      assignedSelect.addEventListener("change", () => {
+        const selectedId = assignedSelect.value;
+        const emp = assignableEmployees.find((e) => String(e.id) === String(selectedId));
+        const respHidden = document.getElementById("in_responsible");
+        const emailInput = document.getElementById("in_responsibleEmail");
+        if (emp) {
+          if (respHidden) respHidden.value = emp.fullName || emp.name || "";
+          if (emailInput) emailInput.value = emp.email || "";
+        } else {
+          if (respHidden) respHidden.value = "";
+          if (emailInput) emailInput.value = "";
+        }
+      });
+    }
+
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest("#quickAddBtn");
+      if (btn) {
+        e.preventDefault();
+        openQuickAdd();
+      }
+    });
+
+    window.addEventListener("rts-renewal-updated", () => {
+      refreshDashboard();
+    });
   });
 })();

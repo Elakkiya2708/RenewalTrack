@@ -39,8 +39,20 @@
     document.getElementById("daysValue").style.color =
       status === "expired" ? "var(--danger)" : status === "due-soon" ? "var(--warning)" : "var(--success)";
 
-    const assignedName = record.assignedToName || record.assigned_to_name || record.responsiblePerson || record.responsible_person || "Unassigned";
-    const assignedEmail = record.assignedToEmail || record.assigned_to_email || record.responsibleEmail || "";
+    let assignedName = record.assignedToName || record.assigned_to_name || record.responsiblePerson || record.responsible_person || "";
+    let assignedEmail = record.assignedToEmail || record.assigned_to_email || record.responsibleEmail || record.responsible_email || "";
+    const assignedId = record.assignedToId || record.assigned_to_id || "";
+
+    if ((!assignedName || assignedName === "Unassigned") && assignedId) {
+      const accounts = (RTS.auth && typeof RTS.auth.getAccounts === "function" && RTS.auth.getAccounts()) || [];
+      const matched = accounts.find((a) => String(a.id) === String(assignedId));
+      if (matched) {
+        assignedName = matched.fullName || matched.name || "";
+        assignedEmail = assignedEmail || matched.email || "";
+      }
+    }
+    if (!assignedName) assignedName = "Unassigned";
+
     const initials = assignedName && assignedName !== "Unassigned"
       ? assignedName.split(" ").filter(Boolean).map((p) => p[0]).slice(0, 2).join("").toUpperCase()
       : "U";
@@ -296,6 +308,18 @@
     const record = render();
     if (record) wireActions();
     RTS.refreshIcons();
+
+    if (RTS.data && RTS.data.syncFromBackend) {
+      RTS.data.syncFromBackend().then(() => {
+        render();
+        RTS.refreshIcons();
+      });
+    }
+
+    window.addEventListener("rts-renewal-updated", () => {
+      render();
+      RTS.refreshIcons();
+    });
 
     window.addEventListener("rts-language-changed", () => {
       render();

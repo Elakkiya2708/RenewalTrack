@@ -52,10 +52,35 @@ async function getReqUser(req) {
   return null;
 }
 
-// GET /api/renewals — Get all renewals
+// Helper to check if a renewal record is assigned to a specific user
+function isRenewalAssignedToUser(renewal, user) {
+  if (!user || !renewal) return false;
+  const uId = user.id ? String(user.id) : "";
+  const uEmail = (user.email || "").trim().toLowerCase();
+  const uName = (user.fullName || user.name || "").trim().toLowerCase();
+
+  const assignedId = renewal.assignedToId || renewal.assigned_to_id ? String(renewal.assignedToId || renewal.assigned_to_id) : "";
+  const assignedEmail = (renewal.assignedToEmail || renewal.assigned_to_email || renewal.responsibleEmail || renewal.responsible_email || "").trim().toLowerCase();
+  const assignedName = (renewal.assignedToName || renewal.assigned_to_name || renewal.responsiblePerson || renewal.responsible_person || "").trim().toLowerCase();
+  const createdBy = (renewal.createdBy || "").trim().toLowerCase();
+
+  return (
+    (uId && assignedId === uId) ||
+    (uEmail && assignedEmail === uEmail) ||
+    (uName && assignedName === uName) ||
+    (uName && (assignedName.includes(uName) || uName.includes(assignedName))) ||
+    (uEmail && createdBy === uEmail)
+  );
+}
+
+// GET /api/renewals — Get renewals (Employees see and manage only their assigned renewals)
 router.get("/", async (req, res) => {
   try {
-    const list = await db.getRenewals();
+    const actor = await getReqUser(req);
+    let list = await db.getRenewals();
+    if (actor && actor.role === "Employee") {
+      list = list.filter((r) => isRenewalAssignedToUser(r, actor));
+    }
     res.json({ ok: true, data: list });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -65,17 +90,25 @@ router.get("/", async (req, res) => {
 // GET /api/renewals/assignees — Get active employee users available for assignment
 router.get("/assignees", async (req, res) => {
   try {
+    const actor = await getReqUser(req);
+    if (actor && actor.status === "deactivated") {
+      return res.status(403).json({ ok: false, success: false, error: "Access denied. Account has been deactivated." });
+    }
     const employees = await db.getActiveEmployees();
-    res.json({ ok: true, data: employees });
+    res.json({ ok: true, success: true, data: employees });
   } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
+    res.status(500).json({ ok: false, success: false, error: err.message });
   }
 });
 
-// GET /api/renewals/history — Get aggregated renewal history
+// GET /api/renewals/history — Get aggregated renewal history (filtered for employees)
 router.get("/history", async (req, res) => {
   try {
-    const list = await db.getRenewals();
+    const actor = await getReqUser(req);
+    let list = await db.getRenewals();
+    if (actor && actor.role === "Employee") {
+      list = list.filter((r) => isRenewalAssignedToUser(r, actor));
+    }
     const rows = [];
     list.forEach((r) => {
       let hist = r.history;
@@ -101,12 +134,21 @@ router.get("/history", async (req, res) => {
   }
 });
 
-// GET /api/renewals/:id — Get renewal by ID
+// GET /api/renewals/:id — Get renewal by ID (Employees can only view renewals assigned to them)
 router.get("/:id", async (req, res) => {
   try {
     const record = await db.getRenewalById(req.params.id);
     if (!record) {
       return res.status(404).json({ ok: false, error: "Renewal record not found." });
+    }
+    const actor = await getReqUser(req);
+    if (actor && actor.role === "Employee") {
+      if (!isRenewalAssignedToUser(record, actor)) {
+        return res.status(403).json({
+          ok: false,
+          error: "Access denied. Employees may only view renewals assigned to them.",
+        });
+      }
     }
     res.json({ ok: true, data: record });
   } catch (err) {
@@ -163,10 +205,10 @@ router.post("/", async (req, res) => {
           error: `Cannot assign renewal to deactivated user "${assignedUser.fullName}".`,
         });
       }
-      if (assignedUser.role === "Viewer") {
+      if (assignedUser.role !== "Employee") {
         return res.status(400).json({
           ok: false,
-          error: `Cannot assign renewal to Viewer "${assignedUser.fullName}". Renewals can only be assigned to active Employees or Administrators.`,
+          error: `Cannot assign renewal to ${assignedUser.role} "${assignedUser.fullName}". Renewals can only be assigned to active Employees.`,
         });
       }
       // Populate authoritative user data from database record
@@ -260,17 +302,7 @@ router.put("/:id", async (req, res) => {
 
     // Requirement 6: Employees can manage their assigned renewals only and must not change assignments
     if (actor.role === "Employee") {
-      const respEmail = (existing.assignedToEmail || existing.assigned_to_email || existing.responsibleEmail || existing.responsible_email || "").toLowerCase();
-      const respName = (existing.assignedToName || existing.assigned_to_name || existing.responsiblePerson || existing.responsible_person || "").toLowerCase();
-      const createdBy = (existing.createdBy || "").toLowerCase();
-
-      const isAssigned =
-        (existingAssigneeId && String(existingAssigneeId) === String(actor.id)) ||
-        (respEmail && respEmail === actor.email.toLowerCase()) ||
-        (respName && respName === actor.fullName.toLowerCase()) ||
-        (createdBy && createdBy === actor.email.toLowerCase());
-
-      if (!isAssigned) {
+      if (!isRenewalAssignedToUser(existing, actor)) {
         return res.status(403).json({
           ok: false,
           error: "Access denied. Employees may only manage renewals assigned to them.",
@@ -314,10 +346,10 @@ router.put("/:id", async (req, res) => {
             error: `Cannot assign renewal to deactivated user "${newlyAssignedUser.fullName}".`,
           });
         }
-        if (newlyAssignedUser.role === "Viewer") {
+        if (newlyAssignedUser.role !== "Employee") {
           return res.status(400).json({
             ok: false,
-            error: `Cannot assign renewal to Viewer "${newlyAssignedUser.fullName}". Renewals can only be assigned to active Employees or Administrators.`,
+            error: `Cannot assign renewal to ${newlyAssignedUser.role} "${newlyAssignedUser.fullName}". Renewals can only be assigned to active Employees.`,
           });
         }
         updates.assignedToId = newlyAssignedUser.id;
@@ -326,6 +358,14 @@ router.put("/:id", async (req, res) => {
         updates.responsiblePerson = newlyAssignedUser.fullName;
         updates.responsibleEmail = newlyAssignedUser.email;
         isReassigned = true;
+      } else if (updates.assignedToId) {
+        const currentAssignee = await db.getUserById(updates.assignedToId);
+        if (currentAssignee) {
+          updates.assignedToName = updates.assignedToName || currentAssignee.fullName;
+          updates.assignedToEmail = updates.assignedToEmail || currentAssignee.email;
+          updates.responsiblePerson = updates.responsiblePerson || currentAssignee.fullName;
+          updates.responsibleEmail = updates.responsibleEmail || currentAssignee.email;
+        }
       } else if (!updates.assignedToId) {
         if (existingAssigneeId) {
           await db.logAudit({
@@ -448,11 +488,7 @@ router.delete("/:id", async (req, res) => {
 
     // RBAC Requirement 6: Employees can only delete renewals assigned to them
     if (actor.role === "Employee") {
-      const assignedId = existing.assignedToId || existing.assigned_to_id;
-      const respEmail = (existing.assignedToEmail || existing.assigned_to_email || existing.responsibleEmail || existing.responsible_email || "").toLowerCase();
-      const respName = (existing.assignedToName || existing.assigned_to_name || existing.responsiblePerson || existing.responsible_person || "").toLowerCase();
-      const isAssigned = (assignedId && assignedId === actor.id) || respEmail === actor.email.toLowerCase() || respName === actor.fullName.toLowerCase();
-      if (!isAssigned) {
+      if (!isRenewalAssignedToUser(existing, actor)) {
         return res.status(403).json({
           ok: false,
           error: "Access denied. Employees may only delete renewals assigned to them.",
@@ -501,17 +537,7 @@ router.post("/:id/mark-renewed", async (req, res) => {
 
     // RBAC Requirement 6: Employees can only renew records assigned to them
     if (actor.role === "Employee") {
-      const assignedId = record.assignedToId || record.assigned_to_id;
-      const respEmail = (record.assignedToEmail || record.assigned_to_email || record.responsibleEmail || record.responsible_email || "").toLowerCase();
-      const respName = (record.assignedToName || record.assigned_to_name || record.responsiblePerson || record.responsible_person || "").toLowerCase();
-      const createdBy = (record.createdBy || "").toLowerCase();
-      const isAssigned =
-        (assignedId && assignedId === actor.id) ||
-        (!respEmail && !respName) ||
-        respEmail === actor.email.toLowerCase() ||
-        respName === actor.fullName.toLowerCase() ||
-        createdBy === actor.email.toLowerCase();
-      if (!isAssigned) {
+      if (!isRenewalAssignedToUser(record, actor)) {
         return res.status(403).json({
           ok: false,
           error: "Access denied. Employees may only renew records assigned to them.",

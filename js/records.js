@@ -53,18 +53,46 @@
     }
     loadAssigneesPromise = (async () => {
       try {
-        let list = [];
-        if (RTS.team && RTS.team.getAssignableEmployees) {
-          list = await RTS.team.getAssignableEmployees();
+        let res = null;
+        if (typeof RTS !== "undefined" && typeof RTS.getAssignableEmployees === "function") {
+          res = await RTS.getAssignableEmployees({ forceRefresh });
+        } else if (typeof RTS !== "undefined" && RTS.team && typeof RTS.team.getAssignableEmployees === "function") {
+          res = await RTS.team.getAssignableEmployees();
+        } else if (typeof RTS !== "undefined" && RTS.data && typeof RTS.data.getAssignableEmployees === "function") {
+          res = await RTS.data.getAssignableEmployees();
         } else {
-          const res = await fetch("/api/renewals/assignees");
-          const json = await res.json();
-          if (json && json.ok && Array.isArray(json.data)) list = json.data;
+          const url = (typeof RTS !== "undefined" && RTS.apiUrl ? RTS.apiUrl("/api/renewals/assignees") : "/api/renewals/assignees");
+          const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem("rts_auth_token");
+          const user = (RTS.auth && typeof RTS.auth.getCurrentUser === "function" ? RTS.auth.getCurrentUser() : null) || {};
+          const headers = {
+            Accept: "application/json",
+            "x-user-role": user.role || "Admin",
+            "x-user-email": user.email || "",
+          };
+          if (token) headers["Authorization"] = "Bearer " + token;
+          const r = await fetch(url, { headers });
+          if (r.ok) {
+            const json = await r.json();
+            if (json && (json.ok || json.success) && Array.isArray(json.data)) {
+              res = { ok: true, status: json.data.length ? "success" : "empty", data: json.data };
+            }
+          }
         }
-        assignableEmployees = Array.isArray(list) ? list : [];
-        assigneesStatus = assignableEmployees.length > 0 ? "success" : "empty";
+
+        if (res && (res.status === "error" || res.ok === false)) {
+          assignableEmployees = [];
+          assigneesStatus = "error";
+        } else if (res) {
+          const list = Array.isArray(res) ? res : (Array.isArray(res.data) ? res.data : []);
+          assignableEmployees = list;
+          assigneesStatus = list.length ? "success" : "empty";
+        } else {
+          assignableEmployees = [];
+          assigneesStatus = "error";
+        }
       } catch (e) {
         console.warn("Could not load assignees from database:", e);
+        assignableEmployees = [];
         assigneesStatus = "error";
       }
       return assignableEmployees;
@@ -141,8 +169,16 @@
   }
 
   function renderAssigneeCell(r) {
-    const name = r.assignedToName || r.assigned_to_name || r.responsiblePerson || r.responsible_person || "";
-    const email = r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || "";
+    let name = r.assignedToName || r.assigned_to_name || r.responsiblePerson || r.responsible_person || "";
+    let email = r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || "";
+    const aId = r.assignedToId || r.assigned_to_id;
+    if ((!name || name === "Unassigned") && aId && assignableEmployees && assignableEmployees.length) {
+      const match = assignableEmployees.find((e) => String(e.id) === String(aId));
+      if (match) {
+        name = match.fullName || match.name || "";
+        email = email || match.email || "";
+      }
+    }
     if (!name || name === "Unassigned") {
       return `<span class="cell-sub" style="color:var(--text-muted);display:inline-flex;align-items:center;gap:4px;font-size:12px;">Unassigned</span>`;
     }
@@ -422,7 +458,7 @@
         sel.value = "";
       }
       if (help) {
-        help.textContent = "Select an active employee or administrator, or leave as Unassigned.";
+        help.textContent = "Select an active employee, or leave as Unassigned.";
       }
       if (respInput) respInput.value = "";
       if (emailInput) emailInput.value = "";
@@ -1275,6 +1311,12 @@
     wireRenewModal();
     applyUrlParams();
     renderTable();
+
+    if (RTS.data && RTS.data.syncFromBackend) {
+      RTS.data.syncFromBackend().then(() => {
+        renderTable();
+      });
+    }
 
     if (RTS.auth.isViewer()) {
       const openAddBtn = document.getElementById("openAddBtn");

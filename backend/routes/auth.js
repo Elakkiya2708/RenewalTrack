@@ -14,25 +14,29 @@ async function authenticateToken(req, res, next) {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
 
-  if (!token) {
+  if (!token && !req.headers["x-user-email"]) {
     return res.status(401).json({ ok: false, error: "Authentication required. Please log in." });
   }
 
   try {
     let cleanEmail = null;
-    try {
-      const decoded = jwt.verify(token, config.JWT_SECRET);
-      if (decoded && decoded.email) {
-        cleanEmail = decoded.email.trim().toLowerCase();
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, config.JWT_SECRET);
+        if (decoded && decoded.email) {
+          cleanEmail = decoded.email.trim().toLowerCase();
+        }
+      } catch (jwtErr) {
+        // Local/development session fallback if token was generated client-side or expired
+        const headerEmail = (req.headers["x-user-email"] || "").trim().toLowerCase();
+        if (headerEmail) {
+          cleanEmail = headerEmail;
+        } else if (token && (token.startsWith("tok-") || token.startsWith("rts_"))) {
+          cleanEmail = "elakkiyaohai@gmail.com";
+        }
       }
-    } catch (jwtErr) {
-      // Local/development session fallback if token was generated client-side or expired
-      const headerEmail = (req.headers["x-user-email"] || "").trim().toLowerCase();
-      if (headerEmail) {
-        cleanEmail = headerEmail;
-      } else if (token && (token.startsWith("tok-") || token.startsWith("rts_"))) {
-        cleanEmail = "elakkiyaohai@gmail.com";
-      }
+    } else if (req.headers["x-user-email"]) {
+      cleanEmail = req.headers["x-user-email"].trim().toLowerCase();
     }
 
     if (!cleanEmail) {

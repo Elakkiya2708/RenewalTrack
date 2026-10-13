@@ -30,8 +30,8 @@
       <a href="documents.html" class="nav-link"><i data-lucide="folder" class="icon"></i>Documents</a>
       <a href="reports.html" class="nav-link"><i data-lucide="bar-chart-2" class="icon"></i>Reports</a>
 
-      <div class="sidebar-section-label" data-role="Employee,Admin">My Work</div>
-      <a href="assigned.html" class="nav-link" data-role="Employee,Admin"><i data-lucide="user-check" class="icon"></i>Assigned to Me</a>
+      <div class="sidebar-section-label" data-role="Employee">My Work</div>
+      <a href="assigned.html" class="nav-link" data-role="Employee"><i data-lucide="user-check" class="icon"></i>Assigned to Me</a>
 
       <div class="sidebar-section-label" data-role="Admin">Team Management</div>
       <a href="team.html" class="nav-link" data-role="Admin"><i data-lucide="users" class="icon"></i>Team Members</a>
@@ -80,7 +80,7 @@
           <p id="dashboardSubtitle">Overview of all renewal activity across your organization.</p>
         </div>
         <div class="page-header-actions" id="dashboardActions">
-          <a href="records.html#add" class="btn btn-primary" id="quickAddBtn"><i data-lucide="plus" class="icon"></i>Quick Add Renewal</a>
+          <button type="button" class="btn btn-primary" id="quickAddBtn"><i data-lucide="plus" class="icon"></i>Quick Add Renewal</button>
         </div>
       </div>
 
@@ -161,6 +161,129 @@
         </div>
       </div>
     </main>
+  </div>
+</div>
+
+<!-- Add / Quick Add Renewal Modal -->
+<div class="modal-overlay" id="renewalModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="renewalModalTitle">Quick Add Renewal</h3>
+      <button class="modal-close" data-close-modal="renewalModal"><i data-lucide="x" class="icon"></i></button>
+    </div>
+    <form id="renewalForm" novalidate>
+      <div class="modal-body">
+        <input type="hidden" id="renewalId" />
+
+        <div class="form-section-title">Basic Information</div>
+        <div class="field" id="f_name">
+          <label for="in_name">Record Name <span class="req">*</span></label>
+          <input class="input" id="in_name" placeholder="e.g. Office Fire Insurance Policy" />
+          <span class="error-msg">Record name is required.</span>
+        </div>
+        <div class="field-row">
+          <div class="field" id="f_category">
+            <label for="in_category">Category <span class="req">*</span></label>
+            <select class="input" id="in_category"></select>
+            <span class="error-msg">Select a category.</span>
+          </div>
+          <div class="field" id="f_priority">
+            <label for="in_priority">Priority <span class="req">*</span></label>
+            <select class="input" id="in_priority">
+              <option value="High">High</option>
+              <option value="Medium" selected>Medium</option>
+              <option value="Low">Low</option>
+            </select>
+            <span class="error-msg">Select a priority.</span>
+          </div>
+        </div>
+        <div class="field" id="f_description">
+          <label for="in_description">Description</label>
+          <textarea class="input" id="in_description" placeholder="Brief description of what this renewal covers"></textarea>
+        </div>
+
+        <div class="form-section-title">Provider &amp; Reference</div>
+        <div class="field-row">
+          <div class="field" id="f_organization">
+            <label for="in_organization">Organization / Provider <span class="req">*</span></label>
+            <input class="input" id="in_organization" placeholder="e.g. Allied Insurance Co." />
+            <span class="error-msg">Organization / provider is required.</span>
+          </div>
+          <div class="field" id="f_reference">
+            <label for="in_reference">Reference Number</label>
+            <input class="input" id="in_reference" placeholder="e.g. POL-2025-001" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field" id="f_assignedTo">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <label for="in_assignedTo">Assigned To <span style="font-size:11px;font-weight:normal;color:var(--text-low);">(Employee)</span></label>
+              <span id="assignedToBadge" style="font-size:11px;color:var(--accent-text);"></span>
+            </div>
+            <select class="input" id="in_assignedTo">
+              <option value="">— Unassigned —</option>
+            </select>
+            <span class="cell-sub" id="assignedToHelp" style="font-size:11px;margin-top:2px;">Active Employee responsible for managing this renewal</span>
+            <span class="error-msg">Please select an assigned active employee or leave Unassigned.</span>
+          </div>
+          <div class="field" id="f_responsibleEmail">
+            <label for="in_responsibleEmail">Alert / Notification Email</label>
+            <input class="input" type="email" id="in_responsibleEmail" placeholder="Auto-filled from assigned employee/admin" />
+            <span class="cell-sub" style="font-size:11px;margin-top:2px;">Receives assignment alerts &amp; reminders</span>
+          </div>
+        </div>
+        <input type="hidden" id="in_responsible" />
+
+        <div class="form-section-title">Dates &amp; Cost</div>
+        <div class="field-row">
+          <div class="field" id="f_issueDate">
+            <label for="in_issueDate">Issue Date <span class="req">*</span></label>
+            <input class="input" type="date" id="in_issueDate" />
+            <span class="error-msg">Issue date is required.</span>
+          </div>
+          <div class="field" id="f_expiryDate">
+            <label for="in_expiryDate">Expiry Date <span class="req">*</span></label>
+            <input class="input" type="date" id="in_expiryDate" />
+            <span class="error-msg">Expiry date must be after the issue date.</span>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field" id="f_reminderDate">
+            <label for="in_reminderDate">Reminder Date</label>
+            <input class="input" type="date" id="in_reminderDate" />
+            <span class="error-msg">Reminder date should be on or before the expiry date.</span>
+          </div>
+          <div class="field" id="f_cost">
+            <label for="in_cost">Renewal Cost</label>
+            <input class="input" type="number" min="0" step="0.01" id="in_cost" placeholder="0.00" />
+            <span class="error-msg">Enter a valid, non-negative amount.</span>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field" id="f_currency" style="max-width:180px;">
+            <label for="in_currency">Currency</label>
+            <select class="input" id="in_currency"></select>
+          </div>
+          <div class="field" id="f_recurringCycle">
+            <label for="in_recurringCycle" data-i18n="recurringCycle">Recurring Renewal Cycle</label>
+            <select class="input" id="in_recurringCycle"></select>
+          </div>
+        </div>
+
+        <div class="form-section-title">Notes</div>
+        <div class="field" id="f_notes">
+          <label for="in_notes">Notes</label>
+          <textarea class="input" id="in_notes" placeholder="Additional notes for this renewal"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer modal-footer-between">
+        <button type="button" class="btn btn-ghost" id="resetFormBtn">Reset</button>
+        <div style="display:flex;gap:10px;">
+          <button type="button" class="btn btn-secondary" data-close-modal="renewalModal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveRenewalBtn">Save Renewal</button>
+        </div>
+      </div>
+    </form>
   </div>
 </div>
 

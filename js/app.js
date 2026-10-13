@@ -475,8 +475,32 @@
     localStorage.setItem(key, JSON.stringify(value));
   }
 
-  function getRenewals() {
+  function getRawRenewals() {
     return readJSON(STORAGE_KEYS.RENEWALS, []);
+  }
+
+  function getRenewals() {
+    const all = getRawRenewals();
+    if (isEmployee()) {
+      const user = getCurrentUser();
+      const uId = user.id ? String(user.id) : "";
+      const uEmail = (user.email || "").toLowerCase();
+      const uName = (user.fullName || "").toLowerCase();
+      return all.filter((r) => {
+        const assignedId = r.assignedToId || r.assigned_to_id ? String(r.assignedToId || r.assigned_to_id) : "";
+        const respEmail = (r.assignedToEmail || r.assigned_to_email || r.responsibleEmail || r.responsible_email || "").toLowerCase();
+        const respName = (r.assignedToName || r.assigned_to_name || r.responsiblePerson || r.responsible_person || "").toLowerCase();
+        const createdBy = (r.createdBy || "").toLowerCase();
+        return (
+          (uId && assignedId === uId) ||
+          (uEmail && respEmail === uEmail) ||
+          (uName && respName === uName) ||
+          (uName && (respName.includes(uName) || uName.includes(respName))) ||
+          (uEmail && createdBy === uEmail)
+        );
+      });
+    }
+    return all;
   }
 
   function saveRenewals(list) {
@@ -484,7 +508,10 @@
   }
 
   function getRenewalById(id) {
-    return getRenewals().find((r) => r.id === id) || null;
+    if (isEmployee()) {
+      return getRenewals().find((r) => r.id === id) || null;
+    }
+    return getRawRenewals().find((r) => r.id === id) || null;
   }
 
   function apiUrl(endpoint) {
@@ -510,13 +537,73 @@
         method,
         headers,
         body: body ? JSON.stringify(body) : undefined,
+      }).then(async (res) => {
+        if (res.ok) {
+          const json = await res.json().catch(() => null);
+          if (json && json.ok && json.data) {
+            const raw = getRawRenewals();
+            const idx = raw.findIndex((r) => r.id === json.data.id);
+            if (idx >= 0) {
+              raw[idx] = Object.assign({}, raw[idx], json.data);
+              saveRenewals(raw);
+            }
+          }
+        }
       }).catch(() => {});
     } catch (e) {}
   }
 
+  async function syncRenewalsFromBackend() {
+    const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH);
+    const user = getCurrentUser();
+    try {
+      const res = await fetch(apiUrl("/api/renewals"), {
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-role": user.role || "Employee",
+          "x-user-email": user.email || "",
+          ...(token ? { Authorization: "Bearer " + token } : {}),
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.ok && Array.isArray(data.data)) {
+          if (isAdmin()) {
+            saveRenewals(data.data);
+          } else if (isEmployee()) {
+            const currentLocal = getRawRenewals();
+            const serverMap = new Map(data.data.map((r) => [r.id, r]));
+            const merged = currentLocal.map((r) => serverMap.has(r.id) ? serverMap.get(r.id) : r);
+            data.data.forEach((r) => {
+              if (!merged.some((m) => m.id === r.id)) {
+                merged.unshift(r);
+              }
+            });
+            saveRenewals(merged);
+          } else {
+            saveRenewals(data.data);
+          }
+          try {
+            window.dispatchEvent(new CustomEvent("rts-renewal-updated"));
+          } catch (e) {}
+          return data.data;
+        }
+      }
+    } catch (e) {}
+    return getRenewals();
+  }
+
   function addRenewal(data) {
-    const list = getRenewals();
+    const list = getRawRenewals();
     const nextIndex = list.length + 1;
+    if (isEmployee()) {
+      const user = getCurrentUser();
+      data.assignedToId = user.id;
+      data.assignedToName = user.fullName;
+      data.assignedToEmail = user.email;
+      data.responsiblePerson = user.fullName;
+      data.responsibleEmail = user.email;
+    }
     const record = Object.assign(
       {
         id: uid("ren"),
@@ -537,10 +624,24 @@
   }
 
   function updateRenewal(id, data) {
-    const list = getRenewals();
+    const list = getRawRenewals();
     const idx = list.findIndex((r) => r.id === id);
     if (idx === -1) return null;
     const oldRecord = list[idx];
+
+    if (isEmployee() && !canEditRenewal(oldRecord)) {
+      console.warn("Access denied. Employees may only manage renewals assigned to them.");
+      return null;
+    }
+
+    if (isEmployee()) {
+      // Employees cannot reassign renewals
+      data.assignedToId = oldRecord.assignedToId || oldRecord.assigned_to_id;
+      data.assignedToName = oldRecord.assignedToName || oldRecord.assigned_to_name || oldRecord.responsiblePerson;
+      data.assignedToEmail = oldRecord.assignedToEmail || oldRecord.assigned_to_email || oldRecord.responsibleEmail;
+      data.responsiblePerson = data.assignedToName;
+      data.responsibleEmail = data.assignedToEmail;
+    }
 
     // If expiryDate is advancing forward to a new date, automatically record history!
     if (data.expiryDate && oldRecord.expiryDate && data.expiryDate !== oldRecord.expiryDate) {
@@ -581,16 +682,29 @@
   }
 
   function deleteRenewal(id) {
-    const list = getRenewals().filter((r) => r.id !== id);
-    saveRenewals(list);
+    const list = getRawRenewals();
+    const target = list.find((r) => r.id === id);
+    if (!target) return;
+    if (isEmployee() && !canDeleteRenewal(target)) {
+      console.warn("Access denied. Employees may only delete renewals assigned to them.");
+      return;
+    }
+    const updated = list.filter((r) => r.id !== id);
+    saveRenewals(updated);
     syncRenewalToBackend("DELETE", "/api/renewals/" + encodeURIComponent(id));
   }
 
   function markAsRenewed(id, payload) {
-    const list = getRenewals();
+    const list = getRawRenewals();
     const idx = list.findIndex((r) => r.id === id);
     if (idx === -1) return null;
     const record = list[idx];
+
+    if (isEmployee() && !canEditRenewal(record)) {
+      console.warn("Access denied. Employees may only renew their assigned renewals.");
+      return null;
+    }
+
     const cycle = payload.recurringCycle || record.recurringCycle || "Yearly";
     const newExpiry = payload.newExpiryDate || calculateNextExpiry(record.expiryDate, cycle);
     const currentUser = (global.RTS && global.RTS.auth && typeof global.RTS.auth.getCurrentUser === "function" && global.RTS.auth.getCurrentUser()) || null;
@@ -645,9 +759,11 @@
   }
 
   function snoozeReminder(id, days) {
-    const list = getRenewals();
+    const list = getRawRenewals();
     const idx = list.findIndex((r) => r.id === id);
     if (idx === -1) return null;
+    const record = list[idx];
+    if (isEmployee() && !canEditRenewal(record)) return null;
     const newDate = addDays(todayISO(), days || 7);
     list[idx].reminderDate = newDate;
     list[idx].reminderCompleted = false;
@@ -657,7 +773,7 @@
 
   function bulkRenew(ids) {
     if (!ids || !ids.length) return 0;
-    const list = getRenewals();
+    const list = getRawRenewals();
     let count = 0;
     const currentUser = (global.RTS && global.RTS.auth && typeof global.RTS.auth.getCurrentUser === "function" && global.RTS.auth.getCurrentUser()) || null;
     const actorName = (currentUser && currentUser.fullName) || "Bulk Action";
@@ -666,6 +782,7 @@
       const idx = list.findIndex((r) => r.id === id);
       if (idx !== -1) {
         const record = list[idx];
+        if (isEmployee() && !canEditRenewal(record)) return;
         const cycle = record.recurringCycle || "Yearly";
         const newExpiry = calculateNextExpiry(record.expiryDate, cycle);
         const historyEntry = {
@@ -711,11 +828,17 @@
 
   function bulkDelete(ids) {
     if (!ids || !ids.length) return 0;
-    let list = getRenewals();
+    let list = getRawRenewals();
     const before = list.length;
-    list = list.filter((r) => !ids.includes(r.id));
+    const toDelete = ids.filter((id) => {
+      const target = list.find((r) => r.id === id);
+      if (!target) return false;
+      if (isEmployee() && !canDeleteRenewal(target)) return false;
+      return true;
+    });
+    list = list.filter((r) => !toDelete.includes(r.id));
     saveRenewals(list);
-    ids.forEach((id) => {
+    toDelete.forEach((id) => {
       syncRenewalToBackend('DELETE', '/api/renewals/' + encodeURIComponent(id));
     });
     return before - list.length;
@@ -1115,10 +1238,9 @@
     const createdBy = (r.createdBy || "").toLowerCase();
     return (
       (assignedId && user.id && assignedId === user.id) ||
-      (!respEmail && !respName) ||
       (uEmail && respEmail === uEmail) ||
       (uName && respName === uName) ||
-      (uName && respName.includes(uName)) ||
+      (uName && (respName.includes(uName) || uName.includes(respName))) ||
       (uEmail && createdBy === uEmail)
     );
   }
@@ -1138,7 +1260,7 @@
       (assignedId && user.id && assignedId === user.id) ||
       (uEmail && respEmail === uEmail) ||
       (uName && respName === uName) ||
-      (uName && respName.includes(uName)) ||
+      (uName && (respName.includes(uName) || uName.includes(respName))) ||
       (uEmail && createdBy === uEmail)
     );
   }
@@ -1397,13 +1519,13 @@
     // 2. Remove "My Profile" and "Logout" from sidebar across all roles and dashboards
     nav.querySelectorAll("a[href*='profile.html'], [data-logout], a[href*='logout']").forEach((el) => el.remove());
 
-    // 3. Ensure "Assigned to Me" link exists (for Employee and Admin)
+    // 3. Ensure "Assigned to Me" link exists (strictly for Employee sidebar)
     let empLink = nav.querySelector("a[href='assigned.html'], a[href='records.html?assigned=me']");
     if (!empLink) {
       const reportsLink = nav.querySelector("a[href='reports.html']");
       const empHtml = `
-        <div class="sidebar-section-label" data-role="Employee,Admin">My Work</div>
-        <a href="assigned.html" class="nav-link" data-role="Employee,Admin"><i data-lucide="user-check" class="icon"></i>Assigned to Me</a>
+        <div class="sidebar-section-label" data-role="Employee">My Work</div>
+        <a href="assigned.html" class="nav-link" data-role="Employee"><i data-lucide="user-check" class="icon"></i>Assigned to Me</a>
       `;
       if (reportsLink) {
         reportsLink.insertAdjacentHTML("afterend", empHtml);
@@ -1419,10 +1541,10 @@
       }
     } else {
       empLink.setAttribute("href", "assigned.html");
-      empLink.setAttribute("data-role", "Employee,Admin");
+      empLink.setAttribute("data-role", "Employee");
       const prev = empLink.previousElementSibling;
       if (prev && (prev.classList.contains("sidebar-section-label") || prev.classList.contains("nav-section-title"))) {
-        prev.setAttribute("data-role", "Employee,Admin");
+        prev.setAttribute("data-role", "Employee");
       }
     }
 
@@ -1470,20 +1592,20 @@
       }
     });
 
-    // 7. Enforce role-based sidebar visibility
+    // 7. Enforce role-based sidebar visibility: Assigned to Me only in Employee sidebar, not Admin or Viewer
     const adminItems = nav.querySelectorAll("[data-role='Admin']");
-    const assignedItems = nav.querySelectorAll("[data-role='Employee'], [data-role='Employee,Admin']");
+    const employeeItems = nav.querySelectorAll("[data-role='Employee'], [data-role='Employee,Admin']");
 
     if (role === "Admin") {
       adminItems.forEach((el) => (el.style.display = ""));
-      assignedItems.forEach((el) => (el.style.display = ""));
+      employeeItems.forEach((el) => (el.style.display = "none"));
     } else if (role === "Employee") {
       adminItems.forEach((el) => (el.style.display = "none"));
-      assignedItems.forEach((el) => (el.style.display = ""));
+      employeeItems.forEach((el) => (el.style.display = ""));
     } else {
-      // Viewer (read-only): hide both Admin team management and Assigned items
+      // Viewer (read-only): hide both Admin team management and Employee assigned items
       adminItems.forEach((el) => (el.style.display = "none"));
-      assignedItems.forEach((el) => (el.style.display = "none"));
+      employeeItems.forEach((el) => (el.style.display = "none"));
     }
 
     // 8. Active navigation link state
@@ -2535,6 +2657,91 @@
     applyTranslations();
     refreshIcons();
     syncCurrentUserFromBackend();
+    syncRenewalsFromBackend();
+  }
+
+  async function getAssignableEmployees({ forceRefresh = false } = {}) {
+    const token =
+      localStorage.getItem("rts_jwt_token") ||
+      localStorage.getItem(STORAGE_KEYS.AUTH) ||
+      localStorage.getItem("rts_auth_token") ||
+      "";
+    const user = getCurrentUser() || {};
+    const headers = {
+      Accept: "application/json",
+      "x-user-role": user.role || "Admin",
+      "x-user-email": user.email || "",
+    };
+    if (token) headers["Authorization"] = "Bearer " + token;
+
+    function sanitizeList(rawList) {
+      return (rawList || [])
+        .filter((u) => {
+          const role = (u.role || "").trim().toLowerCase();
+          const status = (u.status || "active").trim().toLowerCase();
+          const email = (u.email || "").trim().toLowerCase();
+          return (
+            role === "employee" &&
+            status !== "deactivated" &&
+            status !== "inactive" &&
+            email !== "demo@renewaltrack.com"
+          );
+        })
+        .map((u) => ({
+          id: String(u.id),
+          fullName: (u.fullName || u.name || (u.email ? u.email.split("@")[0] : "Employee")).trim(),
+          email: (u.email || "").trim(),
+          role: "Employee",
+          mobile: u.mobile || "",
+          assignedRenewalsCount: u.assignedRenewalsCount || 0,
+        }))
+        .sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""));
+    }
+
+    // Tier 1: Try /api/renewals/assignees
+    try {
+      const res = await fetch(apiUrl("/api/renewals/assignees"), { headers });
+      if (res.ok) {
+        const json = await res.json();
+        if (json && (json.ok || json.success) && Array.isArray(json.data)) {
+          const list = sanitizeList(json.data);
+          const out = [...list];
+          out.ok = true;
+          out.status = list.length ? "success" : "empty";
+          out.data = list;
+          return out;
+        }
+      }
+    } catch (e1) {
+      console.warn("[RTS] /api/renewals/assignees fetch failed, attempting team members fallback:", e1);
+    }
+
+    // Tier 2: Try /api/team/members (the exact endpoint used by Team Members page)
+    try {
+      const res2 = await fetch(apiUrl("/api/team/members"), { headers });
+      if (res2.ok) {
+        const json2 = await res2.json();
+        const rawList2 = json2.data || json2.members || [];
+        if (Array.isArray(rawList2)) {
+          const list = sanitizeList(rawList2);
+          const out = [...list];
+          out.ok = true;
+          out.status = list.length ? "success" : "empty";
+          out.data = list;
+          return out;
+        }
+      }
+    } catch (e2) {
+      console.warn("[RTS] /api/team/members fallback failed:", e2);
+    }
+
+    // Both API attempts failed: represent an API / server error
+    const errOut = [];
+    errOut.ok = false;
+    errOut.status = "error";
+    errOut.error = "Failed to load employee accounts from database due to a network or server error.";
+    errOut.data = [];
+    return errOut;
   }
 
   /* ------------------------------------------------------------------ */
@@ -2582,12 +2789,14 @@
       snoozeReminder,
       bulkRenew,
       bulkDelete,
+      syncFromBackend: syncRenewalsFromBackend,
       addDocumentToRenewal,
       deleteDocumentFromRenewal,
       toggleReminderCompleted,
       getAllDocuments,
       getAllHistory,
       clearAllRenewals,
+      getAssignableEmployees,
     },
     auth: {
       login,
@@ -2608,6 +2817,7 @@
       registerAccount,
       getAccounts,
       changePassword,
+      getToken: () => localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH) || "",
     },
     team: {
       async getMembers() {
@@ -2686,33 +2896,9 @@
         });
         return res.json();
       },
-      async getAssignableEmployees() {
-        const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH);
-        try {
-          const res = await fetch(apiUrl("/api/renewals/assignees"), {
-            headers: {
-              Authorization: "Bearer " + token,
-              "x-user-role": getCurrentUser().role,
-              "x-user-email": getCurrentUser().email,
-            },
-          });
-          const data = await res.json();
-          if (data && data.ok && Array.isArray(data.data)) {
-            return data.data;
-          }
-        } catch (e) {}
-        const accs = getAccounts();
-        return accs
-          .filter((a) => a.status !== "deactivated" && (a.role === "Employee" || a.role === "Admin"))
-          .map((a) => ({
-            id: a.id || `usr-${a.email}`,
-            fullName: a.fullName,
-            email: a.email,
-            role: a.role,
-          }))
-          .sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""));
-      },
+      getAssignableEmployees,
     },
+    getAssignableEmployees,
     audit: {
       async getLogs(params = {}) {
         const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH);

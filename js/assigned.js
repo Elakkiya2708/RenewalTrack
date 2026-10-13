@@ -384,15 +384,30 @@
   document.addEventListener("DOMContentLoaded", () => {
     RTS.initLayout();
 
+    if (!RTS.auth.isEmployee()) {
+      if (RTS.auth.isAdmin()) {
+        window.location.replace("records.html");
+      } else {
+        window.location.replace("dashboard.html");
+      }
+      return;
+    }
+
     const badge = document.getElementById("assignedRoleBadge");
     if (badge) {
-      badge.textContent = RTS.auth.isAdmin() ? "Admin Workspace" : "Employee Workspace";
+      badge.textContent = "Employee Workspace";
     }
 
     populateCategories();
     wireToolbar();
     wireRenewModal();
     renderTable();
+
+    if (RTS.data && RTS.data.syncFromBackend) {
+      RTS.data.syncFromBackend().then(() => {
+        renderTable();
+      });
+    }
 
     window.addEventListener("rts-renewal-updated", () => {
       renderTable();

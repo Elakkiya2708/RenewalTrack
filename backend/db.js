@@ -286,7 +286,27 @@ const db = {
       }
     }
     const store = getLocalStore();
-    return store.renewals || [];
+    const rawList = store.renewals || [];
+    const users = store.users || [];
+    const userMap = new Map(users.map((u) => [String(u.id), u]));
+
+    return rawList.map((r) => {
+      const aId = r.assignedToId || r.assigned_to_id;
+      if (aId && (!r.assignedToName || !r.assignedToEmail)) {
+        const u = userMap.get(String(aId));
+        if (u) {
+          return {
+            ...r,
+            assignedToId: aId,
+            assignedToName: r.assignedToName || u.fullName,
+            assignedToEmail: r.assignedToEmail || u.email,
+            responsiblePerson: r.responsiblePerson || u.fullName,
+            responsibleEmail: r.responsibleEmail || u.email,
+          };
+        }
+      }
+      return r;
+    });
   },
 
   // 2. Get renewal by ID
@@ -304,15 +324,38 @@ const db = {
       }
     }
     const store = getLocalStore();
-    return (store.renewals || []).find((r) => r.id === id) || null;
+    const record = (store.renewals || []).find((r) => r.id === id) || null;
+    if (record) {
+      const aId = record.assignedToId || record.assigned_to_id;
+      if (aId && (!record.assignedToName || !record.assignedToEmail)) {
+        const u = (store.users || []).find((user) => String(user.id) === String(aId));
+        if (u) {
+          record.assignedToId = aId;
+          record.assignedToName = record.assignedToName || u.fullName;
+          record.assignedToEmail = record.assignedToEmail || u.email;
+          record.responsiblePerson = record.responsiblePerson || u.fullName;
+          record.responsibleEmail = record.responsibleEmail || u.email;
+        }
+      }
+    }
+    return record;
   },
 
   // 3. Save / Upsert renewal
   async saveRenewal(renewalData) {
     const id = renewalData.id || `ren-${Date.now()}`;
-    const assignedToId = renewalData.assignedToId || renewalData.assigned_to_id || null;
-    const assignedToName = renewalData.assignedToName || renewalData.assigned_to_name || renewalData.responsiblePerson || null;
-    const assignedToEmail = renewalData.assignedToEmail || renewalData.assigned_to_email || renewalData.responsibleEmail || null;
+    const store = getLocalStore();
+    let assignedToId = renewalData.assignedToId || renewalData.assigned_to_id || null;
+    let assignedToName = renewalData.assignedToName || renewalData.assigned_to_name || renewalData.responsiblePerson || null;
+    let assignedToEmail = renewalData.assignedToEmail || renewalData.assigned_to_email || renewalData.responsibleEmail || null;
+
+    if (assignedToId && (!assignedToName || !assignedToEmail)) {
+      const matched = (store.users || []).find((u) => String(u.id) === String(assignedToId));
+      if (matched) {
+        if (!assignedToName) assignedToName = matched.fullName;
+        if (!assignedToEmail) assignedToEmail = matched.email;
+      }
+    }
 
     const record = {
       ...renewalData,
@@ -338,7 +381,6 @@ const db = {
       }
     }
 
-    const store = getLocalStore();
     const idx = (store.renewals || []).findIndex((r) => r.id === id);
     if (idx >= 0) {
       store.renewals[idx] = { ...store.renewals[idx], ...record };
@@ -606,9 +648,10 @@ const db = {
 
   // 12. Get user by ID
   async getUserById(id) {
-    if (id === "usr-1") return null;
+    if (!id || id === "usr-1") return null;
+    const cleanId = String(id).trim();
     const users = await this.getUsers();
-    return users.find((u) => u.id === id) || null;
+    return users.find((u) => String(u.id).trim() === cleanId) || null;
   },
 
   // 13. Get user by email
@@ -624,12 +667,22 @@ const db = {
   async getActiveEmployees() {
     const users = await this.getUsers();
     return users
-      .filter((u) => u.status !== "deactivated" && (u.role === "Employee" || u.role === "Admin"))
+      .filter((u) => {
+        const role = (u.role || "").trim().toLowerCase();
+        const status = (u.status || "active").trim().toLowerCase();
+        const email = (u.email || "").trim().toLowerCase();
+        return (
+          role === "employee" &&
+          status !== "deactivated" &&
+          status !== "inactive" &&
+          email !== "demo@renewaltrack.com"
+        );
+      })
       .map((u) => ({
-        id: u.id,
-        fullName: u.fullName,
-        email: u.email,
-        role: u.role,
+        id: String(u.id),
+        fullName: (u.fullName || u.name || (u.email ? u.email.split("@")[0] : "Employee")).trim(),
+        email: (u.email || "").trim(),
+        role: "Employee",
         mobile: u.mobile || "",
         assignedRenewalsCount: u.assignedRenewalsCount || 0,
       }))
