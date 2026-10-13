@@ -45,7 +45,7 @@ async function login(email, password) {
 }
 
 async function run() {
-  console.log("=== RenewGuard RBAC & Action Permissions Test Suite ===\n");
+  console.log("=== RenewalTrack RBAC & Action Permissions Test Suite ===\n");
   let passed = 0;
   let failed = 0;
 

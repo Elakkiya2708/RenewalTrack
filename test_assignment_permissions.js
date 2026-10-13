@@ -33,7 +33,7 @@ async function request(path, options = {}) {
 
 async function runTests() {
   console.log("=================================================================");
-  console.log(" RenewGuard: Renewal Assignment & Role Isolation Verification    ");
+  console.log(" RenewalTrack: Renewal Assignment & Role Isolation Verification    ");
   console.log("=================================================================\n");
 
   let passed = 0;

@@ -1,7 +1,7 @@
 /* ==========================================================================
    backend/routes/webhooks.js — Resend & Email Delivery Webhook Handler
    Processes delivery failure, bounce, and complaint webhooks asynchronously,
-   alerts elakkiyaohai@gmail.com, and logs to Admin Audit Logs.
+   alerts elakkiya270806@gmail.com, and logs to Admin Audit Logs.
    ========================================================================== */
 
 const express = require("express");
@@ -15,7 +15,7 @@ const router = express.Router();
 router.get("/status", (req, res) => {
   res.json({
     ok: true,
-    service: "RenewGuard Email Webhook Listener",
+    service: "RenewalTrack Email Webhook Listener",
     supportedEvents: [
       "email.bounced",
       "email.failed",
@@ -24,7 +24,7 @@ router.get("/status", (req, res) => {
       "email.delivered",
       "email.sent",
     ],
-    alertTarget: config.ALERT_FALLBACK_EMAIL || "elakkiyaohai@gmail.com",
+    alertTarget: config.ALERT_FALLBACK_EMAIL || "elakkiya270806@gmail.com",
     activeProvider: config.EMAIL_PROVIDER,
   });
 });

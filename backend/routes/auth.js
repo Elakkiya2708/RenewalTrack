@@ -56,7 +56,7 @@ async function authenticateToken(req, res, next) {
         if (headerEmail) {
           cleanEmail = headerEmail;
         } else if (token && (token.startsWith("tok-") || token.startsWith("rts_"))) {
-          cleanEmail = "elakkiyaohai@gmail.com";
+          cleanEmail = "elakkiya270806@gmail.com";
         }
       }
     } else if (req.headers["x-user-email"]) {
@@ -93,7 +93,7 @@ async function authenticateToken(req, res, next) {
       fullName: user.fullName,
       role: user.role || "Employee",
       status: user.status || "active",
-      isPrimaryAdmin: user.email.toLowerCase() === "elakkiyaohai@gmail.com",
+      isPrimaryAdmin: user.email.toLowerCase() === "elakkiya270806@gmail.com",
     };
     next();
   } catch (err) {
@@ -126,7 +126,7 @@ function generateToken(user) {
       email: user.email,
       fullName: user.fullName,
       role: user.role || "Employee",
-      isPrimaryAdmin: (user.email || "").toLowerCase() === "elakkiyaohai@gmail.com",
+      isPrimaryAdmin: (user.email || "").toLowerCase() === "elakkiya270806@gmail.com",
     },
     config.JWT_SECRET,
     { expiresIn: config.JWT_EXPIRES_IN }
@@ -198,7 +198,7 @@ router.post("/login", async (req, res) => {
         mobile: user.mobile || "",
         role: user.role,
         status: user.status || "active",
-        isPrimaryAdmin: user.email.toLowerCase() === "elakkiyaohai@gmail.com",
+        isPrimaryAdmin: user.email.toLowerCase() === "elakkiya270806@gmail.com",
       },
     });
   } catch (err) {

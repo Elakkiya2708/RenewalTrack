@@ -1,5 +1,5 @@
 -- ==============================================================================
--- RenewGuard Migration: Invitation Acceptance Admin Notification
+-- RenewalTrack Migration: Invitation Acceptance Admin Notification
 -- Adds notification tracking fields to the invitations table
 -- ==============================================================================
 

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   server.js — RenewGuard Production Backend (Express.js + Supabase + Cron)
+   server.js — RenewalTrack Production Backend (Express.js + Supabase + Cron)
    Serves static frontend, hosts REST APIs, and runs automated email reminder cron.
    ========================================================================== */
 
@@ -35,7 +35,7 @@ app.use(express.urlencoded({ extended: true }));
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
-    app: "RenewGuard - Renewal & Compliance Management System",
+    app: "RenewalTrack - Renewal & Compliance Management System",
     timestamp: new Date().toISOString(),
     supabaseConnected: isSupabaseConnected(),
     emailProvider: config.EMAIL_PROVIDER,
@@ -68,7 +68,7 @@ reminderScheduler.startScheduler();
 const server = app.listen(PORT, () => {
   const url = `http://localhost:${PORT}`;
   console.log("\n================================================================================");
-  console.log(`  RenewGuard — Renewal & Compliance Management System`);
+  console.log(`  RenewalTrack — Renewal & Compliance Management System`);
   console.log(`  Server running at: ${url}`);
   console.log(`  Supabase Status:   ${isSupabaseConnected() ? "CONNECTED (PostgreSQL)" : "LOCAL SAFE STORE (Configure .env for Supabase)"}`);
   console.log(`  Email Provider:    ${config.EMAIL_PROVIDER.toUpperCase()}`);

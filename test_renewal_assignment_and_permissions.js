@@ -35,7 +35,7 @@ async function request(pathUrl, options = {}) {
 
 async function runTestSuite() {
   console.log("================================================================================");
-  console.log("  RenewGuard: Renewal Assignment & Permission Verification Test Suite           ");
+  console.log("  RenewalTrack: Renewal Assignment & Permission Verification Test Suite           ");
   console.log("================================================================================\n");
 
   let passed = 0;

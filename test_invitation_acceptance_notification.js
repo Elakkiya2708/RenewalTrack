@@ -1,6 +1,6 @@
 /**
  * ==============================================================================
- * RenewGuard — Automated End-to-End Test Suite: Invitation Acceptance Notification
+ * RenewalTrack — Automated End-to-End Test Suite: Invitation Acceptance Notification
  *
  * Verifies:
  * 1. Admin issues invitation to Employee and Viewer.
@@ -60,7 +60,7 @@ function request(method, path, body = null, token = null) {
 
 async function runTestSuite() {
   console.log("==================================================================");
-  console.log("  RenewGuard — Invitation Acceptance Admin Notification Test Suite");
+  console.log("  RenewalTrack — Invitation Acceptance Admin Notification Test Suite");
   console.log("==================================================================\n");
 
   let passed = 0;

@@ -31,7 +31,7 @@ async function getReqUser(req) {
       if (headerEmail) {
         cleanEmail = headerEmail;
       } else if (token.startsWith("tok-") || token.startsWith("rts_")) {
-        cleanEmail = "elakkiyaohai@gmail.com";
+        cleanEmail = "elakkiya270806@gmail.com";
       }
     }
   } else {
@@ -53,7 +53,7 @@ async function getReqUser(req) {
       role: user.role || "Employee",
       email: user.email,
       fullName: user.fullName,
-      isPrimaryAdmin: user.email.toLowerCase() === "elakkiyaohai@gmail.com",
+      isPrimaryAdmin: user.email.toLowerCase() === "elakkiya270806@gmail.com",
     };
   }
   return null;
@@ -568,12 +568,12 @@ async function handleMarkRenewed(req, res) {
       }
     }
 
-    const { renewalDate, newExpiryDate, cost, currency, notes, recurringCycle, renewedBy } = req.body || {};
+    const { renewalDate, newExpiryDate, newRenewalDate, cost, currency, notes, recurringCycle, renewedBy } = req.body || {};
     const finalRenewalDate = renewalDate || new Date().toISOString().slice(0, 10);
     const cycle = recurringCycle || record.recurringCycle || "Yearly";
 
     // Calculate next expiry date if not explicitly supplied
-    let finalExpiryDate = newExpiryDate;
+    let finalExpiryDate = newExpiryDate || newRenewalDate;
     if (!finalExpiryDate && record.expiryDate) {
       const d = new Date(record.expiryDate);
       if (!isNaN(d.getTime())) {

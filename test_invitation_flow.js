@@ -1,5 +1,5 @@
 /**
- * End-to-end Test Suite for RenewGuard Real Email Invitations & Role Escalation Prevention
+ * End-to-end Test Suite for RenewalTrack Real Email Invitations & Role Escalation Prevention
  */
 const http = require("http");
 const db = require("./backend/db");
@@ -45,7 +45,7 @@ function request(method, path, body = null, token = null) {
 
 async function runTests() {
   console.log("==================================================================");
-  console.log("  RenewGuard — Real Team Invitations & Security Test Suite");
+  console.log("  RenewalTrack — Real Team Invitations & Security Test Suite");
   console.log("==================================================================\n");
 
   let passed = 0;

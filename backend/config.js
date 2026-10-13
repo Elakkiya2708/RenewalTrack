@@ -15,7 +15,7 @@ const config = {
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
 
   // Authentication
-  JWT_SECRET: process.env.JWT_SECRET || "renewguard_jwt_production_secret_key_2026",
+  JWT_SECRET: process.env.JWT_SECRET || "renewaltrack_jwt_production_secret_key_2026",
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "7d",
 
   // Email Delivery Configuration
@@ -27,15 +27,15 @@ const config = {
   SMTP_PORT: parseInt(process.env.SMTP_PORT || "587", 10),
   SMTP_SECURE: process.env.SMTP_SECURE === "true" || process.env.SMTP_PORT === "465",
   SMTP_SERVICE: process.env.SMTP_SERVICE || (process.env.SMTP_HOST && process.env.SMTP_HOST.includes("gmail") ? "gmail" : ""),
-  SMTP_USER: process.env.SMTP_USER || "",
-  SMTP_PASS: process.env.SMTP_PASS || "",
-  EMAIL_FROM: process.env.EMAIL_FROM || process.env.FROM_EMAIL || "onboarding@resend.dev",
-  FROM_EMAIL: process.env.EMAIL_FROM || process.env.FROM_EMAIL || "onboarding@resend.dev",
-  FROM_NAME: process.env.FROM_NAME || "RenewGuard Alerts",
+  SMTP_USER: (process.env.SMTP_USER || process.env.GMAIL_USER || "").trim(),
+  SMTP_PASS: (process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || "").replace(/\s+/g, ""),
+  EMAIL_FROM: process.env.EMAIL_FROM || process.env.FROM_EMAIL || "RenewalTrack <elakkiya270806@gmail.com>",
+  FROM_EMAIL: process.env.EMAIL_FROM || process.env.FROM_EMAIL || "RenewalTrack <elakkiya270806@gmail.com>",
+  FROM_NAME: process.env.FROM_NAME || "RenewalTrack Alerts",
 
   // Resend API Settings
   RESEND_API_KEY: process.env.RESEND_API_KEY || "",
-  RESEND_FROM: process.env.EMAIL_FROM || process.env.RESEND_FROM || "onboarding@resend.dev",
+  RESEND_FROM: process.env.EMAIL_FROM || process.env.RESEND_FROM || "RenewalTrack <onboarding@resend.dev>",
   RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET || "",
 
   // Background Reminder Scheduler (node-cron)
@@ -43,7 +43,7 @@ const config = {
   CRON_SCHEDULE: process.env.CRON_SCHEDULE || "0 8 * * *",
 
   // Fallback recipient when renewal has no assigned user or invalid email
-  ALERT_FALLBACK_EMAIL: process.env.ALERT_FALLBACK_EMAIL || "elakkiyaohai@gmail.com",
+  ALERT_FALLBACK_EMAIL: process.env.ALERT_FALLBACK_EMAIL || "elakkiya270806@gmail.com",
 };
 
 module.exports = config;

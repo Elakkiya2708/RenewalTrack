@@ -105,7 +105,7 @@ function generateEmailHtml({ renewal, daysRemaining, interval, recipientName, ap
                 <tr>
                   <td>
                     <div style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
-                      <span style="color:#818cf8;">Renew</span>Guard
+                      <span style="color:#818cf8;">Renewal</span>Track
                     </div>
                     <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
                       Automated Renewal &amp; Compliance Management
@@ -197,11 +197,11 @@ function generateEmailHtml({ renewal, daysRemaining, interval, recipientName, ap
           <!-- Footer -->
           <tr>
             <td style="background-color:#f8fafc;padding:20px 32px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center;">
-              <div>This is an automated notification from RenewGuard.</div>
+              <div>This is an automated notification from RenewalTrack.</div>
               <div style="margin-top:6px;">
                 <a href="${settingsUrl}" style="color:#6366f1;text-decoration:underline;">Manage Notification Preferences</a>
                 &nbsp;&bull;&nbsp;
-                <a href="${appUrl}/dashboard.html" style="color:#6366f1;text-decoration:underline;">Open RenewGuard Dashboard</a>
+                <a href="${appUrl}/dashboard.html" style="color:#6366f1;text-decoration:underline;">Open RenewalTrack Dashboard</a>
               </div>
             </td>
           </tr>
@@ -216,7 +216,7 @@ function generateEmailHtml({ renewal, daysRemaining, interval, recipientName, ap
 // Generate plain text email
 function generateEmailText({ renewal, daysRemaining, interval, recipientName, appUrl }) {
   const detailUrl = `${appUrl}/details.html?id=${encodeURIComponent(renewal.id)}`;
-  return `RENEWGUARD - RENEWAL REMINDER (${daysRemaining <= 0 ? "EXPIRES TODAY" : `${daysRemaining} DAYS REMAINING`})
+  return `RENEWALTRACK - RENEWAL REMINDER (${daysRemaining <= 0 ? "EXPIRES TODAY" : `${daysRemaining} DAYS REMAINING`})
 --------------------------------------------------------------------------------
 
 Hello ${recipientName || "Team"},
@@ -236,7 +236,7 @@ Action Required:
 Review and process this renewal at: ${detailUrl}
 
 --------------------------------------------------------------------------------
-Sent automatically by RenewGuard Renewal & Compliance Management System.
+Sent automatically by RenewalTrack Renewal & Compliance Management System.
 Notification Preferences: ${appUrl}/settings.html
 `;
 }
@@ -249,20 +249,22 @@ const emailService = {
   // Resolve authoritative From header for the active provider
   getFromAddress() {
     const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
-    const fromName = config.FROM_NAME || "RenewGuard Alerts";
+    const fromName = config.FROM_NAME || "RenewalTrack Alerts";
 
     if (provider === "resend") {
-      // For Resend: use EMAIL_FROM from .env (e.g. onboarding@resend.dev or custom verified domain)
-      const fromEmail = (config.EMAIL_FROM || config.RESEND_FROM || config.FROM_EMAIL || "onboarding@resend.dev").trim();
+      const fromEmail = (config.EMAIL_FROM || config.RESEND_FROM || config.FROM_EMAIL || "RenewalTrack <onboarding@resend.dev>").trim();
+      if (fromEmail.includes("<") && fromEmail.includes(">")) {
+        return fromEmail;
+      }
       return `"${fromName}" <${fromEmail}>`;
     }
 
     // For Nodemailer / Gmail SMTP:
-    const smtpFrom =
-      config.FROM_EMAIL && !config.FROM_EMAIL.includes("renewguard.com")
-        ? config.FROM_EMAIL
-        : (config.SMTP_USER || "reminders@renewguard.com");
-    return `"${fromName}" <${smtpFrom}>`;
+    const rawSmtp = (config.EMAIL_FROM || config.FROM_EMAIL || config.SMTP_USER || "reminders@renewaltrack.com").trim();
+    if (rawSmtp.includes("<") && rawSmtp.includes(">")) {
+      return rawSmtp;
+    }
+    return `"${fromName}" <${rawSmtp}>`;
   },
 
   // Inspect configuration and provider status (without leaking secrets)
@@ -580,13 +582,13 @@ const emailService = {
       cost: 18500,
       currency: "USD",
       referenceNumber: "TEST-REF-9921",
-      notes: "This is a real test notification generated from RenewGuard to verify email delivery.",
+      notes: "This is a real test notification generated from RenewalTrack to verify email delivery.",
     };
 
     return await this.sendReminderEmail({
       renewal: sampleRenewal,
       recipientEmail: targetEmail,
-      recipientName: "RenewGuard Administrator",
+      recipientName: "RenewalTrack Administrator",
       daysRemaining: 15,
       interval: "15_days",
     });
@@ -599,14 +601,14 @@ const emailService = {
     }
 
     const recipientName = fullName || to.split("@")[0];
-    const subject = `You're invited to join RenewGuard as ${role}`;
+    const subject = `You're invited to join RenewalTrack as ${role}`;
     const inviterText = invitedBy ? `${invitedBy} has invited you` : "You have been invited";
 
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Invitation to Join RenewGuard</title>
+  <title>Invitation to Join RenewalTrack</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;line-height:1.5;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:32px 16px;">
@@ -616,7 +618,7 @@ const emailService = {
           <tr>
             <td style="background-color:#0f172a;padding:24px 32px;border-bottom:3px solid #6366f1;">
               <div style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
-                <span style="color:#818cf8;">Renew</span>Guard
+                <span style="color:#818cf8;">Renewal</span>Track
               </div>
               <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
                 Renewal &amp; Compliance Management
@@ -629,7 +631,7 @@ const emailService = {
                 Welcome to the Team, ${escapeHtml(recipientName)}!
               </h2>
               <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">
-                ${escapeHtml(inviterText)} to join our organization workspace on RenewGuard with the role of <strong>${escapeHtml(role)}</strong>.
+                ${escapeHtml(inviterText)} to join our organization workspace on RenewalTrack with the role of <strong>${escapeHtml(role)}</strong>.
               </p>
               <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:18px;margin-bottom:24px;">
                 <table role="presentation" width="100%">
@@ -660,7 +662,7 @@ const emailService = {
           </tr>
           <tr>
             <td style="background-color:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center;">
-              &copy; 2026 RenewGuard Inc. &bull; Secure Invitation Token
+              &copy; 2026 RenewalTrack Inc. &bull; Secure Invitation Token
             </td>
           </tr>
         </table>
@@ -670,7 +672,7 @@ const emailService = {
 </body>
 </html>`;
 
-    const text = `Welcome to RenewGuard!\n\n${inviterText} to join as ${role}.\n\nPlease accept your invitation here:\n${inviteUrl}\n\nThis invitation link expires in 48 hours.`;
+    const text = `Welcome to RenewalTrack!\n\n${inviterText} to join as ${role}.\n\nPlease accept your invitation here:\n${inviteUrl}\n\nThis invitation link expires in 48 hours.`;
     const from = this.getFromAddress();
     const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
 
@@ -728,7 +730,7 @@ const emailService = {
           <tr>
             <td style="background-color:#0f172a;padding:24px 32px;border-bottom:3px solid #10b981;">
               <div style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
-                <span style="color:#818cf8;">Renew</span>Guard
+                <span style="color:#818cf8;">Renewal</span>Track
               </div>
               <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
                 Team Management Notification
@@ -744,7 +746,7 @@ const emailService = {
                 Hello ${escapeHtml(recipientAdmin)},
               </h2>
               <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">
-                Great news! <strong>${escapeHtml(memberName)}</strong> has accepted your invitation and successfully activated their account on RenewGuard.
+                Great news! <strong>${escapeHtml(memberName)}</strong> has accepted your invitation and successfully activated their account on RenewalTrack.
               </p>
               <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px;">
                 <table role="presentation" width="100%">
@@ -782,7 +784,7 @@ const emailService = {
           </tr>
           <tr>
             <td style="background-color:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center;">
-              &copy; 2026 RenewGuard Inc. &bull; Team Management Automated Notification
+              &copy; 2026 RenewalTrack Inc. &bull; Team Management Automated Notification
             </td>
           </tr>
         </table>
@@ -792,7 +794,7 @@ const emailService = {
 </body>
 </html>`;
 
-    const text = `RenewGuard Team Notification\n\nHello ${recipientAdmin},\n\n${memberName} (${memberEmail}) has accepted your invitation and activated their account with role: ${role}.\n\nAccepted On: ${acceptedDateFormatted}\nAccount Status: Active\n\nView your team members here: ${teamUrl}`;
+    const text = `RenewalTrack Team Notification\n\nHello ${recipientAdmin},\n\n${memberName} (${memberEmail}) has accepted your invitation and activated their account with role: ${role}.\n\nAccepted On: ${acceptedDateFormatted}\nAccount Status: Active\n\nView your team members here: ${teamUrl}`;
 
     const from = this.getFromAddress();
     const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
@@ -853,7 +855,7 @@ const emailService = {
                 <tr>
                   <td>
                     <div style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
-                      <span style="color:#818cf8;">Renew</span>Guard
+                      <span style="color:#818cf8;">Renewal</span>Track
                     </div>
                     <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
                       Renewal Assignment Notification
@@ -917,7 +919,7 @@ const emailService = {
           </tr>
           <tr>
             <td style="background-color:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center;">
-              &copy; 2026 RenewGuard Inc. &bull; Automated Assignment Alert
+              &copy; 2026 RenewalTrack Inc. &bull; Automated Assignment Alert
             </td>
           </tr>
         </table>
@@ -967,13 +969,13 @@ const emailService = {
     }
 
     const recipientName = fullName || to.split("@")[0];
-    const subject = "Reset Your RenewGuard Password";
+    const subject = "Reset Your RenewalTrack Password";
 
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Reset Your RenewGuard Password</title>
+  <title>Reset Your RenewalTrack Password</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;line-height:1.5;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:32px 16px;">
@@ -986,7 +988,7 @@ const emailService = {
                 <tr>
                   <td>
                     <div style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
-                      <span style="color:#818cf8;">Renew</span>Guard
+                      <span style="color:#818cf8;">Renewal</span>Track
                     </div>
                     <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
                       Account Security &amp; Password Recovery
@@ -1007,7 +1009,7 @@ const emailService = {
                 Hello, ${escapeHtml(recipientName)}!
               </h2>
               <p style="margin:0 0 16px;color:#475569;font-size:15px;line-height:1.6;">
-                We received a request to reset the password for your RenewGuard account (<strong>${escapeHtml(to)}</strong>).
+                We received a request to reset the password for your RenewalTrack account (<strong>${escapeHtml(to)}</strong>).
               </p>
               <p style="margin:0 0 24px;color:#475569;font-size:15px;line-height:1.6;">
                 Click the secure button below to set a new password. This link is single-use and will expire in <strong>${expiresMinutes} minutes</strong>.
@@ -1030,7 +1032,7 @@ const emailService = {
           </tr>
           <tr>
             <td style="background-color:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center;">
-              &copy; 2026 RenewGuard Inc. &bull; Automated Security Notification
+              &copy; 2026 RenewalTrack Inc. &bull; Automated Security Notification
             </td>
           </tr>
         </table>
@@ -1040,7 +1042,7 @@ const emailService = {
 </body>
 </html>`;
 
-    const text = `Hello ${recipientName},\n\nWe received a request to reset your RenewGuard password.\n\nPlease reset your password using this link (expires in ${expiresMinutes} minutes):\n${resetUrl}\n\nIf you did not request this, please ignore this email.`;
+    const text = `Hello ${recipientName},\n\nWe received a request to reset your RenewalTrack password.\n\nPlease reset your password using this link (expires in ${expiresMinutes} minutes):\n${resetUrl}\n\nIf you did not request this, please ignore this email.`;
 
     const from = this.getFromAddress();
     const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
@@ -1083,7 +1085,7 @@ const emailService = {
 
   /**
    * Real Email Delivery Failure Alert System:
-   * Dispatches a critical failure alert to elakkiyaohai@gmail.com whenever an employee
+   * Dispatches a critical failure alert to elakkiya270806@gmail.com whenever an employee
    * assignment email, webhook bounce, or other important email dispatch fails.
    *
    * Includes:
@@ -1109,7 +1111,7 @@ const emailService = {
     context = {},
     force = false,
   }) {
-    const adminEmail = (config.ALERT_FALLBACK_EMAIL || "elakkiyaohai@gmail.com").trim().toLowerCase();
+    const adminEmail = (config.ALERT_FALLBACK_EMAIL || "elakkiya270806@gmail.com").trim().toLowerCase();
     const cleanRecipient = (recipientEmail || "").trim().toLowerCase();
     const cleanReason = sanitizeSecrets(reason || "Email delivery failed");
     const failTimestamp = failureTime || new Date().toISOString();
@@ -1130,7 +1132,7 @@ const emailService = {
         await db.logAudit({
           actorId: "system",
           actorName: "Email Delivery System",
-          actorEmail: "system@renewguard.com",
+          actorEmail: "system@renewaltrack.com",
           actorRole: "System",
           action: "EMAIL_ALERT_FAILED",
           targetType: "admin_alert",
@@ -1153,7 +1155,7 @@ const emailService = {
         await db.logAudit({
           actorId: "system",
           actorName: "Email Delivery System",
-          actorEmail: "system@renewguard.com",
+          actorEmail: "system@renewaltrack.com",
           actorRole: "System",
           action: "EMAIL_DELIVERY_FAILURE",
           targetType: "email_delivery",
@@ -1187,7 +1189,7 @@ const emailService = {
                 <tr>
                   <td>
                     <div style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
-                      <span style="color:#fca5a5;">Renew</span>Guard
+                      <span style="color:#fca5a5;">Renewal</span>Track
                     </div>
                     <div style="font-size:12px;color:#fecaca;margin-top:2px;">
                       Automated Email Delivery Failure Alert
@@ -1253,7 +1255,7 @@ const emailService = {
                 <ul style="margin:0;padding-left:20px;font-size:13px;color:#475569;line-height:1.6;">
                   <li>Verify that <strong>${escapeHtml(empEmail)}</strong> is typed correctly and able to receive external emails.</li>
                   <li>If using Resend sandbox mode (<code>onboarding@resend.dev</code>), Resend restricts delivery to the verified account owner until a custom domain is configured.</li>
-                  <li>Review the full incident report in the RenewGuard Admin Audit Logs.</li>
+                  <li>Review the full incident report in the RenewalTrack Admin Audit Logs.</li>
                 </ul>
               </div>
 
@@ -1269,7 +1271,7 @@ const emailService = {
           </tr>
           <tr>
             <td style="background-color:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center;">
-              &copy; 2026 RenewGuard Inc. &bull; Automated Critical Incident Alert &bull; Target: ${escapeHtml(adminEmail)}
+              &copy; 2026 RenewalTrack Inc. &bull; Automated Critical Incident Alert &bull; Target: ${escapeHtml(adminEmail)}
             </td>
           </tr>
         </table>
@@ -1279,7 +1281,7 @@ const emailService = {
 </body>
 </html>`;
 
-    const text = `RenewGuard Critical Alert: Email Delivery Failure\n\nAttention Administrator (${adminEmail}),\n\nAn automated email dispatch could not be delivered:\n- Event: ${emailType}\n- Employee: ${empName} (${empEmail})\n- Role/ID: ${empRole} ${empId !== 'N/A' ? `(${empId})` : ''}\n- Renewal: ${recRenewalName}\n- Failure Time: ${failDateFormatted} (${failTimestamp})\n- Failure Reason: ${cleanReason}\n\nAudit Logs: ${auditUrl}\nRenewal Details: ${detailsUrl}`;
+    const text = `RenewalTrack Critical Alert: Email Delivery Failure\n\nAttention Administrator (${adminEmail}),\n\nAn automated email dispatch could not be delivered:\n- Event: ${emailType}\n- Employee: ${empName} (${empEmail})\n- Role/ID: ${empRole} ${empId !== 'N/A' ? `(${empId})` : ''}\n- Renewal: ${recRenewalName}\n- Failure Time: ${failDateFormatted} (${failTimestamp})\n- Failure Reason: ${cleanReason}\n\nAudit Logs: ${auditUrl}\nRenewal Details: ${detailsUrl}`;
 
     const from = this.getFromAddress();
     const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
@@ -1332,7 +1334,7 @@ const emailService = {
         await db.logAudit({
           actorId: "system",
           actorName: "Email Delivery System",
-          actorEmail: "system@renewguard.com",
+          actorEmail: "system@renewaltrack.com",
           actorRole: "System",
           action: "EMAIL_DELIVERY_FAILURE",
           targetType: "email_delivery",
@@ -1354,7 +1356,7 @@ const emailService = {
         await db.logAudit({
           actorId: "system",
           actorName: "Email Delivery System",
-          actorEmail: "system@renewguard.com",
+          actorEmail: "system@renewaltrack.com",
           actorRole: "System",
           action: "EMAIL_DELIVERY_FAILURE",
           targetType: "email_delivery",
@@ -1364,7 +1366,7 @@ const emailService = {
         await db.logAudit({
           actorId: "system",
           actorName: "Email Delivery System",
-          actorEmail: "system@renewguard.com",
+          actorEmail: "system@renewaltrack.com",
           actorRole: "System",
           action: "EMAIL_ALERT_FAILED",
           targetType: "admin_alert",

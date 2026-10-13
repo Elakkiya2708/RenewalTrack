@@ -33,7 +33,7 @@ async function request(path, options = {}) {
 
 async function runTests() {
   console.log("=================================================================");
-  console.log(" RenewGuard: Primary Admin, Demo Removal & RBAC Automated Tests  ");
+  console.log(" RenewalTrack: Primary Admin, Demo Removal & RBAC Automated Tests  ");
   console.log("=================================================================\n");
 
   let passed = 0;

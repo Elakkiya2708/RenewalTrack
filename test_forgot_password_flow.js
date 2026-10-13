@@ -1,5 +1,5 @@
 /**
- * End-to-end Verification for RenewGuard Forgot Password & Reset Password Flow
+ * End-to-end Verification for RenewalTrack Forgot Password & Reset Password Flow
  */
 const http = require("http");
 const db = require("./backend/db");
@@ -44,7 +44,7 @@ function request(method, path, body = null) {
 
 async function runTests() {
   console.log("==================================================================");
-  console.log("  RenewGuard — Forgot Password & Reset Password Test Suite");
+  console.log("  RenewalTrack — Forgot Password & Reset Password Test Suite");
   console.log("==================================================================\n");
 
   let passed = 0;

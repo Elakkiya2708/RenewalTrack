@@ -324,7 +324,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `renewguard_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `renewaltrack_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     RTS.toast("Audit logs exported to CSV.", "success");

@@ -32,7 +32,7 @@ function request(options, data = null) {
 
 async function runTests() {
   console.log("================================================================================");
-  console.log("  RenewGuard — Real Email Delivery Verification & Diagnostics");
+  console.log("  RenewalTrack — Real Email Delivery Verification & Diagnostics");
   console.log("================================================================================\n");
 
   const status = emailService.getProviderStatus();
@@ -105,7 +105,7 @@ async function runTests() {
       console.log(`  [TEST] Dispatching real test assignment email to: ${testRecipient}...`);
       const liveResult = await emailService.sendAssignmentNotification({
         to: testRecipient,
-        recipientName: "RenewGuard Verified Recipient",
+        recipientName: "RenewalTrack Verified Recipient",
         renewal: sampleRenewal,
         assignedBy: "Elakkiya (Administrator)",
         isReassignment: false,

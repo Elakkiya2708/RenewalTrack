@@ -1,5 +1,5 @@
 -- ============================================================================
--- RenewGuard - Set Primary Admin to Elakkiya & Purge Demo Account Migration
+-- RenewalTrack - Set Primary Admin to Elakkiya & Purge Demo Account Migration
 -- Migration: 20261012_set_primary_admin_elakkiya.sql
 -- Description:
 --   1. Reassigns dependencies and safely deletes or deactivates demo@renewaltrack.com

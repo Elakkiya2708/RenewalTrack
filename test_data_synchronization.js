@@ -1,6 +1,6 @@
 /* ==========================================================================
    test_data_synchronization.js
-   Comprehensive test suite for RenewGuard Data Synchronization & Persistence:
+   Comprehensive test suite for RenewalTrack Data Synchronization & Persistence:
    - Create, Edit, Assign/Reassign, Snooze, Renew, Complete/Reopen, Delete
    - Verifies real database persistence (db.js / store.json)
    - Verifies history deduplication and proper reminder date updates
@@ -52,7 +52,7 @@ function loginUser(email, password) {
 
 async function runTests() {
   console.log("\n================================================================================");
-  console.log("   RENEWGUARD DATA SYNCHRONIZATION & PERSISTENCE TEST SUITE");
+  console.log("   RENEWALTRACK DATA SYNCHRONIZATION & PERSISTENCE TEST SUITE");
   console.log("================================================================================\n");
 
   let testsPassed = 0;

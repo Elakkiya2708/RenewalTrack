@@ -53,7 +53,7 @@ function assert(condition, message) {
 
 async function runTests() {
   console.log("=================================================================");
-  console.log(" RenewGuard: Admin Dashboard Quick Add & Full Assignment Flow    ");
+  console.log(" RenewalTrack: Admin Dashboard Quick Add & Full Assignment Flow    ");
   console.log("=================================================================\n");
 
   // 1. Authenticate users

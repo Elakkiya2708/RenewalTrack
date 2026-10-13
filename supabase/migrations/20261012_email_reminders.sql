@@ -1,5 +1,5 @@
 -- ============================================================================
--- RenewGuard - Real Email Reminder System Migration
+-- RenewalTrack - Real Email Reminder System Migration
 -- Migration: 20261012_email_reminders.sql
 -- Description: Creates tables for renewals, reminder logs (with duplicate prevention),
 --              notification settings, and user accounts.

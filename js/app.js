@@ -511,7 +511,7 @@
   let syncBroadcastChannel = null;
   try {
     if (typeof BroadcastChannel !== "undefined") {
-      syncBroadcastChannel = new BroadcastChannel("renewguard_data_sync");
+      syncBroadcastChannel = new BroadcastChannel("renewaltrack_data_sync");
       syncBroadcastChannel.onmessage = (evt) => {
         if (evt && evt.data && evt.data.type === "renewal-data-updated") {
           syncRenewalsFromBackend({ broadcast: false }).then(() => {
@@ -1012,7 +1012,7 @@
     syncRenewalToBackend('DELETE', '/api/renewals');
   }
 
-  const PRIMARY_ADMIN_EMAIL = "elakkiyaohai@gmail.com";
+  const PRIMARY_ADMIN_EMAIL = "elakkiya270806@gmail.com";
   const PRIMARY_ADMIN_NAME = "Elakkiya";
 
   const DEFAULT_ACCOUNTS = [
@@ -1025,6 +1025,16 @@
       role: "Admin",
       status: "active",
       isPrimaryAdmin: true,
+    },
+    {
+      id: "usr-emp-elakkiya",
+      fullName: "Elakkiya",
+      email: "elakkiyaohai@gmail.com",
+      mobile: "+91 98765 43210",
+      password: "Admin@1234",
+      role: "Employee",
+      status: "active",
+      isPrimaryAdmin: false,
     },
     {
       id: "usr-2",

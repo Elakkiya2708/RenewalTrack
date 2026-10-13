@@ -42,7 +42,7 @@ async function request(path, options = {}) {
 
 async function runTests() {
   console.log("\n================================================================================");
-  console.log("  RenewGuard: Employee Renewal Permissions & History/Status Sync Test Suite    ");
+  console.log("  RenewalTrack: Employee Renewal Permissions & History/Status Sync Test Suite    ");
   console.log("================================================================================\n");
 
   const db = require("./backend/db");
@@ -55,7 +55,7 @@ async function runTests() {
   // Admin: Elakkiya
   const adminLogin = await request("/api/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email: "elakkiyaohai@gmail.com", password: "Admin@1234" }),
+    body: JSON.stringify({ email: "elakkiya270806@gmail.com", password: "Admin@1234" }),
   });
   assert(adminLogin.status === 200, "Admin (Elakkiya) login successful");
   const adminToken = adminLogin.data && adminLogin.data.token;

@@ -18,7 +18,7 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-const PRIMARY_ADMIN_EMAIL = "elakkiyaohai@gmail.com";
+const PRIMARY_ADMIN_EMAIL = "elakkiya270806@gmail.com";
 const PRIMARY_ADMIN_NAME = "Elakkiya";
 
 function addDays(isoDate, days) {
@@ -58,7 +58,7 @@ function getLocalStore() {
             action: "SYSTEM_INITIALIZED",
             targetType: "system",
             targetId: "system",
-            details: "RenewGuard initialized with Role-Based Access Control (Admin, Employee, Viewer).",
+            details: "RenewalTrack initialized with Role-Based Access Control (Admin, Employee, Viewer).",
             channel: "System",
             createdAt: new Date().toISOString(),
           },
@@ -86,7 +86,7 @@ function getLocalStore() {
         changed = true;
       }
 
-      // Ensure Primary Admin (Elakkiya / elakkiyaohai@gmail.com) exists with Admin role
+      // Ensure Primary Admin (Elakkiya / elakkiya270806@gmail.com) exists with Admin role
       let primaryAdmin = store.users.find(
         (u) => u.email && u.email.toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase()
       );
@@ -117,8 +117,26 @@ function getLocalStore() {
         }
       }
 
-      // Ensure remaining users have valid role and active status
+      // Ensure elakkiyaohai@gmail.com is set as Employee
+      const ohaiUser = store.users.find(
+        (u) => u.email && u.email.toLowerCase() === "elakkiyaohai@gmail.com"
+      );
+      if (ohaiUser && ohaiUser.role !== "Employee") {
+        ohaiUser.role = "Employee";
+        changed = true;
+      }
+
+      // Enforce that elakkiya270806@gmail.com is the ONLY Admin:
+      // Any other admin account is demoted to Employee
       store.users.forEach((u) => {
+        if (
+          u.email &&
+          u.email.toLowerCase() !== PRIMARY_ADMIN_EMAIL.toLowerCase() &&
+          u.role === "Admin"
+        ) {
+          u.role = "Employee";
+          changed = true;
+        }
         if (u.role === "Editor") {
           u.role = "Employee";
           changed = true;
@@ -176,7 +194,7 @@ function getLocalStore() {
         action: "SYSTEM_INITIALIZED",
         targetType: "system",
         targetId: "system",
-        details: "RenewGuard initialized with Role-Based Access Control (Admin, Employee, Viewer).",
+        details: "RenewalTrack initialized with Role-Based Access Control (Admin, Employee, Viewer).",
         channel: "System",
         createdAt: new Date().toISOString(),
       },
@@ -753,7 +771,7 @@ const db = {
     const user = await this.getUserById(id);
     if (!user) throw new Error("User not found.");
 
-    // Primary Admin Protection: Cannot demote elakkiyaohai@gmail.com
+    // Primary Admin Protection: Cannot demote elakkiya270806@gmail.com
     if (user.email && user.email.toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase() && newRole !== "Admin") {
       throw new Error(`The Primary Admin account (${PRIMARY_ADMIN_EMAIL}) is protected and cannot be demoted.`);
     }
@@ -785,7 +803,7 @@ const db = {
     const user = await this.getUserById(id);
     if (!user) throw new Error("User not found.");
 
-    // Primary Admin Protection: Cannot deactivate elakkiyaohai@gmail.com
+    // Primary Admin Protection: Cannot deactivate elakkiya270806@gmail.com
     if (user.email && user.email.toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase() && newStatus === "deactivated") {
       throw new Error(`The Primary Admin account (${PRIMARY_ADMIN_EMAIL}) is protected and cannot be deactivated.`);
     }
@@ -858,8 +876,8 @@ const db = {
       email: cleanEmail,
       fullName: (fullName || "").trim(),
       role: cleanRole,
-      invitedBy: actor.email || "elakkiyaohai@gmail.com",
-      invitedByName: actor.fullName || "Elakkiya",
+      invitedBy: actor.email || PRIMARY_ADMIN_EMAIL,
+      invitedByName: actor.fullName || PRIMARY_ADMIN_NAME,
       token,
       status: "pending",
       expiresAt,
@@ -895,8 +913,8 @@ const db = {
 
     await this.logAudit({
       actorId: actor.id || "usr-admin-elakkiya",
-      actorName: actor.fullName || "Elakkiya",
-      actorEmail: actor.email || "elakkiyaohai@gmail.com",
+      actorName: actor.fullName || PRIMARY_ADMIN_NAME,
+      actorEmail: actor.email || PRIMARY_ADMIN_EMAIL,
       actorRole: actor.role || "Admin",
       action: "MEMBER_INVITED",
       targetType: "invitation",
@@ -1091,8 +1109,8 @@ const db = {
 
     await this.logAudit({
       actorId: actor.id || "usr-admin-elakkiya",
-      actorName: actor.fullName || "Elakkiya",
-      actorEmail: actor.email || "elakkiyaohai@gmail.com",
+      actorName: actor.fullName || PRIMARY_ADMIN_NAME,
+      actorEmail: actor.email || PRIMARY_ADMIN_EMAIL,
       actorRole: actor.role || "Admin",
       action: "INVITE_REVOKED",
       targetType: "invitation",

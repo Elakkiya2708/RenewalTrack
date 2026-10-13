@@ -346,7 +346,7 @@
           .filter(u => u.email && u.email.toLowerCase() !== "demo@renewaltrack.com")
           .map(u => ({
             ...u,
-            isPrimaryAdmin: (u.email || "").toLowerCase() === "elakkiyaohai@gmail.com",
+            isPrimaryAdmin: (u.email || "").toLowerCase() === "elakkiya270806@gmail.com",
             assignedRenewalCount: u.assignedRenewalsCount !== undefined ? u.assignedRenewalsCount : (u.assignedRenewalCount || 0),
           }));
         renderMembers();
@@ -364,7 +364,7 @@
             role: a.role || "Employee",
             status: a.status || "active",
             assignedRenewalCount: 0,
-            isPrimaryAdmin: (a.email || "").toLowerCase() === "elakkiyaohai@gmail.com",
+            isPrimaryAdmin: (a.email || "").toLowerCase() === "elakkiya270806@gmail.com",
           }));
         renderMembers();
         updateStats();
@@ -382,7 +382,7 @@
           role: a.role || "Employee",
           status: a.status || "active",
           assignedRenewalCount: 0,
-          isPrimaryAdmin: (a.email || "").toLowerCase() === "elakkiyaohai@gmail.com",
+          isPrimaryAdmin: (a.email || "").toLowerCase() === "elakkiya270806@gmail.com",
         }));
       renderMembers();
       updateStats();
@@ -439,7 +439,7 @@
     }
 
     tbody.innerHTML = filtered.map(m => {
-      const isPrimary = m.isPrimaryAdmin || (m.email || "").toLowerCase() === "elakkiyaohai@gmail.com";
+      const isPrimary = m.isPrimaryAdmin || (m.email || "").toLowerCase() === "elakkiya270806@gmail.com";
       const roleBadge = `<span class="role-pill-badge role-${(m.role || 'employee').toLowerCase()}">${m.role || 'Employee'}</span>`;
       const statusBadge = `<span class="status-pill status-${m.status === 'deactivated' ? 'deactivated' : 'active'}">${m.status === 'deactivated' ? 'Deactivated' : 'Active'}</span>`;
       const assignedCount = m.assignedRenewalCount !== undefined ? m.assignedRenewalCount : 0;

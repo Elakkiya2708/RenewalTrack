@@ -1,5 +1,5 @@
 -- ============================================================================
--- RenewGuard - Renewal Assignment Migration
+-- RenewalTrack - Renewal Assignment Migration
 -- Migration: 20261012_renewal_assignment.sql
 -- Description: Adds assigned_to_id (FK to app_users), assigned_to_name, and
 --              assigned_to_email to the renewals table with indexing.

@@ -1,5 +1,5 @@
 -- ============================================================================
--- RenewGuard - Role-Based Access Control, Team Management & Audit Logging Migration
+-- RenewalTrack - Role-Based Access Control, Team Management & Audit Logging Migration
 -- Migration: 20261012_role_based_team_management.sql
 -- Description: Adds status and metadata to app_users, creates invitations and
 --              audit_logs tables with RLS and seed accounts for Admin, Employee, Viewer.

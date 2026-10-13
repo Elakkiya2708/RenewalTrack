@@ -34,14 +34,20 @@ Opening the site shows the public landing page; click **Login** to enter the app
 
 ### 1. Primary Admin Account
 - **Name:** Elakkiya
+- **Email:** `elakkiya270806@gmail.com`
+- **Password:** `Admin@1234`
+- **Role:** `Admin` (Sole Primary Administrator, Full Privileges, Team Management, Audit Logs)
+
+### 2. Employee Accounts
+- **Name:** Elakkiya (Employee)
 - **Email:** `elakkiyaohai@gmail.com`
 - **Password:** `Admin@1234`
-- **Role:** `Admin` (Full Administrative Privileges, Team Management, Audit Logs)
+- **Role:** `Employee` (Manage assigned renewals & personal renewals)
 
-### 2. Employee Account
+- **Name:** David Kim
 - **Email:** `david.kim@renewaltrack.com`
 - **Password:** `Demo@1234`
-- **Role:** `Employee` (Manage assigned renewals & team visibility)
+- **Role:** `Employee` (Manage assigned renewals)
 
 ### 3. Viewer Account
 - **Email:** `priya.nair@renewaltrack.com`
@@ -158,7 +164,7 @@ Every page talks to data **only** through `RTS.data.*` and `RTS.auth.*` in
 
 ## Automated Real Email Reminder System
 
-RenewGuard includes an automated, background-scheduled email reminder engine powered by **Node.js, Express, node-cron, Nodemailer / Resend, and Supabase PostgreSQL**:
+RenewalTrack includes an automated, background-scheduled email reminder engine powered by **Node.js, Express, node-cron, Nodemailer / Resend, and Supabase PostgreSQL**:
 
 - **Automated Intervals:** Dispatches notifications **30 days, 15 days, 7 days** before expiry, and **on the exact expiry date (0 days)**.
 - **Duplicate Prevention:** Tracks every sent reminder in the `reminder_logs` database table with a unique constraint on `(renewal_id, reminder_interval, expiry_date)`. Reminders for the same interval will never be sent twice.

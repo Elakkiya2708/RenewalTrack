@@ -45,7 +45,7 @@ async function request(path, options = {}) {
 
 async function runTests() {
   console.log("\n================================================================================");
-  console.log("  RenewGuard: Resend API Backend Integration Test Suite                        ");
+  console.log("  RenewalTrack: Resend API Backend Integration Test Suite                        ");
   console.log("================================================================================\n");
 
   const emailService = require("./backend/emailService");

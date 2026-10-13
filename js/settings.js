@@ -110,7 +110,7 @@
     if (notifyDigestEl) notifyDigestEl.checked = !!settings.notifyReminderDigest;
     if (fallbackEmailInput) {
       const user = RTS.auth.getCurrentUser();
-      fallbackEmailInput.value = settings.defaultRecipientEmail || user.email || "elakkiyaohai@gmail.com";
+      fallbackEmailInput.value = settings.defaultRecipientEmail || user.email || "elakkiya270806@gmail.com";
     }
 
     // Save toggles immediately on change
@@ -350,7 +350,7 @@
         .map((m) => {
           const isYou = (m.email || "").toLowerCase() === (currentUser.email || "").toLowerCase();
           const role = m.role || "Employee";
-          const isPrimary = (m.email || "").toLowerCase() === "elakkiyaohai@gmail.com";
+          const isPrimary = (m.email || "").toLowerCase() === "elakkiya270806@gmail.com";
           const count =
             m.assignedRenewalsCount !== undefined
               ? m.assignedRenewalsCount

@@ -40,7 +40,7 @@ async function request(path, options = {}) {
 
 async function runTests() {
   console.log("\n================================================================================");
-  console.log("  RenewGuard: Email Delivery Failure Alerts & Webhook Test Suite               ");
+  console.log("  RenewalTrack: Email Delivery Failure Alerts & Webhook Test Suite               ");
   console.log("================================================================================\n");
 
   const emailService = require("./backend/emailService");
@@ -54,7 +54,7 @@ async function runTests() {
   console.log("[1] Authenticating Admin user...");
   const loginRes = await request("/api/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email: "elakkiyaohai@gmail.com", password: "Admin@1234" }),
+    body: JSON.stringify({ email: "elakkiya270806@gmail.com", password: "Admin@1234" }),
   });
   assert(loginRes.status === 200, "Admin login successful", `Status: ${loginRes.status}`);
   const adminToken = loginRes.data && loginRes.data.token;
@@ -79,33 +79,34 @@ async function runTests() {
     priority: "High",
   };
 
-  // Dispatch assignment email to David Kim (which Resend sandbox restricts to account owner)
+  // Dispatch assignment email to invalid/unroutable recipient (guaranteed delivery failure across all providers)
+  const invalidEmail = "david.kim-unroutable@invalid";
   const assignResult = await emailService.sendAssignmentNotification({
-    to: "david.kim@renewaltrack.com",
+    to: invalidEmail,
     recipientName: "David Kim",
     renewal: testRenewal,
     assignedBy: "Elakkiya (Admin)",
     isReassignment: false,
   });
 
-  // Verify assignment email failed as expected under sandbox restrictions
+  // Verify assignment email failed as expected
   assert(assignResult.success === false, "Employee assignment email correctly failed for unverified domain recipient");
-  assert(Boolean(assignResult.error), "Error reason was captured from Resend API");
+  assert(Boolean(assignResult.error), "Error reason was captured from email provider error");
 
   // Verify Audit Log has EMAIL_DELIVERY_FAILURE
   const recentLogs = await db.getAuditLogs({ limit: 10, action: "EMAIL_DELIVERY_FAILURE" });
   assert(recentLogs.length > 0, "Audit Log recorded EMAIL_DELIVERY_FAILURE entry");
   const latestFailure = recentLogs[0];
-  assert(latestFailure.details.includes("David Kim") || latestFailure.details.includes("david.kim@renewaltrack.com"), "Audit Log contains employee details");
+  assert(latestFailure.details.includes("David Kim") || latestFailure.details.includes(invalidEmail), "Audit Log contains employee details");
   assert(latestFailure.details.includes("Enterprise Cloudflare SSL Certificate"), "Audit Log contains renewal name");
   assert(!latestFailure.details.includes("re_"), "Audit Log contains ZERO plaintext Resend API keys");
 
   // 4. Test Duplicate Alert Suppression (15-Minute Dedup Window)
   console.log("\n[4] Testing Duplicate Alert Suppression...");
   const duplicateAlertResult = await emailService.notifyDeliveryFailure({
-    recipientEmail: "david.kim@renewaltrack.com",
+    recipientEmail: invalidEmail,
     recipientName: "David Kim",
-    employeeDetails: { name: "David Kim", email: "david.kim@renewaltrack.com", role: "Employee" },
+    employeeDetails: { name: "David Kim", email: invalidEmail, role: "Employee" },
     renewalName: testRenewal.name,
     failureTime: new Date().toISOString(),
     reason: assignResult.error,
@@ -119,7 +120,7 @@ async function runTests() {
   const webhookStatus = await request("/api/webhooks/status");
   assert(webhookStatus.status === 200, "GET /api/webhooks/status returned 200 OK");
   assert(webhookStatus.data && webhookStatus.data.ok === true, "Webhook listener is active");
-  assert(webhookStatus.data.alertTarget === "elakkiyaohai@gmail.com", "Webhook alert target is elakkiyaohai@gmail.com");
+  assert(webhookStatus.data.alertTarget === "elakkiya270806@gmail.com", "Webhook alert target is elakkiya270806@gmail.com");
 
   // Test email.bounced webhook event
   emailService.clearAlertDeduplicationCache(); // reset cache for unique test
@@ -128,7 +129,7 @@ async function runTests() {
     created_at: new Date().toISOString(),
     data: {
       email_id: "res-test-bounce-123",
-      from: "RenewGuard Alerts <onboarding@resend.dev>",
+      from: "RenewalTrack Alerts <onboarding@resend.dev>",
       to: ["raja@renewaltrack.com"],
       subject: "Renewal Assigned: AWS Production Infrastructure",
       bounce: {
