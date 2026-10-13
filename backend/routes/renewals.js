@@ -242,6 +242,7 @@ router.post("/", async (req, res) => {
       details: `Created renewal "${saved.name}" (${saved.category}, Expiry: ${saved.expiryDate}).`,
     });
 
+    let emailResult = null;
     // Requirement 7: Audit log & Email notification for assignment
     if (assignedUser && assignedUser.email) {
       await db.logAudit({
@@ -255,21 +256,26 @@ router.post("/", async (req, res) => {
         details: `Assigned renewal "${saved.name}" to ${assignedUser.fullName} (${assignedUser.email}).`,
       });
 
-      // Send email notification if configured
+      // Send real email notification
       try {
-        await emailService.sendAssignmentNotification({
+        emailResult = await emailService.sendAssignmentNotification({
           to: assignedUser.email,
           recipientName: assignedUser.fullName,
           renewal: saved,
           assignedBy: actor.fullName,
           isReassignment: false,
         });
+        if (emailResult && emailResult.success) {
+          console.log(`[Assignment Email Sent] Real email successfully sent to ${assignedUser.email} (Provider: ${emailResult.provider}, Message ID: ${emailResult.messageId})`);
+        } else if (emailResult) {
+          console.warn(`[Assignment Email Warning] Email delivery to ${assignedUser.email} not completed: ${emailResult.error}`);
+        }
       } catch (e) {
         console.error(`[Assignment Notification Error] ${e.message}`);
       }
     }
 
-    res.status(201).json({ ok: true, data: saved });
+    res.status(201).json({ ok: true, data: saved, emailNotification: emailResult });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -375,6 +381,7 @@ router.put("/:id", async (req, res) => {
       details: `Updated renewal details for "${updated.name}".`,
     });
 
+    let emailResult = null;
     // Requirement 7: Reassignment Audit Log & Email Notification
     if (isReassigned && newlyAssignedUser) {
       const actionName = existingAssigneeId ? "RENEWAL_REASSIGNED" : "RENEWAL_ASSIGNED";
@@ -389,9 +396,9 @@ router.put("/:id", async (req, res) => {
         details: `Reassigned renewal "${updated.name}" from ${existingAssigneeName} to ${newlyAssignedUser.fullName} (${newlyAssignedUser.email}).`,
       });
 
-      // Send email notification to the newly assigned employee
+      // Send real email notification to the newly assigned employee
       try {
-        await emailService.sendAssignmentNotification({
+        emailResult = await emailService.sendAssignmentNotification({
           to: newlyAssignedUser.email,
           recipientName: newlyAssignedUser.fullName,
           renewal: updated,
@@ -399,12 +406,17 @@ router.put("/:id", async (req, res) => {
           isReassignment: !!existingAssigneeId,
           previousAssignee: existingAssigneeName,
         });
+        if (emailResult && emailResult.success) {
+          console.log(`[Assignment Email Sent] Real email successfully sent to ${newlyAssignedUser.email} (Provider: ${emailResult.provider}, Message ID: ${emailResult.messageId})`);
+        } else if (emailResult) {
+          console.warn(`[Assignment Email Warning] Email delivery to ${newlyAssignedUser.email} not completed: ${emailResult.error}`);
+        }
       } catch (emailErr) {
         console.error(`[Reassignment Notification Error] ${emailErr.message}`);
       }
     }
 
-    res.json({ ok: true, data: updated });
+    res.json({ ok: true, data: updated, emailNotification: emailResult });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }

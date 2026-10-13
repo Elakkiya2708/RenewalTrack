@@ -19,20 +19,22 @@ const config = {
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "7d",
 
   // Email Delivery Configuration
-  EMAIL_PROVIDER: (process.env.EMAIL_PROVIDER || "nodemailer").toLowerCase(), // 'nodemailer' or 'resend'
-  EMAIL_SEND_ENABLED: process.env.EMAIL_SEND_ENABLED === "true", // Safe default is false (simulation mode)
+  EMAIL_PROVIDER: (process.env.EMAIL_PROVIDER || "nodemailer").toLowerCase(), // 'nodemailer' (SMTP/Gmail) or 'resend'
+  EMAIL_SEND_ENABLED: process.env.EMAIL_SEND_ENABLED !== "false", // Real delivery enabled by default unless explicitly disabled with 'false'
 
-  // Nodemailer SMTP Settings
-  SMTP_HOST: process.env.SMTP_HOST || "",
+  // Nodemailer SMTP Settings (e.g. Gmail SMTP)
+  SMTP_HOST: process.env.SMTP_HOST || "smtp.gmail.com",
   SMTP_PORT: parseInt(process.env.SMTP_PORT || "587", 10),
-  SMTP_SECURE: process.env.SMTP_SECURE === "true", // true for 465, false for 587
+  SMTP_SECURE: process.env.SMTP_SECURE === "true" || process.env.SMTP_PORT === "465",
+  SMTP_SERVICE: process.env.SMTP_SERVICE || (process.env.SMTP_HOST && process.env.SMTP_HOST.includes("gmail") ? "gmail" : ""),
   SMTP_USER: process.env.SMTP_USER || "",
   SMTP_PASS: process.env.SMTP_PASS || "",
-  FROM_EMAIL: process.env.FROM_EMAIL || "reminders@renewguard.com",
+  FROM_EMAIL: process.env.FROM_EMAIL || process.env.EMAIL_FROM || "",
   FROM_NAME: process.env.FROM_NAME || "RenewGuard Alerts",
 
   // Resend API Settings
   RESEND_API_KEY: process.env.RESEND_API_KEY || "",
+  RESEND_FROM: process.env.RESEND_FROM || "onboarding@resend.dev",
 
   // Background Reminder Scheduler (node-cron)
   // Default is daily at 08:00 AM ('0 8 * * *')

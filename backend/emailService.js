@@ -223,7 +223,229 @@ const emailService = {
   // Validate an email address
   isValidEmail,
 
-  // Send a renewal reminder email
+  // Resolve authoritative From header for the active provider
+  getFromAddress() {
+    const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
+    const fromName = config.FROM_NAME || "RenewGuard Alerts";
+
+    if (provider === "resend") {
+      // For Resend: if a verified custom sender is specified, use it; otherwise use Resend sandbox default
+      const fromEmail =
+        config.FROM_EMAIL && !config.FROM_EMAIL.includes("renewguard.com")
+          ? config.FROM_EMAIL
+          : (config.RESEND_FROM || "onboarding@resend.dev");
+      return `"${fromName}" <${fromEmail}>`;
+    }
+
+    // For Nodemailer / Gmail SMTP:
+    const smtpFrom =
+      config.FROM_EMAIL && !config.FROM_EMAIL.includes("renewguard.com")
+        ? config.FROM_EMAIL
+        : (config.SMTP_USER || "reminders@renewguard.com");
+    return `"${fromName}" <${smtpFrom}>`;
+  },
+
+  // Inspect configuration and provider status (without leaking secrets)
+  getProviderStatus() {
+    const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
+    const isResend = provider === "resend";
+    const hasResendKey = Boolean(config.RESEND_API_KEY && config.RESEND_API_KEY.trim());
+    const hasSmtpCreds = Boolean(config.SMTP_USER && config.SMTP_PASS && config.SMTP_PASS.trim());
+
+    const isConfigured = isResend ? hasResendKey : hasSmtpCreds;
+
+    return {
+      provider,
+      isConfigured,
+      hasResendKey,
+      hasSmtpCreds,
+      smtpHost: config.SMTP_HOST || "smtp.gmail.com",
+      smtpPort: config.SMTP_PORT || 587,
+      smtpUser: config.SMTP_USER ? `${config.SMTP_USER.slice(0, 3)}***@***` : null,
+      fromAddress: this.getFromAddress(),
+      enabled: config.EMAIL_SEND_ENABLED !== false,
+    };
+  },
+
+  // Verify connection with configured email provider
+  async verifyConnection() {
+    const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
+
+    if (provider === "resend") {
+      if (!config.RESEND_API_KEY || !config.RESEND_API_KEY.trim()) {
+        const err = "RESEND_API_KEY is not configured in .env.";
+        return { ok: false, provider: "resend", error: err, unconfigured: true };
+      }
+      try {
+        const resend = new Resend(config.RESEND_API_KEY);
+        const { data, error } = await resend.apiKeys.list().catch(() => ({ data: null }));
+        if (error) {
+          return { ok: false, provider: "resend", error: error.message };
+        }
+        return {
+          ok: true,
+          provider: "resend",
+          message: "Resend API connection and API key verified successfully.",
+        };
+      } catch (err) {
+        return {
+          ok: false,
+          provider: "resend",
+          error: `Resend authentication check failed: ${err.message}`,
+        };
+      }
+    } else {
+      // Nodemailer (Gmail SMTP or custom SMTP)
+      if (!config.SMTP_USER || !config.SMTP_PASS) {
+        const err = "SMTP_USER and/or SMTP_PASS are missing in .env. Configure your Gmail address and 16-character Google App Password.";
+        return { ok: false, provider: "nodemailer", error: err, unconfigured: true };
+      }
+
+      try {
+        const transporter = this._createNodemailerTransporter();
+        await transporter.verify();
+        return {
+          ok: true,
+          provider: "nodemailer",
+          message: `SMTP connection established and authenticated successfully with ${config.SMTP_HOST || 'Gmail'}!`,
+        };
+      } catch (err) {
+        return {
+          ok: false,
+          provider: "nodemailer",
+          error: `SMTP connection/authentication failed: ${err.message}`,
+        };
+      }
+    }
+  },
+
+  // Internal: Build Nodemailer transporter
+  _createNodemailerTransporter() {
+    const isGmail =
+      (config.SMTP_HOST && config.SMTP_HOST.toLowerCase().includes("gmail")) ||
+      (config.SMTP_SERVICE && config.SMTP_SERVICE.toLowerCase() === "gmail") ||
+      (config.SMTP_USER && config.SMTP_USER.toLowerCase().endsWith("@gmail.com"));
+
+    let transportOptions;
+    if (isGmail) {
+      transportOptions = {
+        service: "gmail",
+        auth: {
+          user: config.SMTP_USER,
+          pass: config.SMTP_PASS, // 16-character Google App Password
+        },
+      };
+    } else {
+      transportOptions = {
+        host: config.SMTP_HOST || "smtp.gmail.com",
+        port: config.SMTP_PORT || 587,
+        secure: config.SMTP_SECURE,
+        auth:
+          config.SMTP_USER && config.SMTP_PASS
+            ? {
+                user: config.SMTP_USER,
+                pass: config.SMTP_PASS,
+              }
+            : undefined,
+        tls: {
+          rejectUnauthorized: false,
+        },
+      };
+    }
+
+    return nodemailer.createTransport(transportOptions);
+  },
+
+  // Internal: Send via Nodemailer (SMTP / Gmail)
+  async _sendViaNodemailer({ from, to, subject, html, text, renewal }) {
+    if (!config.SMTP_USER || !config.SMTP_PASS) {
+      const err = "Cannot send real email: SMTP_USER and SMTP_PASS are not configured in .env.";
+      console.error(`[Nodemailer Error] ${err}`);
+      return { success: false, error: err, unconfigured: true, provider: "nodemailer" };
+    }
+
+    try {
+      const transporter = this._createNodemailerTransporter();
+      const fromHeader = from || this.getFromAddress();
+
+      console.log(`[Nodemailer Dispatch] Connecting to SMTP (${config.SMTP_HOST || 'Gmail'})...`);
+      const info = await transporter.sendMail({
+        from: fromHeader,
+        to,
+        subject,
+        text,
+        html,
+      });
+
+      console.log(`[Nodemailer Success] Real email DELIVERED to ${to} for "${renewal ? renewal.name : 'Notification'}". Message ID: ${info.messageId}`);
+      return {
+        success: true,
+        messageId: info.messageId,
+        provider: "nodemailer",
+        response: info.response,
+        delivered: true,
+      };
+    } catch (err) {
+      console.error(`[Nodemailer Delivery Error] Failed sending to ${to}: ${err.message}`);
+      return {
+        success: false,
+        error: err.message,
+        provider: "nodemailer",
+        delivered: false,
+      };
+    }
+  },
+
+  // Internal: Send via Resend API
+  async _sendViaResend({ from, to, subject, html, text, renewal }) {
+    if (!config.RESEND_API_KEY || !config.RESEND_API_KEY.trim()) {
+      const err = "Cannot send real email: RESEND_API_KEY is not configured in .env.";
+      console.error(`[Resend Error] ${err}`);
+      return { success: false, error: err, unconfigured: true, provider: "resend" };
+    }
+
+    try {
+      const resend = new Resend(config.RESEND_API_KEY);
+      const fromHeader = from || this.getFromAddress();
+
+      console.log(`[Resend Dispatch] Sending email via Resend API to ${to}...`);
+      const { data, error } = await resend.emails.send({
+        from: fromHeader,
+        to,
+        subject,
+        html,
+        text,
+      });
+
+      if (error) {
+        console.error(`[Resend API Error] Failed sending to ${to}: ${error.message}`);
+        return {
+          success: false,
+          error: error.message,
+          provider: "resend",
+          delivered: false,
+        };
+      }
+
+      console.log(`[Resend Success] Real email DELIVERED to ${to} for "${renewal ? renewal.name : 'Notification'}". Message ID: ${data.id}`);
+      return {
+        success: true,
+        messageId: data.id,
+        provider: "resend",
+        delivered: true,
+      };
+    } catch (err) {
+      console.error(`[Resend Delivery Error] Failed sending to ${to}: ${err.message}`);
+      return {
+        success: false,
+        error: err.message,
+        provider: "resend",
+        delivered: false,
+      };
+    }
+  },
+
+  // Send a renewal reminder email (Real delivery)
   async sendReminderEmail({ renewal, recipientEmail, recipientName, daysRemaining, interval }) {
     if (!isValidEmail(recipientEmail)) {
       const err = `Invalid recipient email address: "${recipientEmail}"`;
@@ -260,135 +482,31 @@ const emailService = {
       appUrl,
     });
 
-    const fromAddress = `"${config.FROM_NAME}" <${config.FROM_EMAIL}>`;
+    const fromAddress = this.getFromAddress();
+    const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
 
-    // ------------------------------------------------------------------------
-    // Development / Simulation Mode:
-    // If EMAIL_SEND_ENABLED is false (default), log and record without sending real email
-    // ------------------------------------------------------------------------
-    if (!config.EMAIL_SEND_ENABLED) {
-      console.log("\n================================================================================");
-      console.log(`[EMAIL SIMULATION] Reminder Notification for "${renewal.name}"`);
-      console.log(`To:        ${recipientName ? `${recipientName} <${recipientEmail}>` : recipientEmail}`);
-      console.log(`From:      ${fromAddress}`);
-      console.log(`Subject:   ${subject}`);
-      console.log(`Interval:  ${interval} (${intervalLabel})`);
-      console.log(`Renewal:   ${renewal.name} (${renewal.category} - ${renewal.expiryDate})`);
-      console.log(`Provider:  ${config.EMAIL_PROVIDER} (Simulation Mode - Set EMAIL_SEND_ENABLED=true in .env for live delivery)`);
-      console.log("================================================================================\n");
-
-      return {
-        success: true,
-        simulated: true,
-        messageId: `simulated-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-        provider: `${config.EMAIL_PROVIDER}-simulation`,
-      };
-    }
-
-    // ------------------------------------------------------------------------
-    // Live Email Delivery Mode:
-    // ------------------------------------------------------------------------
-    try {
-      if (config.EMAIL_PROVIDER === "resend") {
-        return await this._sendViaResend({
-          from: fromAddress,
-          to: recipientEmail,
-          subject,
-          html: htmlContent,
-          text: textContent,
-          renewal,
-        });
-      } else {
-        return await this._sendViaNodemailer({
-          from: fromAddress,
-          to: recipientEmail,
-          subject,
-          html: htmlContent,
-          text: textContent,
-          renewal,
-        });
-      }
-    } catch (err) {
-      console.error(`[Email Delivery Error] Failed sending to ${recipientEmail}: ${err.message}`);
-      return {
-        success: false,
-        error: err.message,
-      };
+    if (provider === "resend") {
+      return await this._sendViaResend({
+        from: fromAddress,
+        to: recipientEmail,
+        subject,
+        html: htmlContent,
+        text: textContent,
+        renewal,
+      });
+    } else {
+      return await this._sendViaNodemailer({
+        from: fromAddress,
+        to: recipientEmail,
+        subject,
+        html: htmlContent,
+        text: textContent,
+        renewal,
+      });
     }
   },
 
-  // Internal: Send via Nodemailer (SMTP)
-  async _sendViaNodemailer({ from, to, subject, html, text, renewal }) {
-    if (!config.SMTP_HOST) {
-      const err = "SMTP_HOST is not configured in environment variables.";
-      console.error(`[Nodemailer Error] ${err}`);
-      return { success: false, error: err };
-    }
-
-    const transportOptions = {
-      host: config.SMTP_HOST,
-      port: config.SMTP_PORT,
-      secure: config.SMTP_SECURE,
-    };
-
-    if (config.SMTP_USER && config.SMTP_PASS) {
-      transportOptions.auth = {
-        user: config.SMTP_USER,
-        pass: config.SMTP_PASS,
-      };
-    }
-
-    const transporter = nodemailer.createTransport(transportOptions);
-
-    const info = await transporter.sendMail({
-      from,
-      to,
-      subject,
-      text,
-      html,
-    });
-
-    console.log(`[Nodemailer Success] Sent email to ${to} for "${renewal.name}". Message ID: ${info.messageId}`);
-    return {
-      success: true,
-      simulated: false,
-      messageId: info.messageId,
-      provider: "nodemailer",
-    };
-  },
-
-  // Internal: Send via Resend
-  async _sendViaResend({ from, to, subject, html, text, renewal }) {
-    if (!config.RESEND_API_KEY) {
-      const err = "RESEND_API_KEY is not configured in environment variables.";
-      console.error(`[Resend Error] ${err}`);
-      return { success: false, error: err };
-    }
-
-    const resend = new Resend(config.RESEND_API_KEY);
-    const { data, error } = await resend.emails.send({
-      from,
-      to,
-      subject,
-      html,
-      text,
-    });
-
-    if (error) {
-      console.error(`[Resend Error] ${error.message}`);
-      return { success: false, error: error.message };
-    }
-
-    console.log(`[Resend Success] Sent email to ${to} for "${renewal.name}". Message ID: ${data.id}`);
-    return {
-      success: true,
-      simulated: false,
-      messageId: data.id,
-      provider: "resend",
-    };
-  },
-
-  // Send a direct test email (for testing configuration in settings)
+  // Send a direct test email (for testing real delivery to an inbox)
   async sendTestEmail(targetEmail) {
     if (!isValidEmail(targetEmail)) {
       return { success: false, error: `Invalid test email address: "${targetEmail}"` };
@@ -397,14 +515,14 @@ const emailService = {
     const sampleRenewal = {
       id: "ren-test-sample",
       name: "Microsoft 365 Enterprise Test License",
-      category: "License",
+      category: "Software License",
       organization: "Microsoft Corporation",
       expiryDate: new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10),
       priority: "High",
       cost: 18500,
       currency: "USD",
       referenceNumber: "TEST-REF-9921",
-      notes: "This is a test notification generated from RenewGuard Settings.",
+      notes: "This is a real test notification generated from RenewGuard to verify email delivery.",
     };
 
     return await this.sendReminderEmail({
@@ -430,7 +548,6 @@ const emailService = {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Invitation to Join RenewGuard</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;line-height:1.5;">
@@ -496,34 +613,22 @@ const emailService = {
 </html>`;
 
     const text = `Welcome to RenewGuard!\n\n${inviterText} to join as ${role}.\n\nPlease accept your invitation here:\n${inviteUrl}\n\nThis invitation link expires in 48 hours.`;
+    const from = this.getFromAddress();
+    const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
 
-    if (!config.EMAIL_SEND_ENABLED) {
-      console.log(`[Email Simulation] Invitation to ${to} (${role}): ${inviteUrl}`);
-      return {
-        success: true,
-        simulated: true,
-        provider: "simulated",
-        inviteUrl,
-      };
-    }
-
-    try {
-      const from = config.EMAIL_FROM;
-      if (config.EMAIL_PROVIDER.toLowerCase() === "resend") {
-        return await this._sendViaResend({ from, to, subject, html, text, renewal: { name: "Team Invitation" } });
-      } else {
-        return await this._sendViaNodemailer({ from, to, subject, html, text, renewal: { name: "Team Invitation" } });
-      }
-    } catch (err) {
-      console.error(`[Invitation Email Error] ${err.message}`);
-      return { success: false, error: err.message, inviteUrl };
+    if (provider === "resend") {
+      return await this._sendViaResend({ from, to, subject, html, text, renewal: { name: "Team Invitation" } });
+    } else {
+      return await this._sendViaNodemailer({ from, to, subject, html, text, renewal: { name: "Team Invitation" } });
     }
   },
 
-  // 6. Send renewal assignment / reassignment notification email
+  // Real Email Delivery: Send renewal assignment / reassignment notification email
   async sendAssignmentNotification({ to, recipientName, renewal, assignedBy, isReassignment = false, previousAssignee = "" }) {
     if (!isValidEmail(to)) {
-      return { success: false, error: `Invalid recipient email address: "${to}"` };
+      const err = `Invalid recipient email address: "${to}"`;
+      console.warn(`[Assignment Email Validation] ${err}`);
+      return { success: false, error: err, isInvalidEmail: true };
     }
 
     const appUrl = config.APP_URL || `http://localhost:${config.PORT}`;
@@ -544,12 +649,23 @@ const emailService = {
         <table role="presentation" width="100%" style="max-width:600px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07);border:1px solid #e2e8f0;">
           <tr>
             <td style="background-color:#0f172a;padding:24px 32px;border-bottom:3px solid #6366f1;">
-              <div style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
-                <span style="color:#818cf8;">Renew</span>Guard
-              </div>
-              <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
-                Renewal Assignment Notification
-              </div>
+              <table role="presentation" width="100%">
+                <tr>
+                  <td>
+                    <div style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
+                      <span style="color:#818cf8;">Renew</span>Guard
+                    </div>
+                    <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
+                      Renewal Assignment Notification
+                    </div>
+                  </td>
+                  <td align="right">
+                    <span style="display:inline-block;padding:5px 12px;background-color:#4f46e5;color:#ffffff;font-size:11px;font-weight:700;border-radius:16px;text-transform:uppercase;">
+                      ${actionWord}
+                    </span>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           <tr>
@@ -563,25 +679,29 @@ const emailService = {
               <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:18px;margin-bottom:24px;">
                 <table role="presentation" width="100%">
                   <tr>
-                    <td style="padding:4px 0;font-size:13px;color:#64748b;">Record Name:</td>
-                    <td style="padding:4px 0;font-size:13px;font-weight:600;color:#0f172a;">${escapeHtml(renewal.name || "—")}</td>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;width:35%;">Record Name:</td>
+                    <td style="padding:6px 0;font-size:14px;font-weight:700;color:#0f172a;">${escapeHtml(renewal.name || "—")}</td>
                   </tr>
                   <tr>
-                    <td style="padding:4px 0;font-size:13px;color:#64748b;">Category:</td>
-                    <td style="padding:4px 0;font-size:13px;font-weight:600;color:#4f46e5;">${escapeHtml(renewal.category || "General")}</td>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;border-top:1px solid #edf2f7;">Category:</td>
+                    <td style="padding:6px 0;font-size:13px;font-weight:600;color:#4f46e5;border-top:1px solid #edf2f7;">${escapeHtml(renewal.category || "General")}</td>
                   </tr>
                   <tr>
-                    <td style="padding:4px 0;font-size:13px;color:#64748b;">Expiry Date:</td>
-                    <td style="padding:4px 0;font-size:13px;font-weight:600;color:#dc2626;">${escapeHtml(renewal.expiryDate || "—")}</td>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;border-top:1px solid #edf2f7;">Expiry Date:</td>
+                    <td style="padding:6px 0;font-size:14px;font-weight:700;color:#dc2626;border-top:1px solid #edf2f7;">${escapeHtml(renewal.expiryDate || "—")}</td>
                   </tr>
                   <tr>
-                    <td style="padding:4px 0;font-size:13px;color:#64748b;">Priority:</td>
-                    <td style="padding:4px 0;font-size:13px;font-weight:600;color:#0f172a;">${escapeHtml(renewal.priority || "Medium")}</td>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;border-top:1px solid #edf2f7;">Priority:</td>
+                    <td style="padding:6px 0;font-size:13px;font-weight:600;color:#0f172a;border-top:1px solid #edf2f7;">${escapeHtml(renewal.priority || "Medium")}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;border-top:1px solid #edf2f7;">Organization / Vendor:</td>
+                    <td style="padding:6px 0;font-size:13px;color:#334155;border-top:1px solid #edf2f7;">${escapeHtml(renewal.organization || "—")}</td>
                   </tr>
                   ${isReassignment && previousAssignee ? `
                   <tr>
-                    <td style="padding:4px 0;font-size:13px;color:#64748b;">Previous Owner:</td>
-                    <td style="padding:4px 0;font-size:13px;font-weight:600;color:#64748b;">${escapeHtml(previousAssignee)}</td>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;border-top:1px solid #edf2f7;">Previous Owner:</td>
+                    <td style="padding:6px 0;font-size:13px;color:#64748b;border-top:1px solid #edf2f7;">${escapeHtml(previousAssignee)}</td>
                   </tr>` : ""}
                 </table>
               </div>
@@ -590,11 +710,14 @@ const emailService = {
                   View Renewal Details &rarr;
                 </a>
               </div>
+              <p style="font-size:12px;color:#64748b;margin:20px 0 0;text-align:center;">
+                You can manage and mark this renewal as renewed in your "Assigned to Me" workspace.
+              </p>
             </td>
           </tr>
           <tr>
             <td style="background-color:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center;">
-              &copy; 2026 RenewGuard Inc. &bull; Assignment Alert
+              &copy; 2026 RenewGuard Inc. &bull; Automated Assignment Alert
             </td>
           </tr>
         </table>
@@ -604,29 +727,23 @@ const emailService = {
 </body>
 </html>`;
 
-    const text = `Hello ${recipientName},\n\nYou have been ${isReassignment ? "reassigned" : "assigned"} to manage renewal "${renewal.name}" (Expiry: ${renewal.expiryDate}) by ${assignedBy}.\n\nView details here: ${detailUrl}`;
+    const text = `Hello ${recipientName},\n\nYou have been ${isReassignment ? "reassigned" : "assigned"} to manage renewal "${renewal.name}" (Expiry: ${renewal.expiryDate}) by ${assignedBy}.\n\nView details: ${detailUrl}`;
 
-    if (!config.EMAIL_SEND_ENABLED) {
-      console.log(`[Email Simulation] Assignment notification to ${to} for renewal "${renewal.name}" (${actionWord})`);
-      return {
-        success: true,
-        simulated: true,
-        provider: "simulated",
-      };
+    const from = this.getFromAddress();
+    const provider = (config.EMAIL_PROVIDER || "nodemailer").toLowerCase();
+
+    console.log(`[Assignment Email Dispatch] Attempting real delivery of assignment email to ${recipientName} <${to}> via ${provider}...`);
+
+    let result;
+    if (provider === "resend") {
+      result = await this._sendViaResend({ from, to, subject, html, text, renewal });
+    } else {
+      result = await this._sendViaNodemailer({ from, to, subject, html, text, renewal });
     }
 
-    try {
-      const from = config.EMAIL_FROM;
-      if (config.EMAIL_PROVIDER.toLowerCase() === "resend") {
-        return await this._sendViaResend({ from, to, subject, html, text, renewal });
-      } else {
-        return await this._sendViaNodemailer({ from, to, subject, html, text, renewal });
-      }
-    } catch (err) {
-      console.error(`[Assignment Email Error] ${err.message}`);
-      return { success: false, error: err.message };
-    }
+    return result;
   },
 };
 
 module.exports = emailService;
+

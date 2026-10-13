@@ -136,4 +136,34 @@ router.get("/status", async (req, res) => {
   }
 });
 
+// GET /api/reminders/email-status — Get email provider configuration status
+router.get("/email-status", async (req, res) => {
+  try {
+    const status = emailService.getProviderStatus();
+    res.json({ ok: true, data: status });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/reminders/verify-email — Verify credentials and connectivity with configured email provider
+router.post("/verify-email", async (req, res) => {
+  try {
+    const actor = await getReqUser(req);
+    if (actor && actor.role === "Viewer") {
+      return res.status(403).json({
+        ok: false,
+        error: "Access denied. Viewer role has read-only access.",
+      });
+    }
+
+    console.log("[API] Verifying email provider credentials & connection...");
+    const result = await emailService.verifyConnection();
+    res.json({ ok: result.ok, data: result });
+  } catch (err) {
+    console.error(`[API Error] Error verifying email provider: ${err.message}`);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 module.exports = router;
