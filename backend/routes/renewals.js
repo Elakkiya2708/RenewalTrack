@@ -16,12 +16,14 @@ async function getReqUser(req) {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
   let cleanEmail = null;
+  let userId = null;
 
   if (token) {
     try {
       const decoded = jwt.verify(token, config.JWT_SECRET);
-      if (decoded && decoded.email) {
-        cleanEmail = decoded.email.trim().toLowerCase();
+      if (decoded) {
+        if (decoded.email) cleanEmail = decoded.email.trim().toLowerCase();
+        if (decoded.id) userId = decoded.id;
       }
     } catch (e) {
       // Local/development session fallback if token was generated client-side or expired
@@ -37,17 +39,22 @@ async function getReqUser(req) {
     if (headerEmail) cleanEmail = headerEmail;
   }
 
+  let user = null;
   if (cleanEmail && cleanEmail !== "demo@renewaltrack.com") {
-    const user = await db.getUserByEmail(cleanEmail);
-    if (user && user.status !== "deactivated") {
-      return {
-        id: user.id,
-        role: user.role || "Employee",
-        email: user.email,
-        fullName: user.fullName,
-        isPrimaryAdmin: user.email.toLowerCase() === "elakkiyaohai@gmail.com",
-      };
-    }
+    user = await db.getUserByEmail(cleanEmail);
+  }
+  if (!user && userId) {
+    user = await db.getUserById(userId);
+  }
+
+  if (user && user.status !== "deactivated") {
+    return {
+      id: user.id,
+      role: user.role || "Employee",
+      email: user.email,
+      fullName: user.fullName,
+      isPrimaryAdmin: user.email.toLowerCase() === "elakkiyaohai@gmail.com",
+    };
   }
   return null;
 }
@@ -515,8 +522,8 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// POST /api/renewals/:id/mark-renewed — Mark renewal as renewed
-router.post("/:id/mark-renewed", async (req, res) => {
+// Handler for renewing a renewal record (enforces strict RBAC: Admin can renew any; Employees only their own)
+async function handleMarkRenewed(req, res) {
   try {
     const actor = await getReqUser(req);
     if (!actor) {
@@ -530,30 +537,87 @@ router.post("/:id/mark-renewed", async (req, res) => {
       });
     }
 
-    const record = await db.getRenewalById(req.params.id);
+    const renewalId = req.params.id || (req.body && (req.body.id || req.body.renewalId));
+    if (!renewalId) {
+      return res.status(400).json({ ok: false, error: "Renewal ID is required." });
+    }
+
+    const record = await db.getRenewalById(renewalId);
     if (!record) {
       return res.status(404).json({ ok: false, error: "Renewal record not found." });
     }
 
-    // RBAC Requirement 6: Employees can only renew records assigned to them
+    // RBAC: Admin can renew any record; Employees can ONLY renew records assigned to their own account
     if (actor.role === "Employee") {
-      if (!isRenewalAssignedToUser(record, actor)) {
+      const isAssigned = isRenewalAssignedToUser(record, actor);
+      if (!isAssigned) {
+        const hasAssignee = !!(
+          record.assignedToId ||
+          record.assigned_to_id ||
+          record.assignedToEmail ||
+          record.assigned_to_email ||
+          (record.assignedToName && record.assignedToName.toLowerCase() !== "unassigned")
+        );
+        const errorMsg = hasAssignee
+          ? "Access denied. Employees may only renew records assigned to their own account."
+          : "Access denied. Employees cannot renew unassigned records. Only renewals assigned to your own account may be renewed.";
         return res.status(403).json({
           ok: false,
-          error: "Access denied. Employees may only renew records assigned to them.",
+          error: errorMsg,
         });
       }
     }
 
-    const { renewalDate, newExpiryDate, cost, currency, notes, recurringCycle, renewedBy } = req.body;
+    const { renewalDate, newExpiryDate, cost, currency, notes, recurringCycle, renewedBy } = req.body || {};
+    const finalRenewalDate = renewalDate || new Date().toISOString().slice(0, 10);
+    const cycle = recurringCycle || record.recurringCycle || "Yearly";
+
+    // Calculate next expiry date if not explicitly supplied
+    let finalExpiryDate = newExpiryDate;
+    if (!finalExpiryDate && record.expiryDate) {
+      const d = new Date(record.expiryDate);
+      if (!isNaN(d.getTime())) {
+        switch ((cycle || "").toLowerCase()) {
+          case "monthly":
+            d.setMonth(d.getMonth() + 1);
+            break;
+          case "quarterly":
+            d.setMonth(d.getMonth() + 3);
+            break;
+          case "half-yearly":
+          case "semi-annually":
+            d.setMonth(d.getMonth() + 6);
+            break;
+          case "weekly":
+            d.setDate(d.getDate() + 7);
+            break;
+          case "bi-weekly":
+            d.setDate(d.getDate() + 14);
+            break;
+          case "yearly":
+          case "annually":
+          default:
+            d.setFullYear(d.getFullYear() + 1);
+            break;
+        }
+        finalExpiryDate = d.toISOString().slice(0, 10);
+      }
+    }
+
+    if (!finalExpiryDate) {
+      return res.status(400).json({ ok: false, error: "Unable to determine next expiry date." });
+    }
+
     const historyEntry = {
-      id: `hist-${Date.now()}`,
+      id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       previousExpiry: record.expiryDate,
-      newExpiry: newExpiryDate,
-      renewalDate: renewalDate || new Date().toISOString().slice(0, 10),
+      newExpiry: finalExpiryDate,
+      renewalDate: finalRenewalDate,
       cost: cost !== undefined && cost !== "" && cost !== null ? Number(cost) : record.cost,
       currency: currency || record.currency || "USD",
       renewedBy: renewedBy || actor.fullName || "System User",
+      renewedById: actor.id,
+      renewedByEmail: actor.email,
       notes: notes || "",
     };
 
@@ -569,18 +633,18 @@ router.post("/:id/mark-renewed", async (req, res) => {
 
     // Deduplicate history: avoid identical duplicate transitions
     const isDuplicate =
-      record.expiryDate === newExpiryDate ||
+      record.expiryDate === finalExpiryDate ||
       existingHistory.some(
         (h) =>
           h &&
-          (h.newExpiry === newExpiryDate ||
-            (h.previousExpiry === record.expiryDate && h.newExpiry === newExpiryDate))
+          (h.newExpiry === finalExpiryDate ||
+            (h.previousExpiry === record.expiryDate && h.newExpiry === finalExpiryDate))
       );
     const finalHistory = isDuplicate ? existingHistory : [historyEntry, ...existingHistory];
 
-    let nextReminderDate = req.body.reminderDate;
-    if (!nextReminderDate && newExpiryDate) {
-      const d = new Date(newExpiryDate);
+    let nextReminderDate = req.body && req.body.reminderDate;
+    if (!nextReminderDate && finalExpiryDate) {
+      const d = new Date(finalExpiryDate);
       if (!isNaN(d.getTime())) {
         d.setDate(d.getDate() - 14);
         nextReminderDate = d.toISOString().slice(0, 10);
@@ -590,11 +654,12 @@ router.post("/:id/mark-renewed", async (req, res) => {
     const updatedRecord = {
       ...record,
       history: finalHistory,
-      issueDate: historyEntry.renewalDate,
-      expiryDate: newExpiryDate,
-      lastRenewedAt: historyEntry.renewalDate,
+      issueDate: finalRenewalDate,
+      expiryDate: finalExpiryDate,
+      lastRenewedAt: finalRenewalDate,
+      status: "active", // Synchronize status to active upon renewal
       reminderCompleted: false,
-      recurringCycle: recurringCycle || record.recurringCycle,
+      recurringCycle: cycle,
       reminderDate: nextReminderDate || record.reminderDate,
     };
 
@@ -608,14 +673,25 @@ router.post("/:id/mark-renewed", async (req, res) => {
       action: "RENEWAL_MARKED_RENEWED",
       targetType: "renewal",
       targetId: saved.id,
-      details: `Marked "${saved.name}" as renewed. New expiry: ${newExpiryDate}.`,
+      details: `Marked "${saved.name}" as renewed. Previous expiry: ${record.expiryDate}, New expiry: ${finalExpiryDate}. Status synchronized to active.`,
     });
 
-    res.json({ ok: true, data: saved });
+    res.json({
+      ok: true,
+      data: saved,
+      history: saved.history,
+      historyEntry,
+      message: `Renewal "${saved.name}" successfully renewed. New expiry: ${finalExpiryDate}.`,
+    });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
-});
+}
+
+// POST /api/renewals/:id/mark-renewed & aliases
+router.post("/:id/mark-renewed", handleMarkRenewed);
+router.post("/:id/renew", handleMarkRenewed);
+router.post("/renew", handleMarkRenewed);
 
 // POST /api/renewals/:id/snooze — Snooze reminder (Admin or assigned Employee)
 router.post("/:id/snooze", async (req, res) => {
