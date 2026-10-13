@@ -61,27 +61,46 @@ async function runTests() {
   );
 
   // 2. Test Primary Admin Login
-  console.log("\n2. Testing Primary Admin (Elakkiya)...");
+  console.log("\n2. Testing Primary Admin (elakkiya270806@gmail.com)...");
   const adminLogin = await request("/api/auth/login", {
     method: "POST",
-    body: { email: "elakkiyaohai@gmail.com", password: "Admin@1234" },
+    body: { email: "elakkiya270806@gmail.com", password: "Admin@1234" },
   });
   assert(
     adminLogin.status === 200 && adminLogin.data.ok === true,
-    `Elakkiya login succeeded with 200 OK`
+    `Primary Admin elakkiya270806@gmail.com login succeeded with 200 OK`
   );
   assert(
     adminLogin.data.user.role === "Admin",
-    `Elakkiya role is Admin (got: ${adminLogin.data?.user?.role})`
+    `elakkiya270806@gmail.com role is Admin (got: ${adminLogin.data?.user?.role})`
   );
   assert(
     adminLogin.data.user.isPrimaryAdmin === true,
-    `Elakkiya is flagged as Primary Admin`
+    `elakkiya270806@gmail.com is flagged as Primary Admin`
   );
   const adminToken = adminLogin.data.token;
 
   // 3. Test Employee Login
-  console.log("\n3. Testing Employee Account (David Kim)...");
+  console.log("\n3. Testing Employee Account (elakkiyaohai@gmail.com)...");
+  const elakkiyaEmpLogin = await request("/api/auth/login", {
+    method: "POST",
+    body: { email: "elakkiyaohai@gmail.com", password: "Admin@1234" },
+  });
+  assert(
+    elakkiyaEmpLogin.status === 200 && elakkiyaEmpLogin.data.ok === true,
+    `elakkiyaohai@gmail.com login succeeded with 200 OK`
+  );
+  assert(
+    elakkiyaEmpLogin.data.user.role === "Employee",
+    `elakkiyaohai@gmail.com role verified as Employee (got: ${elakkiyaEmpLogin.data?.user?.role})`
+  );
+  assert(
+    !elakkiyaEmpLogin.data.user.isPrimaryAdmin,
+    `elakkiyaohai@gmail.com is not flagged as Primary Admin`
+  );
+  const elakkiyaEmpToken = elakkiyaEmpLogin.data.token;
+
+  console.log("\n3b. Testing Legacy Employee Account (David Kim)...");
   const empLogin = await request("/api/auth/login", {
     method: "POST",
     body: { email: "david.kim@renewaltrack.com", password: "Demo@1234" },
@@ -129,10 +148,22 @@ async function runTests() {
   const hasDemo = members.some((m) => (m.email || "").toLowerCase() === "demo@renewaltrack.com");
   assert(!hasDemo, `demo@renewaltrack.com is NOT present in Team Members list`);
 
-  const primaryInList = members.find((m) => (m.email || "").toLowerCase() === "elakkiyaohai@gmail.com");
+  const primaryInList = members.find((m) => (m.email || "").toLowerCase() === "elakkiya270806@gmail.com");
   assert(
-    !!primaryInList && primaryInList.isPrimaryAdmin === true,
-    `Elakkiya is present in Team Members list and marked as Primary Admin`
+    !!primaryInList && primaryInList.isPrimaryAdmin === true && primaryInList.role === "Admin",
+    `elakkiya270806@gmail.com is present in Team Members list and marked as Primary Admin`
+  );
+
+  const elakkiyaOhaiInList = members.find((m) => (m.email || "").toLowerCase() === "elakkiyaohai@gmail.com");
+  assert(
+    !!elakkiyaOhaiInList && elakkiyaOhaiInList.role === "Employee" && !elakkiyaOhaiInList.isPrimaryAdmin,
+    `elakkiyaohai@gmail.com is present in Team Members list and marked as Employee`
+  );
+
+  const adminCount = members.filter((m) => m.role === "Admin").length;
+  assert(
+    adminCount === 1,
+    `Exactly 1 Admin exists across all team members (found: ${adminCount})`
   );
 
   const viewerMembersRes = await request("/api/team/members", {
@@ -149,6 +180,14 @@ async function runTests() {
   assert(
     empMembersRes.status === 403,
     `Employee is denied access to /api/team/members (got 403)`
+  );
+
+  const elakkiyaEmpMembersRes = await request("/api/team/members", {
+    headers: { Authorization: `Bearer ${elakkiyaEmpToken}` },
+  });
+  assert(
+    elakkiyaEmpMembersRes.status === 403,
+    `elakkiyaohai@gmail.com as Employee is denied access to /api/team/members (got 403)`
   );
 
   // 6. Protecting Primary Admin from accidental demotion or deactivation

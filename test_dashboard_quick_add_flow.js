@@ -60,7 +60,7 @@ async function runTests() {
   console.log("1. Authenticating Admin and Employee accounts...");
   const adminLogin = await request("/api/auth/login", {
     method: "POST",
-    body: { email: "elakkiyaohai@gmail.com", password: "Admin@1234" },
+    body: { email: "elakkiya270806@gmail.com", password: "Admin@1234" },
   });
   assert(adminLogin.status === 200, "Admin authenticated");
   const adminToken = adminLogin.data.token;
@@ -136,7 +136,7 @@ async function runTests() {
 
   // 5. Verify Assigned to Me page for Employee 1
   console.log("\n5. Verifying renewal appears in Employee 1's Assigned to Me list...");
-  const emp1RenewalsRes = await request("/api/renewals", {
+  const emp1RenewalsRes = await request("/api/renewals?scope=assigned", {
     headers: { Authorization: `Bearer ${emp1Token}` },
   });
   assert(emp1RenewalsRes.status === 200 && emp1RenewalsRes.data.ok, "Employee 1 fetched assigned renewals");
@@ -147,7 +147,7 @@ async function runTests() {
 
   // 6. Verify renewal does NOT appear in Employee 2's Assigned to Me list
   console.log("\n6. Verifying renewal does NOT appear in Employee 2's Assigned to Me list...");
-  const emp2RenewalsRes = await request("/api/renewals", {
+  const emp2RenewalsRes = await request("/api/renewals?scope=assigned", {
     headers: { Authorization: `Bearer ${emp2Token}` },
   });
   assert(emp2RenewalsRes.status === 200 && emp2RenewalsRes.data.ok, "Employee 2 fetched assigned renewals");
@@ -172,7 +172,7 @@ async function runTests() {
 
   // 8. Verify Employee 1 NO LONGER sees the renewal in Assigned to Me
   console.log("\n8. Verifying Employee 1 NO LONGER sees the renewal after reassignment...");
-  const emp1AfterReassign = await request("/api/renewals", {
+  const emp1AfterReassign = await request("/api/renewals?scope=assigned", {
     headers: { Authorization: `Bearer ${emp1Token}` },
   });
   const foundInEmp1After = emp1AfterReassign.data.data.find((r) => r.id === renewalId);
@@ -180,7 +180,7 @@ async function runTests() {
 
   // 9. Verify Employee 2 NOW sees the renewal in Assigned to Me
   console.log("\n9. Verifying Employee 2 NOW sees the renewal after reassignment...");
-  const emp2AfterReassign = await request("/api/renewals", {
+  const emp2AfterReassign = await request("/api/renewals?scope=assigned", {
     headers: { Authorization: `Bearer ${emp2Token}` },
   });
   const foundInEmp2After = emp2AfterReassign.data.data.find((r) => r.id === renewalId);

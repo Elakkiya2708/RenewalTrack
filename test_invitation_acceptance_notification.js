@@ -80,7 +80,7 @@ async function runTestSuite() {
     // 1. Authenticate as Admin (Elakkiya)
     console.log("Step 1: Admin Authentication");
     const adminLogin = await request("POST", "/api/auth/login", {
-      email: "elakkiyaohai@gmail.com",
+      email: "elakkiya270806@gmail.com",
       password: "Admin@1234",
     });
     assert(adminLogin.status === 200 && adminLogin.body.token, "Admin authenticated successfully");
@@ -104,7 +104,7 @@ async function runTestSuite() {
     assert(empInvite.token && empInvite.token.startsWith("inv-"), "Invitation token generated");
     assert(empInvite.adminNotified === false, "adminNotified is initially false");
     assert(empInvite.status === "pending", "Invitation status is pending");
-    assert(empInvite.invitedBy === "elakkiyaohai@gmail.com", "Invited by recorded as Admin email");
+    assert(empInvite.invitedBy === "elakkiya270806@gmail.com", "Invited by recorded as Admin email");
     const empToken = empInvite.token;
 
     // 3. Admin creates invitation for a Viewer
@@ -128,7 +128,7 @@ async function runTestSuite() {
     // 4. Inspect emailService helper directly for invitation acceptance format
     console.log("\nStep 4: Verify Acceptance Email Content Template & Formatting");
     const testPayload = {
-      to: "elakkiyaohai@gmail.com",
+      to: "elakkiya270806@gmail.com",
       adminName: "Elakkiya",
       memberName: "Alex Rivera",
       memberEmail: testEmployeeEmail,
@@ -176,7 +176,7 @@ async function runTestSuite() {
     const notifyLog = logs.find((l) => l.action === "INVITE_ACCEPTANCE_NOTIFIED" && (l.targetId === empInvite.id || (l.details && l.details.includes(testEmployeeEmail))));
     assert(notifyLog !== undefined, "INVITE_ACCEPTANCE_NOTIFIED audit log recorded for Admin notification");
     if (notifyLog) {
-      assert(notifyLog.details.includes("elakkiyaohai@gmail.com"), "Audit log details mention Admin recipient email");
+      assert(notifyLog.details.includes("elakkiya270806@gmail.com"), "Audit log details mention Admin recipient email");
       assert(notifyLog.details.includes("Employee"), "Audit log details mention member role");
     }
 

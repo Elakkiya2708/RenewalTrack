@@ -53,7 +53,7 @@ async function runTests() {
   console.log("1. Authenticating test users...");
   const adminLogin = await request("/api/auth/login", {
     method: "POST",
-    body: { email: "elakkiyaohai@gmail.com", password: "Admin@1234" },
+    body: { email: "elakkiya270806@gmail.com", password: "Admin@1234" },
   });
   assert(adminLogin.status === 200, "Admin (Elakkiya) logged in successfully");
   const adminToken = adminLogin.data.token;
@@ -91,7 +91,7 @@ async function runTests() {
   const assignees = assigneesRes.data.data;
   const hasOnlyEmployees = assignees.every((u) => u.role === "Employee" && u.status !== "deactivated");
   assert(hasOnlyEmployees, "All users in assignees dropdown are active Employees only");
-  const hasAdmin = assignees.some((u) => u.role === "Admin" || u.email === "elakkiyaohai@gmail.com");
+  const hasAdmin = assignees.some((u) => u.role === "Admin" || u.email === "elakkiya270806@gmail.com");
   assert(!hasAdmin, "Assignees list strictly excludes Admin");
   const hasViewer = assignees.some((u) => u.role === "Viewer" || u.email === "priya.nair@renewaltrack.com");
   assert(!hasViewer, "Assignees list strictly excludes Viewer");

@@ -61,7 +61,7 @@ async function run() {
 
   // 1. Authenticate users
   console.log("1. Authenticating Admin, Employee, and Viewer accounts...");
-  const adminAuth = await login("elakkiyaohai@gmail.com", "Admin@1234");
+  const adminAuth = await login("elakkiya270806@gmail.com", "Admin@1234");
   assert(adminAuth.user.role === "Admin", "Admin logged in successfully (Role: Admin)");
 
   const empAuth = await login("david.kim@renewaltrack.com", "Demo@1234");

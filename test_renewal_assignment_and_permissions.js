@@ -55,7 +55,7 @@ async function runTestSuite() {
   console.log("[1] Authenticating test accounts...");
   const adminRes = await request("/api/auth/login", {
     method: "POST",
-    body: { email: "elakkiyaohai@gmail.com", password: "Admin@1234" },
+    body: { email: "elakkiya270806@gmail.com", password: "Admin@1234" },
   });
   assert(adminRes.status === 200 && adminRes.data.token, "Admin (Elakkiya) authenticated");
   const adminToken = adminRes.data.token;
@@ -97,7 +97,7 @@ async function runTestSuite() {
     assignees.every((u) => u.role === "Employee" && u.status !== "deactivated"),
     "Assignees list contains only active Employees"
   );
-  assert(!assignees.some((u) => u.role === "Admin" || u.email === "elakkiyaohai@gmail.com"), "Assignees list strictly excludes Admin");
+  assert(!assignees.some((u) => u.role === "Admin" || u.email === "elakkiya270806@gmail.com"), "Assignees list strictly excludes Admin");
   assert(!assignees.some((u) => u.role === "Viewer" || u.email === "priya.nair@renewaltrack.com"), "Assignees list strictly excludes Viewer");
 
   // 3. Admin Assigns Existing Renewal without Creating Duplicates

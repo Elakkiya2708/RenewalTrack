@@ -70,7 +70,7 @@ async function runTests() {
 
   // 1. Authenticate users
   console.log("[Setup] Authenticating test accounts...");
-  const adminLogin = await loginUser("elakkiyaohai@gmail.com", "Admin@1234");
+  const adminLogin = await loginUser("elakkiya270806@gmail.com", "Admin@1234");
   assert(adminLogin.data && adminLogin.data.ok, "Admin login successful");
   const adminToken = adminLogin.data.token;
 

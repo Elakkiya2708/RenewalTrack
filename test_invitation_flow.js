@@ -65,7 +65,7 @@ async function runTests() {
     // 1. Authenticate as Admin and as Employee
     console.log("Test 1: Authentication of test roles");
     const adminLogin = await request("POST", "/api/auth/login", {
-      email: "elakkiyaohai@gmail.com",
+      email: "elakkiya270806@gmail.com",
       password: "Admin@1234",
     });
     assert(adminLogin.status === 200 && adminLogin.body.token, "Admin login successful");
