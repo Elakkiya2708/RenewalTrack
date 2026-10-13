@@ -1409,12 +1409,30 @@ textarea.input {
   margin-bottom: 20px;
 }
 
+.stat-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+  width: 100%;
+}
+
 .stat-card {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 16px 16px 14px;
+  padding: 16px 18px 14px;
   box-shadow: var(--shadow-1);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+  border-color: var(--border-hover);
 }
 
 .stat-card .stat-top {
@@ -1422,11 +1440,23 @@ textarea.input {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 10px;
+  gap: 8px;
+}
+
+.stat-card .stat-top .stat-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stat-card .stat-icon {
   width: 32px;
   height: 32px;
+  min-width: 32px;
   border-radius: var(--r-sm);
   background: var(--stat-bg, var(--accent-dim));
   color: var(--stat-color, var(--accent));
@@ -1444,13 +1474,21 @@ textarea.input {
   font-family: var(--font-display);
   font-size: 26px;
   font-weight: 800;
-  line-height: 1;
+  line-height: 1.1;
+  color: var(--text);
 }
 
 .stat-card .stat-label {
   color: var(--text-mid);
   font-size: 12.5px;
   margin-top: 6px;
+}
+
+.stat-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.35;
 }
 
 .dashboard-grid {
