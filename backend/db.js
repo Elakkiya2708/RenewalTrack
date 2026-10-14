@@ -21,6 +21,37 @@ function todayISO() {
 const PRIMARY_ADMIN_EMAIL = "elakkiya270806@gmail.com";
 const PRIMARY_ADMIN_NAME = "Elakkiya";
 
+function isUnauthorizedTestInvitation(inv) {
+  if (!inv) return true;
+  if (!inv.email) return true;
+  if (inv.isSample === true || inv.autoAccept === true) return true;
+  const em = (inv.email || "").toLowerCase().trim();
+  const testEmails = [
+    "demo@renewaltrack.com",
+    "genuine.employee@company.org",
+    "sneaky.admin@company.org",
+    "david.kim@renewaltrack.com",
+    "priya.nair@renewaltrack.com",
+    "elakkiyaohai@gmail.com",
+  ];
+  if (testEmails.includes(em)) return true;
+  if (
+    em.includes("sample") ||
+    em.includes("testuser_") ||
+    em.includes("test.employee") ||
+    em.includes("test.viewer") ||
+    em.includes("emp.notify.") ||
+    em.includes("viewer.notify.") ||
+    em.includes("test_invite@") ||
+    em.includes("newcolleague@") ||
+    em.includes("@company.org") ||
+    em.includes("@unknown-domain.com")
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function addDays(isoDate, days) {
   const d = new Date(isoDate);
   d.setDate(d.getDate() + days);
@@ -161,14 +192,9 @@ function getLocalStore() {
         }
       }
 
-      // Remove all automatic, sample, and demo invitations
+      // Remove all automatic, sample, test, and unauthorized invitations
       if (store.invitations && Array.isArray(store.invitations)) {
-        const cleanInvites = store.invitations.filter((inv) => {
-          if (!inv || !inv.email) return false;
-          const em = (inv.email || "").toLowerCase().trim();
-          if (em === "demo@renewaltrack.com" || em.includes("sample") || inv.isSample || inv.autoAccept) return false;
-          return true;
-        });
+        const cleanInvites = store.invitations.filter((inv) => !isUnauthorizedTestInvitation(inv));
         if (cleanInvites.length !== store.invitations.length) {
           store.invitations = cleanInvites;
           changed = true;
@@ -859,6 +885,7 @@ const db = {
 
     const store = getLocalStore();
     store.users = (store.users || []).filter((u) => u.id !== id && u.email.toLowerCase() !== user.email.toLowerCase());
+    store.invitations = (store.invitations || []).filter((i) => !i.email || i.email.toLowerCase() !== user.email.toLowerCase());
     saveLocalStore(store);
 
     await this.logAudit({
@@ -1015,13 +1042,7 @@ const db = {
 
     // Filter to genuine Admin-created invitations and sync dynamic expiration status
     const genuine = (list || [])
-      .filter((inv) => {
-        if (!inv || !inv.email) return false;
-        const em = (inv.email || "").toLowerCase().trim();
-        if (em === "demo@renewaltrack.com") return false;
-        if (inv.isSample === true || inv.autoAccept === true) return false;
-        return true;
-      })
+      .filter((inv) => !isUnauthorizedTestInvitation(inv))
       .map((inv) => {
         const exp = new Date(inv.expiresAt || inv.expires_at || 0);
         // If pending and expired, reflect actual status
@@ -1238,6 +1259,37 @@ const db = {
     });
 
     return invite;
+  },
+
+  // 22b. Delete invitation permanently
+  async deleteInvitation(id, actor = {}) {
+    const store = getLocalStore();
+    const invite = (store.invitations || []).find((i) => i.id === id);
+    if (!invite) throw new Error("Invitation not found.");
+
+    store.invitations = (store.invitations || []).filter((i) => i.id !== id);
+    saveLocalStore(store);
+
+    if (isConfigured()) {
+      try {
+        await supabase.from("invitations").delete().eq("id", id);
+      } catch (e) {
+        console.error(`[Supabase deleteInvitation error] ${e.message}`);
+      }
+    }
+
+    await this.logAudit({
+      actorId: actor.id || "usr-admin-elakkiya",
+      actorName: actor.fullName || PRIMARY_ADMIN_NAME,
+      actorEmail: actor.email || PRIMARY_ADMIN_EMAIL,
+      actorRole: actor.role || "Admin",
+      action: "INVITE_DELETED",
+      targetType: "invitation",
+      targetId: id,
+      details: `Permanently removed invitation record for ${invite.email}.`,
+    });
+
+    return { ok: true, id };
   },
 
   // 23. Log audit activity

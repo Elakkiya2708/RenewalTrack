@@ -116,9 +116,13 @@ router.get("/invites", async (req, res) => {
   }
 });
 
-// DELETE /api/team/invites/:id — Revoke a pending invitation
+// DELETE /api/team/invites/:id — Revoke or permanently delete an invitation
 router.delete("/invites/:id", async (req, res) => {
   try {
+    if (req.query.permanent === "true" || req.query.purge === "true") {
+      const deleted = await db.deleteInvitation(req.params.id, req.user);
+      return res.json({ ok: true, data: deleted, message: "Invitation permanently removed." });
+    }
     const revoked = await db.revokeInvitation(req.params.id, req.user);
     res.json({ ok: true, data: revoked, message: "Invitation revoked successfully." });
   } catch (err) {

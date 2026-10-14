@@ -3051,6 +3051,18 @@
         });
         return res.json();
       },
+      async deleteInvite(id) {
+        const token = localStorage.getItem("rts_jwt_token") || localStorage.getItem(STORAGE_KEYS.AUTH);
+        const res = await fetch(apiUrl("/api/team/invites/" + encodeURIComponent(id) + "?permanent=true"), {
+          method: "DELETE",
+          headers: {
+            Authorization: "Bearer " + token,
+            "x-user-role": getCurrentUser().role,
+            "x-user-email": getCurrentUser().email,
+          },
+        });
+        return res.json();
+      },
       getAssignableEmployees,
     },
     getAssignableEmployees,
