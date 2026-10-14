@@ -14,9 +14,9 @@ services:
       - key: BACKEND_URL
         value: https://renewaltrack-tyvw.onrender.com
       - key: APP_URL
-        sync: false # Set to your production Vercel frontend URL (e.g. https://renewaltrack.vercel.app)
+        sync: false # Set to your production Vercel frontend URL (e.g. https://renewal-track.vercel.app)
       - key: ALLOWED_ORIGINS
-        sync: false # Comma-separated allowed origins (e.g. https://renewaltrack.vercel.app)
+        sync: false # Comma-separated allowed origins (e.g. https://renewal-track.vercel.app)
       - key: ALLOW_VERCEL_PREVIEWS
         value: "true"
       - key: JWT_SECRET

@@ -15,7 +15,7 @@
 ┌───────────────────────────────┐               ┌───────────────────────────────┐
 │        Vercel Frontend        │               │         Render Backend        │
 │    (Static HTML/CSS/JS)       │               │       (Express.js API)        │
-│  https://your-app.vercel.app  │               │https://renewaltrack-tyvw.onrender.com│
+│  https://renewal-track.vercel.app│               │https://renewaltrack-tyvw.onrender.com│
 └───────────────┬───────────────┘               └───────────────┬───────────────┘
                 │                                               │
                 │ Rewrites /api/* to Render                     │
@@ -47,8 +47,8 @@
 6. Under **Environment Variables**, fill in your secret values:
    - `GMAIL_USER`: `elakkiya270806@gmail.com` (or your sending Gmail)
    - `GMAIL_APP_PASSWORD`: Your 16-character Google App Password (without spaces)
-   - `APP_URL`: Leave empty initially, or set to your Vercel URL once deployed
-   - `ALLOWED_ORIGINS`: Set to your Vercel URL (e.g. `https://your-app.vercel.app`)
+   - `APP_URL`: `https://renewal-track.vercel.app`
+   - `ALLOWED_ORIGINS`: `https://renewal-track.vercel.app`
 7. Click **Apply**.
 8. Render will provision the Web Service, attach the 1GB persistent disk at `/var/data`, and start the server.
 
@@ -76,8 +76,8 @@
 | `NODE_ENV` | `production` | Production mode |
 | `PORT` | `10000` | Port automatically assigned by Render |
 | `DATA_DIR` | `/var/data` | Points to persistent disk mount |
-| `APP_URL` | `https://your-app.vercel.app` | Your Vercel frontend URL |
-| `ALLOWED_ORIGINS` | `https://your-app.vercel.app` | Allowed CORS origin |
+| `APP_URL` | `https://renewal-track.vercel.app` | Your live Vercel frontend URL |
+| `ALLOWED_ORIGINS` | `https://renewal-track.vercel.app` | Allowed CORS origin |
 | `ALLOW_VERCEL_PREVIEWS` | `true` | Allows Vercel preview URLs |
 | `JWT_SECRET` | *(Click "Generate")* | Strong random string |
 | `EMAIL_PROVIDER` | `nodemailer` | Real email delivery engine |
@@ -137,7 +137,7 @@ Render Web Services use ephemeral filesystems by default. RenewalTrack ensures *
    }
    ```
 6. Click **Deploy**.
-7. Vercel will deploy your frontend in seconds (e.g. `https://renewaltrack.vercel.app`).
+7. Vercel will deploy your frontend in seconds (e.g. `https://renewal-track.vercel.app`).
 8. Direct cross-origin API calls are also pre-configured in [`js/config.js`](./js/config.js) to:
    ```javascript
    window.RTS_CONFIG = {
@@ -180,10 +180,10 @@ Once both services are deployed, verify the complete pipeline:
      }
      ```
 2. **Frontend Loading**:
-   - Open your Vercel URL: `https://your-app.vercel.app`
+   - Open your Vercel URL: `https://renewal-track.vercel.app`
    - Verify landing page, styles, and Lucide icons render cleanly.
 3. **Admin Sign In**:
-   - Go to `https://your-app.vercel.app/login.html`
+   - Go to `https://renewal-track.vercel.app/login.html`
    - Sign in as Primary Admin: `elakkiya270806@gmail.com`
    - Dashboard loads with navigation, metrics, and role badge.
 4. **Member Invitation & Real Email**:
