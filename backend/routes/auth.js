@@ -250,8 +250,7 @@ router.post("/register", async (req, res) => {
       }
     }
 
-    // 2. Public registration (without token)
-    // NEVER ALLOW PUBLIC REGISTRATION TO GRANT ADMIN ACCESS
+    // 2. Reject any attempt to choose Admin role
     if (req.body.role && req.body.role.toLowerCase() === "admin") {
       return res.status(403).json({
         ok: false,
@@ -259,50 +258,47 @@ router.post("/register", async (req, res) => {
       });
     }
 
+    // 3. Duplicate email verification
     const existing = await db.getUserByEmail(cleanEmail);
     if (existing) {
       return res.status(409).json({ ok: false, error: "An account with this email already exists." });
     }
 
-    // Public registration strictly defaults to 'Employee', never Admin
-    const hashedPassword = hashPassword(password);
-    const newAccount = {
-      id: `usr-${Date.now()}`,
-      fullName: fullName.trim(),
-      email: cleanEmail,
-      mobile: mobile || "",
-      password: hashedPassword,
-      passwordHash: hashedPassword,
-      role: "Employee",
-      status: "active",
-      createdAt: new Date().toISOString(),
-    };
+    // 4. Invitation Authorization: check if this email has an active pending invitation from Admin
+    const pendingInvite = await db.getPendingInvitationByEmail(cleanEmail);
+    if (pendingInvite) {
+      try {
+        const hashedPassword = hashPassword(password);
+        const user = await db.acceptInvitation(pendingInvite.token, {
+          fullName,
+          mobile,
+          password: hashedPassword,
+          passwordHash: hashedPassword,
+        });
+        const token = generateToken(user);
+        return res.status(201).json({
+          ok: true,
+          token,
+          user: {
+            id: user.id,
+            fullName: user.fullName,
+            email: user.email,
+            mobile: user.mobile || "",
+            role: user.role,
+            status: user.status,
+          },
+          adminNotified: user._invite ? user._invite.adminNotified : (user._adminNotification ? user._adminNotification.success : false),
+          adminNotification: user._adminNotification || null,
+        });
+      } catch (inviteErr) {
+        return res.status(400).json({ ok: false, error: inviteErr.message });
+      }
+    }
 
-    await db.saveUser(newAccount);
-
-    await db.logAudit({
-      actorId: newAccount.id,
-      actorName: newAccount.fullName,
-      actorEmail: newAccount.email,
-      actorRole: newAccount.role,
-      action: "USER_REGISTERED",
-      targetType: "user",
-      targetId: newAccount.id,
-      details: `New user registered via public registration (role assigned: ${newAccount.role}).`,
-    });
-
-    const token = generateToken(newAccount);
-    res.status(201).json({
-      ok: true,
-      token,
-      user: {
-        id: newAccount.id,
-        fullName: newAccount.fullName,
-        email: newAccount.email,
-        mobile: newAccount.mobile,
-        role: newAccount.role,
-        status: newAccount.status,
-      },
+    // 5. Prevent unauthorized account creation (Strict Invitation Policy)
+    return res.status(403).json({
+      ok: false,
+      error: "Registration is restricted to invited team members. Only Employees or Viewers with an active invitation from an Administrator can create an account.",
     });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });

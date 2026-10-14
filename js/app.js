@@ -1026,53 +1026,36 @@
       status: "active",
       isPrimaryAdmin: true,
     },
-    {
-      id: "usr-emp-elakkiya",
-      fullName: "Elakkiya",
-      email: "elakkiyaohai@gmail.com",
-      mobile: "+91 98765 43210",
-      password: "Admin@1234",
-      role: "Employee",
-      status: "active",
-      isPrimaryAdmin: false,
-    },
-    {
-      id: "usr-2",
-      fullName: "David Kim",
-      email: "david.kim@renewaltrack.com",
-      mobile: "+1 555 0103",
-      password: "Demo@1234",
-      role: "Employee",
-      status: "active",
-    },
-    {
-      id: "usr-3",
-      fullName: "Priya Nair",
-      email: "priya.nair@renewaltrack.com",
-      mobile: "+1 555 0104",
-      password: "Demo@1234",
-      role: "Viewer",
-      status: "active",
-    },
   ];
+
+  const LEGACY_TEST_EMAILS = [
+    "demo@renewaltrack.com",
+    "david.kim@renewaltrack.com",
+    "priya.nair@renewaltrack.com",
+    "elakkiyaohai@gmail.com",
+  ];
+
+  function isLegacyTestAccount(email) {
+    if (!email) return false;
+    const em = email.toLowerCase().trim();
+    return LEGACY_TEST_EMAILS.includes(em) || em.startsWith("testuser_");
+  }
 
   function seedAccount() {
     let accounts = readJSON(STORAGE_KEYS.ACCOUNTS, null);
 
-    // Completely purge unwanted demo account from localStorage
+    // Completely purge unwanted demo and legacy test accounts from localStorage
     if (accounts && Array.isArray(accounts)) {
-      const filtered = accounts.filter(
-        (a) => a.email && a.email.toLowerCase() !== "demo@renewaltrack.com"
-      );
+      const filtered = accounts.filter((a) => !isLegacyTestAccount(a.email));
       if (filtered.length !== accounts.length) {
         accounts = filtered;
         writeJSON(STORAGE_KEYS.ACCOUNTS, accounts);
       }
     }
 
-    // Purge unwanted demo user from current user session
+    // Purge unwanted test user from current user session if set
     const currentStored = readJSON(STORAGE_KEYS.USER, null);
-    if (currentStored && currentStored.email && currentStored.email.toLowerCase() === "demo@renewaltrack.com") {
+    if (currentStored && isLegacyTestAccount(currentStored.email)) {
       writeJSON(STORAGE_KEYS.USER, DEFAULT_ACCOUNTS[0]);
     }
 
@@ -1092,6 +1075,11 @@
           }
           if (!found.status) {
             found.status = "active";
+            changed = true;
+          }
+          if (def.isPrimaryAdmin) {
+            found.isPrimaryAdmin = true;
+            found.role = "Admin";
             changed = true;
           }
         }
@@ -1116,7 +1104,7 @@
 
   function getAccounts() {
     const accs = readJSON(STORAGE_KEYS.ACCOUNTS, []);
-    const clean = accs.filter((a) => a.email && a.email.toLowerCase() !== "demo@renewaltrack.com");
+    const clean = accs.filter((a) => !isLegacyTestAccount(a.email));
     if (!clean.length) return DEFAULT_ACCOUNTS;
     return clean;
   }
@@ -1154,24 +1142,11 @@
       writeJSON(STORAGE_KEYS.ACCOUNTS, accounts);
       return { ok: true, user: newAcc };
     } catch (err) {
-      const accounts = getAccounts();
-      if (accounts.some((a) => a.email.toLowerCase() === cleanEmail)) {
-        return { ok: false, error: "An account with this email already exists." };
-      }
-
-      const newAcc = {
-        id: uid("usr"),
-        fullName: fullName.trim(),
-        email: cleanEmail,
-        mobile: mobile || "",
-        password,
-        role: "Employee",
-        status: "active",
+      console.warn("Registration network error:", err);
+      return {
+        ok: false,
+        error: "Unable to connect to server. Registration requires an active workspace connection to verify invitation.",
       };
-
-      accounts.push(newAcc);
-      writeJSON(STORAGE_KEYS.ACCOUNTS, accounts);
-      return { ok: true, user: newAcc };
     }
   }
 

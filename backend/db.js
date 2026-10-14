@@ -117,35 +117,38 @@ function getLocalStore() {
         }
       }
 
-      // Ensure elakkiyaohai@gmail.com is set as Employee
-      const ohaiUser = store.users.find(
-        (u) => u.email && u.email.toLowerCase() === "elakkiyaohai@gmail.com"
-      );
-      if (ohaiUser && ohaiUser.role !== "Employee") {
-        ohaiUser.role = "Employee";
+      // Purge all legacy non-admin accounts and unwanted test accounts
+      const cleanUsers = store.users.filter((u) => {
+        if (!u || !u.email) return false;
+        const em = u.email.toLowerCase().trim();
+        if (em === PRIMARY_ADMIN_EMAIL.toLowerCase()) return true;
+        // Purge legacy mock, test, and removed accounts
+        if (
+          em === "demo@renewaltrack.com" ||
+          em === "elakkiyaohai@gmail.com" ||
+          em === "david.kim@renewaltrack.com" ||
+          em === "priya.nair@renewaltrack.com" ||
+          em.includes("testuser_") ||
+          em.includes("test.employee") ||
+          em.includes("test.viewer") ||
+          em.includes("emp.notify.") ||
+          em.includes("viewer.notify.") ||
+          em.includes("test_invite@") ||
+          em.includes("newcolleague@")
+        ) {
+          return false;
+        }
+        // Keep users that joined via genuine invitations
+        const hasAcceptedInvite = (store.invitations || []).some(
+          (inv) => inv.email && inv.email.toLowerCase() === em && (inv.status === "accepted" || inv.status === "pending")
+        );
+        return hasAcceptedInvite;
+      });
+
+      if (cleanUsers.length !== store.users.length) {
+        store.users = cleanUsers;
         changed = true;
       }
-
-      // Enforce that elakkiya270806@gmail.com is the ONLY Admin:
-      // Any other admin account is demoted to Employee
-      store.users.forEach((u) => {
-        if (
-          u.email &&
-          u.email.toLowerCase() !== PRIMARY_ADMIN_EMAIL.toLowerCase() &&
-          u.role === "Admin"
-        ) {
-          u.role = "Employee";
-          changed = true;
-        }
-        if (u.role === "Editor") {
-          u.role = "Employee";
-          changed = true;
-        }
-        if (!u.status) {
-          u.status = "active";
-          changed = true;
-        }
-      });
 
       // Update settings default recipient
       if (store.settings) {
@@ -837,6 +840,41 @@ const db = {
     return user;
   },
 
+  // Delete user account (Admin only, Primary Admin protected)
+  async deleteUser(id, actor = {}) {
+    const user = await this.getUserById(id);
+    if (!user) throw new Error("User not found.");
+
+    if (user.email && user.email.toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase()) {
+      throw new Error(`The Primary Admin account (${PRIMARY_ADMIN_EMAIL}) is protected and cannot be deleted.`);
+    }
+
+    if (isConfigured()) {
+      try {
+        await supabase.from("users").delete().eq("id", id);
+      } catch (e) {
+        console.error(`[Supabase deleteUser error] ${e.message}`);
+      }
+    }
+
+    const store = getLocalStore();
+    store.users = (store.users || []).filter((u) => u.id !== id && u.email.toLowerCase() !== user.email.toLowerCase());
+    saveLocalStore(store);
+
+    await this.logAudit({
+      actorId: actor.id || "admin",
+      actorName: actor.fullName || actor.name || "Administrator",
+      actorEmail: actor.email || PRIMARY_ADMIN_EMAIL,
+      actorRole: actor.role || "Admin",
+      action: "MEMBER_DELETED",
+      targetType: "user",
+      targetId: user.id,
+      details: `Permanently removed member ${user.fullName || user.email} (${user.role}).`,
+    });
+
+    return { ok: true, id, email: user.email };
+  },
+
   // 17. Calculate assigned renewals count for all users
   async getAssignedRenewalCounts() {
     const renewals = await this.getRenewals();
@@ -1021,6 +1059,21 @@ const db = {
     return invite;
   },
 
+  // 20b. Get active pending invitation by email
+  async getPendingInvitationByEmail(email) {
+    if (!email) return null;
+    const cleanEmail = email.trim().toLowerCase();
+    const invites = await this.getInvitations();
+    return (
+      invites.find(
+        (i) =>
+          (i.email || "").toLowerCase() === cleanEmail &&
+          i.status === "pending" &&
+          new Date(i.expiresAt || i.expires_at) > new Date()
+      ) || null
+    );
+  },
+
   // 21. Accept invitation
   async acceptInvitation(token, registrationData) {
     const invite = await this.getInvitationByToken(token);
@@ -1040,6 +1093,16 @@ const db = {
     const assignedRole = ["Employee", "Viewer"].includes(invite.role) ? invite.role : "Employee";
     const passwordVal = registrationData.passwordHash || registrationData.password;
 
+    invite.status = "accepted";
+    invite.acceptedAt = new Date().toISOString();
+
+    const store = getLocalStore();
+    const invIdx = (store.invitations || []).findIndex((i) => i.token === token || i.id === invite.id);
+    if (invIdx >= 0) {
+      store.invitations[invIdx] = { ...store.invitations[invIdx], ...invite };
+      saveLocalStore(store);
+    }
+
     const newUser = {
       id: `usr-${Date.now()}`,
       fullName: (registrationData.fullName || invite.fullName || "").trim(),
@@ -1052,11 +1115,8 @@ const db = {
       createdAt: new Date().toISOString(),
     };
 
-    // Save and activate account in database FIRST (notify only after acceptance is verified)
+    // Save and activate account in database
     await this.saveUser(newUser);
-
-    invite.status = "accepted";
-    invite.acceptedAt = new Date().toISOString();
 
     // Send real acceptance notification to the Admin who sent the invitation
     // Prevent duplicate notifications: only send if not already notified
@@ -1128,11 +1188,11 @@ const db = {
       }
     }
 
-    const store = getLocalStore();
-    const idx = (store.invitations || []).findIndex((i) => i.token === token);
+    const finalStore = getLocalStore();
+    const idx = (finalStore.invitations || []).findIndex((i) => i.token === token);
     if (idx >= 0) {
-      store.invitations[idx] = invite;
-      saveLocalStore(store);
+      finalStore.invitations[idx] = invite;
+      saveLocalStore(finalStore);
     }
 
     await this.logAudit({

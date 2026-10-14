@@ -64,6 +64,16 @@ router.put("/members/:id/status", async (req, res) => {
   }
 });
 
+// DELETE /api/team/members/:id — Permanently remove a non-admin member
+router.delete("/members/:id", async (req, res) => {
+  try {
+    const result = await db.deleteUser(req.params.id, req.user);
+    res.json({ ok: true, data: result, message: "Member successfully removed." });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
 // POST /api/team/invites — Invite a new member by email
 router.post("/invites", async (req, res) => {
   try {
