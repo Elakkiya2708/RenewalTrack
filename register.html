@@ -132,9 +132,9 @@
         <div class="field" id="regTermsField" style="margin-bottom:12px;">
           <label class="checkbox-row">
             <input type="checkbox" id="regTerms" />
-            <span>I agree to the <a class="link" href="#" onclick="return false;">Terms</a> &amp; <a class="link" href="#" onclick="return false;">Privacy Policy</a></span>
+            <span>I agree to the <a class="link" href="#" id="openTermsLink">Terms &amp; Conditions</a> &amp; <a class="link" href="#" id="openPrivacyLink">Privacy Policy</a></span>
           </label>
-          <span class="error-msg">You must accept the Terms.</span>
+          <span class="error-msg">You must accept the Terms &amp; Privacy Policy to continue.</span>
         </div>
 
         <button type="submit" class="btn btn-primary btn-block">Create Account</button>
@@ -143,6 +143,147 @@
       <p class="auth-footer-link">Already have an account? <a href="login.html">Sign in</a></p>
     </div>
   </section>
+</div>
+
+<!-- Terms & Privacy Policy Modal -->
+<div class="modal-overlay" id="termsPrivacyModal" role="dialog" aria-modal="true" aria-labelledby="termsModalTitle" style="display:none;">
+  <div class="modal modal-lg" style="max-width: 680px; max-height: 85vh; display: flex; flex-direction: column;">
+    <div class="modal-header" style="flex-shrink: 0;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <i data-lucide="shield-check" class="icon" style="color:var(--accent); width:22px; height:22px;"></i>
+        <div>
+          <h3 id="termsModalTitle" style="margin:0; font-size:16px;">Legal Terms &amp; Privacy Policy</h3>
+          <span style="font-size:12px; color:var(--text-mid);">RenewalTrack Enterprise Governance &amp; Compliance</span>
+        </div>
+      </div>
+      <button type="button" class="modal-close" data-close-modal="termsPrivacyModal" aria-label="Close modal">
+        <i data-lucide="x" class="icon"></i>
+      </button>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="modal-tabs">
+      <button type="button" class="modal-tab-btn active" id="tabBtnTerms" data-tab="tabTerms">
+        <i data-lucide="file-text" class="icon" style="width:14px;height:14px;"></i>
+        Terms &amp; Conditions
+      </button>
+      <button type="button" class="modal-tab-btn" id="tabBtnPrivacy" data-tab="tabPrivacy">
+        <i data-lucide="lock" class="icon" style="width:14px;height:14px;"></i>
+        Privacy Policy
+      </button>
+    </div>
+
+    <!-- Modal Body (Scrollable) -->
+    <div class="modal-body" style="flex:1; overflow-y:auto; padding: 20px 22px;">
+      <!-- Tab 1: Terms & Conditions -->
+      <div class="modal-tab-pane active" id="tabTerms">
+        <div class="legal-section">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <span class="legal-badge-pill"><i data-lucide="clock" style="width:12px;height:12px;"></i> Last updated: October 2026</span>
+            <span style="font-size:11px; color:var(--text-dim); font-weight:600;">Version 2.4.0</span>
+          </div>
+          <h4>1. Acceptance of Terms</h4>
+          <p>By registering an account, accessing, or using RenewalTrack, you agree to be legally bound by these Terms &amp; Conditions and our acceptable use policies. If you are registering on behalf of a company, enterprise, or other entity, you represent and warrant that you hold appropriate authority to bind that entity to these terms.</p>
+        </div>
+
+        <div class="legal-section">
+          <h4>2. Platform Scope &amp; Workspace Access</h4>
+          <p>RenewalTrack provides automated renewal tracking, contract lifecycle management, notification scheduling, and team collaboration tooling. Access is provisioned based on assigned organizational roles:</p>
+          <ul>
+            <li><strong>Primary Administrator:</strong> Holds administrative jurisdiction over workspace configurations, member invites/revocations, SMTP dispatch credentials, and security audit logs.</li>
+            <li><strong>Employees &amp; Viewers:</strong> Authorized to monitor, update, and manage designated renewal records, upload vendor agreements, and review upcoming renewal deadlines according to organizational permissions.</li>
+          </ul>
+        </div>
+
+        <div class="legal-section">
+          <h4>3. Automated Renewal Notifications &amp; Schedules</h4>
+          <p>RenewalTrack dispatches automated alert emails (at customizable intervals such as 90, 60, 30, 14, 7, and 1-day milestones) and in-app notifications. While RenewalTrack maintains continuous dispatch daemons, your organization retains ultimate responsibility for maintaining accurate contract renewal dates, valid recipient email addresses, and taking timely commercial renewal action.</p>
+        </div>
+
+        <div class="legal-section">
+          <h4>4. Account Security &amp; Credentials</h4>
+          <p>Users must provide accurate, current, and complete registration details. You are responsible for safeguarding your login credentials and preventing unauthorized access to your workspace. Any suspected credential compromise or unauthorized access must be reported to the workspace Primary Administrator immediately.</p>
+        </div>
+
+        <div class="legal-section">
+          <h4>5. Data Ownership &amp; System Integrity</h4>
+          <p>You retain full intellectual property ownership of all contract metadata, proprietary vendor records, and financial renewal figures uploaded to your workspace. You agree not to upload malicious scripts, attempt unauthorized database injection, or interfere with background dispatch workers.</p>
+        </div>
+
+        <div class="legal-section">
+          <h4>6. Limitation of Liability</h4>
+          <p>RenewalTrack is provided on an "as is" and "as available" basis. Under no circumstances shall RenewalTrack or its administrators be liable for indirect, incidental, or consequential damages resulting from third-party vendor auto-renewals, SMTP delivery delays beyond our control, or external network downtime.</p>
+        </div>
+      </div>
+
+      <!-- Tab 2: Privacy Policy -->
+      <div class="modal-tab-pane" id="tabPrivacy">
+        <div class="legal-section">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <span class="legal-badge-pill"><i data-lucide="shield" style="width:12px;height:12px;"></i> Privacy Guaranteed</span>
+            <span style="font-size:11px; color:var(--text-dim); font-weight:600;">Compliant with Modern Privacy Standards</span>
+          </div>
+          <h4>1. Information We Collect</h4>
+          <p>RenewalTrack collects only information necessary to deliver contract renewal tracking and workspace collaboration:</p>
+          <ul>
+            <li><strong>Account Profile:</strong> Full name, verified business email, contact phone number, and cryptographic password hash.</li>
+            <li><strong>Renewal &amp; Vendor Data:</strong> Contract titles, vendor names, renewal dates, cost metrics, billing cycles, and uploaded agreement attachments.</li>
+            <li><strong>Security Audit Logs:</strong> Timestamped action records, authenticated IP addresses, and session activities recorded in our tamper-resistant audit trail.</li>
+          </ul>
+        </div>
+
+        <div class="legal-section">
+          <h4>2. How We Use Your Information</h4>
+          <p>Your information is used strictly to provide, maintain, and protect your RenewalTrack services:</p>
+          <ul>
+            <li>Delivering automated renewal reminders, digest notifications, and email alerts before deadlines.</li>
+            <li>Authenticating user sessions and enforcing role-based permissions (Admin, Employee, Viewer).</li>
+            <li>Generating workspace cost forecasts, spend analytics, and compliance audit histories.</li>
+          </ul>
+        </div>
+
+        <div class="legal-section">
+          <h4>3. Security &amp; Cryptographic Protection</h4>
+          <p>We enforce industry-standard security safeguards to protect your confidential corporate data:</p>
+          <ul>
+            <li>User passwords are protected using salted <strong>scrypt</strong> key-derivation algorithms and are never stored in plaintext.</li>
+            <li>Authentication tokens are securely signed with HMAC-SHA256 signatures and session-bound.</li>
+            <li>Data access is strictly isolated by workspace, preventing unauthorized cross-tenant visibility.</li>
+          </ul>
+        </div>
+
+        <div class="legal-section">
+          <h4>4. Third-Party Sharing &amp; Data Selling</h4>
+          <p>We do not sell, rent, monetize, or disclose your corporate contract data, user contacts, or renewal records to advertisers or third-party brokers. Data is transmitted solely to operational subprocessors (such as your organization's configured SMTP mail server) necessary for system notifications.</p>
+        </div>
+
+        <div class="legal-section">
+          <h4>5. Data Retention &amp; User Rights</h4>
+          <p>You and your workspace administrator have the right to inspect, export (via CSV/ICS/JSON), update, or delete your data at any time. When an account or renewal record is permanently removed by an administrator, related records and associated reminder queues are deleted from the active datastore.</p>
+        </div>
+
+        <div class="legal-section">
+          <h4>6. Contact &amp; Governance Inquiries</h4>
+          <p>For privacy inquiries, data deletion requests, or compliance auditing questions, please contact the workspace Primary Administrator at <a class="link" href="mailto:elakkiya270806@gmail.com">elakkiya270806@gmail.com</a>.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="modal-footer" style="padding:14px 22px; margin-top:0; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--bg-surface-2); flex-shrink:0;">
+      <span style="font-size:12px; color:var(--text-dim); display:flex; align-items:center; gap:6px;">
+        <i data-lucide="check-circle" class="icon" style="width:13px;height:13px;color:var(--accent);"></i>
+        Review both sections before accepting
+      </span>
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn btn-secondary" data-close-modal="termsPrivacyModal">Close</button>
+        <button type="button" class="btn btn-primary" id="acceptLegalTermsBtn">
+          <i data-lucide="check" class="icon" style="width:14px;height:14px;"></i>
+          I Agree &amp; Accept
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="js/app.js"></script>

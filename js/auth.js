@@ -154,6 +154,119 @@
       }
     }
 
+    // Terms & Privacy Policy Modal Wiring
+    const termsModal = document.getElementById("termsPrivacyModal");
+    const openTermsLink = document.getElementById("openTermsLink");
+    const openPrivacyLink = document.getElementById("openPrivacyLink");
+    const tabBtnTerms = document.getElementById("tabBtnTerms");
+    const tabBtnPrivacy = document.getElementById("tabBtnPrivacy");
+    const tabTerms = document.getElementById("tabTerms");
+    const tabPrivacy = document.getElementById("tabPrivacy");
+    const acceptLegalTermsBtn = document.getElementById("acceptLegalTermsBtn");
+    const regTermsCheckbox = document.getElementById("regTerms");
+    const regTermsField = document.getElementById("regTermsField");
+
+    function switchLegalTab(tabName) {
+      if (!tabBtnTerms || !tabBtnPrivacy || !tabTerms || !tabPrivacy) return;
+      if (tabName === "privacy") {
+        tabBtnPrivacy.classList.add("active");
+        tabBtnTerms.classList.remove("active");
+        tabPrivacy.classList.add("active");
+        tabTerms.classList.remove("active");
+      } else {
+        tabBtnTerms.classList.add("active");
+        tabBtnPrivacy.classList.remove("active");
+        tabTerms.classList.add("active");
+        tabPrivacy.classList.remove("active");
+      }
+      if (window.RTS && RTS.refreshIcons) RTS.refreshIcons();
+    }
+
+    function openLegalModal(tabName) {
+      switchLegalTab(tabName);
+      if (termsModal) {
+        termsModal.classList.add("open");
+        termsModal.style.display = "flex";
+        document.body.style.overflow = "hidden";
+        if (window.RTS && RTS.refreshIcons) RTS.refreshIcons();
+      }
+    }
+
+    function closeLegalModal() {
+      if (termsModal) {
+        termsModal.classList.remove("open");
+        termsModal.style.display = "none";
+        document.body.style.overflow = "";
+      }
+    }
+
+    if (openTermsLink) {
+      openTermsLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openLegalModal("terms");
+      });
+    }
+
+    if (openPrivacyLink) {
+      openPrivacyLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openLegalModal("privacy");
+      });
+    }
+
+    if (tabBtnTerms) {
+      tabBtnTerms.addEventListener("click", () => switchLegalTab("terms"));
+    }
+
+    if (tabBtnPrivacy) {
+      tabBtnPrivacy.addEventListener("click", () => switchLegalTab("privacy"));
+    }
+
+    if (acceptLegalTermsBtn) {
+      acceptLegalTermsBtn.addEventListener("click", () => {
+        if (regTermsCheckbox) {
+          regTermsCheckbox.checked = true;
+        }
+        if (regTermsField) {
+          regTermsField.classList.remove("has-error");
+        }
+        closeLegalModal();
+        if (window.RTS && RTS.toast) {
+          RTS.toast("Terms & Privacy Policy accepted.", "success");
+        }
+      });
+    }
+
+    if (regTermsCheckbox && regTermsField) {
+      regTermsCheckbox.addEventListener("change", () => {
+        if (regTermsCheckbox.checked) {
+          regTermsField.classList.remove("has-error");
+        }
+      });
+    }
+
+    if (termsModal) {
+      termsModal.addEventListener("click", (e) => {
+        if (e.target === termsModal) {
+          closeLegalModal();
+        }
+      });
+      termsModal.querySelectorAll("[data-close-modal]").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          closeLegalModal();
+        });
+      });
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && termsModal && termsModal.classList.contains("open")) {
+        closeLegalModal();
+      }
+    });
+
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       clearErrors(form);
@@ -196,7 +309,7 @@
         valid = false;
       }
       if (!terms) {
-        setFieldError(termsField, "You must accept the Terms & Conditions.");
+        setFieldError(termsField, "You must accept the Terms & Privacy Policy to continue.");
         valid = false;
       }
       if (!valid) return;
