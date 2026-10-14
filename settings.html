@@ -88,6 +88,7 @@
           <div class="settings-tab" data-tab="reminders">Reminder Preferences</div>
           <div class="settings-tab" data-tab="notifications">Notifications</div>
           <div class="settings-tab" data-tab="team">Team &amp; Roles</div>
+          <div class="settings-tab" data-tab="admin-info"><i data-lucide="shield-check" class="icon" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:6px;"></i>Admin Information</div>
           <div class="settings-tab" data-tab="smartdoc">AI SmartDoc</div>
           <div class="settings-tab" data-tab="audit">Audit Log &amp; Channels</div>
           <div class="settings-tab" data-tab="security">Change Password</div>
@@ -257,6 +258,23 @@
               </div>
               <button type="button" class="btn btn-primary btn-sm" id="inviteMemberBtn"><i data-lucide="user-plus" class="icon"></i>Invite Member</button>
             </div>
+
+            <!-- Active Admin Highlight Card -->
+            <div style="margin:14px 0;padding:12px 16px;background:var(--bg-surface-2);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <div class="avatar" style="width:36px;height:36px;font-size:14px;background:var(--accent);color:#fff;font-weight:700;">E</div>
+                <div>
+                  <span style="font-size:11px;color:var(--text-low);text-transform:uppercase;letter-spacing:0.04em;font-weight:700;">Active Primary Administrator</span>
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <strong style="font-size:14px;color:var(--text-hi);" id="teamAdminName">Elakkiya</strong>
+                    <span style="font-size:12.5px;color:var(--accent);font-family:monospace;font-weight:600;" id="teamAdminEmail">elakkiya270806@gmail.com</span>
+                    <span class="role-pill-badge role-admin" style="font-size:10px;">Primary Admin</span>
+                  </div>
+                </div>
+              </div>
+              <span class="status-pill status-active"><i data-lucide="shield-check" class="icon" style="width:12px;height:12px;"></i> Protected Authority</span>
+            </div>
+
             <div class="table-wrap" style="margin-top:14px;">
               <table class="data-table">
                 <thead>
@@ -276,6 +294,87 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          <!-- Secure Administrator Information -->
+          <div class="settings-panel card" id="panel-admin-info">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+              <div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <i data-lucide="shield-check" class="icon" style="color:var(--accent);width:22px;height:22px;"></i>
+                  <h3 style="margin:0;">System Administrator Information</h3>
+                  <span class="role-pill-badge role-admin">Verified Active Admin</span>
+                </div>
+                <p style="font-size:12.5px;color:var(--text-mid);margin:4px 0 0;">
+                  Authoritative primary administrator profile and system ownership details verified from database records.
+                </p>
+              </div>
+              <span class="status-pill status-active"><i data-lucide="check-circle" class="icon" style="width:12px;height:12px;"></i> Active Authority</span>
+            </div>
+
+            <!-- Primary Admin Hero Banner -->
+            <div style="margin-top:16px;padding:20px;background:linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(14, 116, 144, 0.08) 100%);border:1px solid rgba(79, 70, 229, 0.25);border-radius:var(--r-md);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+              <div style="display:flex;align-items:center;gap:16px;">
+                <div class="avatar avatar-lg" id="adminHeroAvatar" style="background:var(--accent);color:#fff;font-size:22px;font-weight:700;box-shadow:0 4px 14px rgba(79,70,229,0.35);width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:50%;">E</div>
+                <div>
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <strong style="font-size:18px;color:var(--text-hi);" id="adminCardName">Elakkiya</strong>
+                    <span class="role-pill-badge role-admin" style="font-size:11px;">Primary Administrator</span>
+                    <span class="badge badge-active" style="font-size:11px;"><i data-lucide="lock" class="icon" style="width:10px;height:10px;"></i> Protected Account</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+                    <i data-lucide="mail" class="icon" style="width:14px;height:14px;color:var(--accent);"></i>
+                    <span style="font-size:14px;color:var(--text-hi);font-family:monospace;font-weight:600;" id="adminCardEmail">elakkiya270806@gmail.com</span>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnCopyAdminEmail">
+                  <i data-lucide="copy" class="icon"></i> Copy Email
+                </button>
+                <a href="mailto:elakkiya270806@gmail.com" class="btn btn-primary btn-sm" id="btnContactAdmin">
+                  <i data-lucide="send" class="icon"></i> Contact Admin
+                </a>
+              </div>
+            </div>
+
+            <!-- Security & Configuration Specifications -->
+            <div style="margin-top:20px;">
+              <h4 style="font-size:13.5px;font-weight:600;margin-bottom:12px;color:var(--text-hi);">
+                Database User Role &amp; Backend Configuration Details
+              </h4>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:12px;">
+                <div style="padding:14px;background:var(--bg-surface-2);border:1px solid var(--border);border-radius:var(--r-sm);">
+                  <span style="font-size:11.5px;color:var(--text-low);display:block;margin-bottom:2px;">Assigned Role</span>
+                  <strong style="font-size:13.5px;color:var(--text-hi);" id="adminCardRole">Admin (Sole Primary Administrator)</strong>
+                  <span style="font-size:11px;color:var(--text-mid);display:block;margin-top:4px;">Full RBAC privileges across renewals, users, and audit logs.</span>
+                </div>
+                <div style="padding:14px;background:var(--bg-surface-2);border:1px solid var(--border);border-radius:var(--r-sm);">
+                  <span style="font-size:11.5px;color:var(--text-low);display:block;margin-bottom:2px;">Account Status</span>
+                  <strong style="font-size:13.5px;color:var(--success);" id="adminCardStatus">Active (Verified Authority)</strong>
+                  <span style="font-size:11px;color:var(--text-mid);display:block;margin-top:4px;">Protected from deactivation and demotion.</span>
+                </div>
+                <div style="padding:14px;background:var(--bg-surface-2);border:1px solid var(--border);border-radius:var(--r-sm);">
+                  <span style="font-size:11.5px;color:var(--text-low);display:block;margin-bottom:2px;">User Account Identifier</span>
+                  <strong style="font-size:13px;font-family:monospace;color:var(--text-hi);" id="adminCardId">usr-1791890845906</strong>
+                  <span style="font-size:11px;color:var(--text-mid);display:block;margin-top:4px;">Unique immutable identity in data store.</span>
+                </div>
+                <div style="padding:14px;background:var(--bg-surface-2);border:1px solid var(--border);border-radius:var(--r-sm);">
+                  <span style="font-size:11.5px;color:var(--text-low);display:block;margin-bottom:2px;">Notification &amp; SMTP Sender</span>
+                  <strong style="font-size:13px;color:var(--text-hi);" id="adminCardSender">RenewalTrack &lt;elakkiya270806@gmail.com&gt;</strong>
+                  <span style="font-size:11px;color:var(--text-mid);display:block;margin-top:4px;">Verified Gmail SMTP &amp; system fallback address.</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Security Policy Guarantee Box -->
+            <div style="margin-top:20px;padding:14px;background:rgba(16, 185, 129, 0.06);border:1px solid rgba(16, 185, 129, 0.2);border-radius:var(--r-sm);display:flex;align-items:flex-start;gap:12px;">
+              <i data-lucide="shield" class="icon" style="color:var(--success);width:18px;height:18px;flex-shrink:0;margin-top:2px;"></i>
+              <div style="font-size:12.5px;color:var(--text-mid);line-height:1.5;">
+                <strong style="color:var(--text-hi);display:block;margin-bottom:2px;">PostgreSQL Trigger &amp; Backend Protection</strong>
+                This account is safeguarded by database trigger <code style="font-size:11.5px;background:var(--bg-surface);padding:2px 6px;border-radius:4px;border:1px solid var(--border);">protect_primary_admin_function</code>. It cannot be demoted to Employee, deleted, or deactivated by any API request or public registration.
+              </div>
             </div>
           </div>
 

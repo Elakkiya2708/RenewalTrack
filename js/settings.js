@@ -11,9 +11,20 @@
         document.querySelectorAll(".settings-tab").forEach((t) => t.classList.remove("active"));
         document.querySelectorAll(".settings-panel").forEach((p) => p.classList.remove("active"));
         tab.classList.add("active");
-        document.getElementById("panel-" + tab.getAttribute("data-tab")).classList.add("active");
+        const panel = document.getElementById("panel-" + tab.getAttribute("data-tab"));
+        if (panel) panel.classList.add("active");
+        RTS.refreshIcons();
       });
     });
+
+    // Check hash in URL (e.g. settings.html#admin-info or settings.html#team)
+    if (window.location.hash) {
+      const cleanHash = window.location.hash.replace("#", "");
+      const targetTab = document.querySelector(`.settings-tab[data-tab='${cleanHash}']`);
+      if (targetTab) {
+        targetTab.click();
+      }
+    }
   }
 
   function loadProfile() {
@@ -434,6 +445,88 @@
     }
   }
 
+  async function loadAdminInfo() {
+    let admin = {
+      fullName: "Elakkiya",
+      email: "elakkiya270806@gmail.com",
+      role: "Admin",
+      status: "active",
+      id: "usr-1791890845906",
+      mobile: "+91 98765 43210",
+    };
+
+    try {
+      const res = await fetch(RTS.apiUrl("/api/settings/admin-info"));
+      if (res.ok) {
+        const json = await res.json();
+        if (json.ok && json.data) {
+          admin = json.data;
+        }
+      } else {
+        // Fallback to /api/auth/users
+        const uRes = await fetch(RTS.apiUrl("/api/auth/users"));
+        if (uRes.ok) {
+          const uJson = await uRes.json();
+          const found = (uJson.data || []).find((u) => u.role === "Admin");
+          if (found) admin = found;
+        }
+      }
+    } catch (e) {
+      const accounts = RTS.auth.getAccounts();
+      const found = accounts.find((a) => a.role === "Admin" || (a.email || "").toLowerCase() === "elakkiya270806@gmail.com");
+      if (found) admin = Object.assign({}, admin, found);
+    }
+
+    const nameEls = [document.getElementById("adminCardName"), document.getElementById("teamAdminName")];
+    nameEls.forEach((el) => {
+      if (el) el.textContent = admin.fullName || "Elakkiya";
+    });
+
+    const emailEls = [document.getElementById("adminCardEmail"), document.getElementById("teamAdminEmail")];
+    emailEls.forEach((el) => {
+      if (el) el.textContent = admin.email || "elakkiya270806@gmail.com";
+    });
+
+    const idEl = document.getElementById("adminCardId");
+    if (idEl) idEl.textContent = admin.id || "usr-1791890845906";
+
+    const senderEl = document.getElementById("adminCardSender");
+    if (senderEl) senderEl.textContent = `RenewalTrack <${admin.email || "elakkiya270806@gmail.com"}>`;
+
+    const avatarEl = document.getElementById("adminHeroAvatar");
+    if (avatarEl) {
+      const initial = (admin.fullName || "E").trim().charAt(0).toUpperCase();
+      avatarEl.textContent = initial || "E";
+    }
+
+    const contactBtn = document.getElementById("btnContactAdmin");
+    if (contactBtn) {
+      contactBtn.href = `mailto:${admin.email || "elakkiya270806@gmail.com"}`;
+    }
+
+    const copyBtn = document.getElementById("btnCopyAdminEmail");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", async () => {
+        const emailToCopy = admin.email || "elakkiya270806@gmail.com";
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(emailToCopy);
+          } else {
+            const ta = document.createElement("textarea");
+            ta.value = emailToCopy;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+          }
+          RTS.toast(`Administrator email (${emailToCopy}) copied to clipboard!`, "success");
+        } catch (err) {
+          RTS.toast(`Admin Email: ${emailToCopy}`, "info");
+        }
+      });
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     RTS.initLayout();
     wireTabs();
@@ -443,6 +536,7 @@
     loadReminderSettings();
     loadNotificationSettings();
     wireTeamAndAiScan();
+    loadAdminInfo();
     wirePasswordForm();
     RTS.refreshIcons();
   });

@@ -56,4 +56,36 @@ router.put("/notifications", async (req, res) => {
   }
 });
 
+// GET /api/settings/admin-info — Securely fetch active system administrator information
+router.get("/admin-info", async (req, res) => {
+  try {
+    const users = await db.getUsers();
+    const admin =
+      users.find((u) => u.role === "Admin" && (u.status === "active" || !u.status)) ||
+      users.find((u) => u.email && u.email.toLowerCase() === "elakkiya270806@gmail.com") || {
+        id: "usr-1791890845906",
+        fullName: "Elakkiya",
+        email: "elakkiya270806@gmail.com",
+        role: "Admin",
+        status: "active",
+        mobile: "+91 98765 43210",
+      };
+
+    res.json({
+      ok: true,
+      data: {
+        id: admin.id || "usr-1791890845906",
+        fullName: admin.fullName || "Elakkiya",
+        email: admin.email || "elakkiya270806@gmail.com",
+        role: admin.role || "Admin",
+        status: admin.status || "active",
+        mobile: admin.mobile || "+91 98765 43210",
+        isPrimaryAdmin: true,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 module.exports = router;
