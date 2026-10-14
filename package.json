@@ -4,7 +4,11 @@
   "description": "Renewal Tracking System frontend",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "node -e \"console.log('Build completed for RenewalTrack.')\""
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "license": "MIT",
   "dependencies": {

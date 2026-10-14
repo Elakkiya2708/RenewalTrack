@@ -501,6 +501,27 @@
   function apiUrl(endpoint) {
     if (!endpoint) return "";
     const clean = endpoint.startsWith("/") ? endpoint : "/" + endpoint;
+
+    // Check runtime config or global variables (for Vercel frontend pointing to external Render backend)
+    let runtimeBase =
+      (window.RTS_CONFIG && window.RTS_CONFIG.API_URL) ||
+      window.RTS_API_URL ||
+      (typeof localStorage !== "undefined" ? localStorage.getItem("rts_api_url") : null);
+
+    // Automatic fallback if deployed on Vercel without custom config
+    if (!runtimeBase && typeof window !== "undefined" && window.location && window.location.hostname) {
+      const host = window.location.hostname;
+      const isLocal = host === "localhost" || host === "127.0.0.1" || host === "";
+      const isBackendHost = host.includes("onrender.com");
+      if (!isLocal && !isBackendHost && (host.endsWith(".vercel.app") || host.includes("vercel"))) {
+        runtimeBase = "https://renewaltrack-tyvw.onrender.com";
+      }
+    }
+
+    if (runtimeBase && typeof runtimeBase === "string" && runtimeBase.trim() !== "") {
+      return runtimeBase.trim().replace(/\/+$/, "") + clean;
+    }
+
     if (window.location.protocol === "file:" || !window.location.host) {
       return "http://localhost:3000" + clean;
     }

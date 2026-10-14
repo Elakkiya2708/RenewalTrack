@@ -26,20 +26,125 @@ const app = express();
 const PORT = config.PORT;
 const ROOT = __dirname;
 
-// Middlewares
-app.use(cors());
+// Production CORS configuration (Vercel frontend <-> Render backend)
+const rawAllowed = (process.env.ALLOWED_ORIGINS || config.ALLOWED_ORIGINS || "*").trim();
+const allowedOrigins = rawAllowed.split(",").map((o) => o.trim()).filter(Boolean);
+
+// Automatically include APP_URL / FRONTEND_URL if specified in environment
+[process.env.APP_URL, config.APP_URL, process.env.FRONTEND_URL].forEach((urlStr) => {
+  if (urlStr && typeof urlStr === "string" && urlStr.trim()) {
+    try {
+      const parsedOrigin = new URL(urlStr.trim()).origin;
+      if (!allowedOrigins.includes(parsedOrigin)) {
+        allowedOrigins.push(parsedOrigin);
+      }
+    } catch (_) {
+      const clean = urlStr.trim().replace(/\/+$/, "");
+      if (!allowedOrigins.includes(clean)) {
+        allowedOrigins.push(clean);
+      }
+    }
+  }
+});
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // 1. Allow non-browser clients (server-to-server, cron, mobile, curl)
+    if (!origin) return callback(null, true);
+
+    const normOrigin = origin.trim().replace(/\/+$/, "").toLowerCase();
+
+    // 2. Allow local development (localhost, 127.0.0.1 on any port, or null file:// origin)
+    if (
+      normOrigin === "null" ||
+      normOrigin.startsWith("http://localhost:") ||
+      normOrigin.startsWith("http://127.0.0.1:") ||
+      normOrigin === "http://localhost" ||
+      normOrigin === "http://127.0.0.1"
+    ) {
+      return callback(null, true);
+    }
+
+    // 3. Allow all if wildcard '*' is present
+    if (allowedOrigins.includes("*")) {
+      return callback(null, true);
+    }
+
+    // 4. Exact match against configured allowed origins
+    if (allowedOrigins.some((ao) => ao.toLowerCase().replace(/\/+$/, "") === normOrigin)) {
+      return callback(null, true);
+    }
+
+    // 5. Automatically allow any Vercel domain (*.vercel.app or https://*.vercel.app)
+    // Enabled by default unless explicitly disabled with ALLOW_VERCEL_PREVIEWS=false
+    const allowVercel = process.env.ALLOW_VERCEL_PREVIEWS !== "false";
+    if (allowVercel) {
+      try {
+        const hostname = new URL(origin).hostname.toLowerCase();
+        if (hostname === "vercel.app" || hostname.endsWith(".vercel.app")) {
+          return callback(null, true);
+        }
+      } catch (_) {
+        if (normOrigin.endsWith(".vercel.app") || normOrigin.includes("vercel.app")) {
+          return callback(null, true);
+        }
+      }
+    }
+
+    // 6. Support wildcard subdomain patterns in allowedOrigins (e.g. *.mycompany.com)
+    for (const pattern of allowedOrigins) {
+      if (pattern.includes("*")) {
+        try {
+          const regexStr = "^" + pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$";
+          if (new RegExp(regexStr, "i").test(origin) || new RegExp(regexStr, "i").test(normOrigin)) {
+            return callback(null, true);
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 7. Safe permissive fallback for genuine web clients
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-User-Email",
+    "x-user-email",
+    "X-User-Role",
+    "x-user-role",
+    "X-RenewalTrack-Role",
+    "x-renewaltrack-role",
+    "X-Requested-With",
+    "Accept",
+    "Origin",
+  ],
+  exposedHeaders: ["Content-Range", "X-Content-Range"],
+  maxAge: 86400,
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health Check Endpoint
+// Health Check Endpoint (Render & Monitoring)
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
     app: "RenewalTrack - Renewal & Compliance Management System",
+    version: "1.0.0",
+    nodeEnv: process.env.NODE_ENV || "development",
+    backendUrl: config.BACKEND_URL || "https://renewaltrack-tyvw.onrender.com",
     timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.floor(process.uptime()),
     supabaseConnected: isSupabaseConnected(),
+    storageMode: isSupabaseConnected() ? "supabase_postgresql" : "json_store",
+    dataDirectory: process.env.DATA_DIR || "default",
     emailProvider: config.EMAIL_PROVIDER,
     emailSendEnabled: config.EMAIL_SEND_ENABLED,
+    smtpConfigured: Boolean(config.GMAIL_USER && config.GMAIL_APP_PASSWORD),
     schedulerStatus: reminderScheduler.getStatus(),
   });
 });

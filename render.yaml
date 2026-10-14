@@ -1,0 +1,57 @@
+services:
+  - type: web
+    name: renewaltrack-tyvw
+    runtime: node
+    plan: starter # Starter plan supports persistent disk. For free tier without disk, configure Supabase credentials below.
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: BACKEND_URL
+        value: https://renewaltrack-tyvw.onrender.com
+      - key: APP_URL
+        sync: false # Set to your production Vercel frontend URL (e.g. https://renewaltrack.vercel.app)
+      - key: ALLOWED_ORIGINS
+        sync: false # Comma-separated allowed origins (e.g. https://renewaltrack.vercel.app)
+      - key: ALLOW_VERCEL_PREVIEWS
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: EMAIL_PROVIDER
+        value: nodemailer
+      - key: EMAIL_SEND_ENABLED
+        value: "true"
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_SERVICE
+        value: gmail
+      - key: GMAIL_USER
+        sync: false # Your Gmail address (e.g. elakkiya270806@gmail.com)
+      - key: GMAIL_APP_PASSWORD
+        sync: false # 16-character Google App Password (no spaces)
+      - key: ALERT_FALLBACK_EMAIL
+        value: elakkiya270806@gmail.com
+      - key: CRON_SCHEDULE
+        value: "0 8 * * *"
+      # Persistent Storage Path (Points to mounted Render persistent disk)
+      - key: DATA_DIR
+        value: /var/data
+      # Optional Cloud Database: Supabase PostgreSQL (Set these if using Supabase)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+    disk:
+      name: renewaltrack-data
+      mountPath: /var/data
+      sizeGB: 1

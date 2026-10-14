@@ -10,8 +10,10 @@ const { supabase, isConfigured } = require("./supabaseClient");
 const config = require("./config");
 const emailService = require("./emailService");
 
-const DATA_DIR = path.join(__dirname, "..", "data");
-const LOCAL_STORE_FILE = path.join(DATA_DIR, "store.json");
+const DEFAULT_DATA_DIR = path.join(__dirname, "..", "data");
+const DATA_DIR = config.DATA_DIR || DEFAULT_DATA_DIR;
+const LOCAL_STORE_FILE = config.DATA_FILE || path.join(DATA_DIR, "store.json");
+const SEED_FILE = path.join(DEFAULT_DATA_DIR, "seed.json");
 
 // Helper for dates relative to today
 function todayISO() {
@@ -69,6 +71,29 @@ function getLocalStore() {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
+
+    // If persistent store does not exist (e.g. fresh Render disk mount),
+    // automatically seed from seed.json or default store.json to preserve all existing data!
+    if (!fs.existsSync(LOCAL_STORE_FILE)) {
+      if (fs.existsSync(SEED_FILE)) {
+        try {
+          const seedContent = fs.readFileSync(SEED_FILE, "utf-8");
+          fs.writeFileSync(LOCAL_STORE_FILE, seedContent, "utf-8");
+          console.log(`[Storage] Initialized store at ${LOCAL_STORE_FILE} from seed.`);
+        } catch (seedErr) {
+          console.warn(`[Storage Warning] Failed to seed store: ${seedErr.message}`);
+        }
+      } else if (LOCAL_STORE_FILE !== path.join(DEFAULT_DATA_DIR, "store.json") && fs.existsSync(path.join(DEFAULT_DATA_DIR, "store.json"))) {
+        try {
+          const defContent = fs.readFileSync(path.join(DEFAULT_DATA_DIR, "store.json"), "utf-8");
+          fs.writeFileSync(LOCAL_STORE_FILE, defContent, "utf-8");
+          console.log(`[Storage] Initialized persistent store from default store.json.`);
+        } catch (copyErr) {
+          console.warn(`[Storage Warning] Failed to copy default store: ${copyErr.message}`);
+        }
+      }
+    }
+
     if (fs.existsSync(LOCAL_STORE_FILE)) {
       const raw = fs.readFileSync(LOCAL_STORE_FILE, "utf-8");
       const store = JSON.parse(raw);

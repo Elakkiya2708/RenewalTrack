@@ -4,12 +4,17 @@
    ========================================================================== */
 
 require("dotenv").config();
+const path = require("path");
 
 const config = {
   PORT: process.env.PORT || 3000,
-  APP_URL: process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`,
-  
-  // Supabase Configuration
+  APP_URL: process.env.APP_URL || process.env.FRONTEND_URL || `http://localhost:${process.env.PORT || 3000}`,
+  BACKEND_URL: process.env.BACKEND_URL || "https://renewaltrack-tyvw.onrender.com",
+  ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || "*",
+
+  // Data Storage Paths (for local JSON store and Render Persistent Disks)
+  DATA_DIR: process.env.DATA_DIR || path.join(__dirname, "..", "data"),
+  DATA_FILE: process.env.DATA_FILE || "",
   SUPABASE_URL: process.env.SUPABASE_URL || "",
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || "",
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
