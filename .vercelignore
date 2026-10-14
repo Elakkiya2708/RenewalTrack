@@ -1,0 +1,18 @@
+# ==============================================================================
+# RenewalTrack — Vercel Ignore Configuration
+# Instructs Vercel to only upload and deploy the static frontend files
+# (HTML, CSS, JS, and assets), preventing Vercel from wrapping server.js
+# into a serverless function.
+# ==============================================================================
+
+# Backend runtime files (hosted separately on Render)
+server.js
+backend/
+scripts/
+data/
+supabase/
+
+# Local testing and environment files
+test_*.js
+*.bat
+.env*

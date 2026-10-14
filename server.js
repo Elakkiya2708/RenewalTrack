@@ -7,6 +7,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const fs = require("fs");
 const { exec } = require("child_process");
 
 const config = require("./backend/config");
@@ -160,10 +161,30 @@ app.use("/api/webhooks", webhooksRoutes);
 
 // Serve static frontend files (HTML, CSS, JS, assets)
 app.use(express.static(ROOT));
+if (process.cwd() !== ROOT) {
+  app.use(express.static(process.cwd()));
+}
+
+// Explicit static handlers for core asset directories
+app.use("/css", express.static(path.join(ROOT, "css")));
+app.use("/js", express.static(path.join(ROOT, "js")));
+app.use("/assets", express.static(path.join(ROOT, "assets")));
 
 // Root route fallback to index.html
 app.get("/", (req, res) => {
   res.sendFile(path.join(ROOT, "index.html"));
+});
+
+// Explicit fallback for all HTML pages
+app.get("/:page.html", (req, res, next) => {
+  const filePath = path.join(ROOT, `${req.params.page}.html`);
+  const cwdPath = path.join(process.cwd(), `${req.params.page}.html`);
+  if (fs.existsSync(filePath)) {
+    return res.sendFile(filePath);
+  } else if (fs.existsSync(cwdPath)) {
+    return res.sendFile(cwdPath);
+  }
+  next();
 });
 
 // Start background cron scheduler

@@ -124,8 +124,13 @@ Render Web Services use ephemeral filesystems by default. RenewalTrack ensures *
 1. Sign in to [Vercel](https://vercel.com).
 2. Click **Add New...** &rarr; **Project**.
 3. Import your `RenewalTrack` GitHub repository.
-4. Leave **Framework Preset** as **Other** (static HTML/CSS/JS).
-5. In [`vercel.json`](./vercel.json), the `destination` URL is configured to your real Render backend:
+4. Verify **Build & Development Settings**:
+   - **Framework Preset**: Select **Other** (pure static HTML/CSS/JS).
+   - **Root Directory**: `./` (leave default root).
+   - **Build Command**: Leave empty / turned off.
+   - **Output Directory**: `.` (leave default empty, root folder).
+5. The project includes [`.vercelignore`](./.vercelignore) which excludes `server.js` and `backend/` from Vercel, allowing Vercel's global CDN to directly serve all static files (`css/`, `js/`, `assets/`, and `*.html`).
+6. In [`vercel.json`](./vercel.json), the `destination` URL is configured to proxy all `/api/*` calls to Render:
    ```json
    {
      "rewrites": [
@@ -136,9 +141,9 @@ Render Web Services use ephemeral filesystems by default. RenewalTrack ensures *
      ]
    }
    ```
-6. Click **Deploy**.
-7. Vercel will deploy your frontend in seconds (e.g. `https://renewal-track.vercel.app`).
-8. Direct cross-origin API calls are also pre-configured in [`js/config.js`](./js/config.js) to:
+7. Click **Deploy**.
+8. Vercel will deploy your static frontend in seconds: [`https://renewal-track.vercel.app`](https://renewal-track.vercel.app).
+9. Direct cross-origin API calls are also pre-configured in [`js/config.js`](./js/config.js) to:
    ```javascript
    window.RTS_CONFIG = {
      API_URL: "https://renewaltrack-tyvw.onrender.com",

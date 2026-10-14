@@ -2,7 +2,6 @@
   "name": "renewal-tracking-system",
   "version": "1.0.0",
   "description": "Renewal Tracking System frontend",
-  "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "build": "node -e \"console.log('Build completed for RenewalTrack.')\""
